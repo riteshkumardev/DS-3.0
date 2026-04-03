@@ -1,4 +1,4 @@
-import Employee from "../models/epmloyee.js"; // ✅ Fixed Typo (epmloyee -> employee)
+import Employee from "../models/Epmloyee.js"; // ✅ Fixed Typo (epmloyee -> employee)
 import ActivityLog from "../models/ActivityLog.js"; // ✅ Match Case
 import fs from "fs/promises"; 
 import path from "path";
