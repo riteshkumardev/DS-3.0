@@ -1,0 +1,40 @@
+/* 📅 Poore Calendar ke digits ko ek jaisa color dene ke liye */
+.react-calendar__month-view__days__day {
+  color: #1e293b !important; /* Dark Blue-Grey color sabhi digits ke liye */
+  font-weight: 500;
+  text-decoration: none !important;
+}
+
+/* 🌑 Pichle aur Agle mahine ke digits (Neighbor days) ko bhi same color dena */
+.react-calendar__month-view__days__day--neighboringMonth {
+  color: #1e293b !important; 
+  opacity: 0.4; /* Inhe thoda halka rakhenge taaki confusion na ho, par color wahi rahega */
+}
+
+/* 🟢 Present waale digits ka text color white (taaki green par dikhe) */
+.cal-present {
+  background-color: #22c55e !important; 
+  color: white !important; /* Green background par white text */
+  border-radius: 8px !important;
+}
+
+/* 🔴 Absent waale digits ka text color white */
+.cal-absent {
+  background-color: #ef4444 !important; 
+  color: white !important; /* Red background par white text */
+  border-radius: 8px !important;
+}
+
+/* 🔵 Aaj ki date (Today) ka highlight hataane ya badalne ke liye */
+.react-calendar__tile--now {
+  background: #f1f5f9 !important;
+  border: 1px solid #3b82f6 !important;
+  color: #3b82f6 !important;
+}
+
+/* 🖱️ Hover effect ko clean karne ke liye */
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus {
+  background-color: #e2e8f0 !important;
+  border-radius: 30px;
+}

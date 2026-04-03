@@ -1,0 +1,14 @@
+.billingDetails {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.billingDetails__label {
+    font-weight:700;
+}
+
+
+.label {
+    font-weight: 700;
+}

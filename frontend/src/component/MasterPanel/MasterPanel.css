@@ -1,0 +1,91 @@
+.master-panel-page {
+  background: #f4f7f6;
+  min-height: 100vh;
+
+  padding: 20px;
+}
+
+.master-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 40px;
+  border-radius: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  color: white;
+}
+
+.master-search-bar {
+  padding: 12px 25px;
+  border-radius: 50px;
+  border: none;
+  width: 350px;
+  font-size: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.master-main-layout {
+  display: flex;
+  gap: 25px;
+}
+
+.users-grid-section {
+  flex: 3;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.user-control-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+  transition: 0.3s;
+}
+
+.user-control-card.is-blocked { border: 2px solid #ef4444; background: #fff1f2; }
+
+.card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; position: relative; }
+
+.user-profile-img {
+  width: 50px; height: 50px; border-radius: 12px; background: #6366f1; color: white;
+  display: flex; align-items: center; justify-content: center; font-weight: bold; overflow: hidden;
+}
+.user-profile-img img { width: 100%; height: 100%; object-fit: cover; }
+
+.role-pill {
+  position: absolute; top: 0; right: 0; font-size: 10px; font-weight: 800;
+  padding: 3px 10px; border-radius: 20px; background: #f1f5f9; text-transform: uppercase;
+}
+.role-pill.admin { background: #dcfce7; color: #15803d; }
+
+.control-body select {
+  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin: 10px 0 20px 0;
+}
+
+.access-toggle-btn {
+  width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer;
+}
+.btn-disable { background: #fee2e2; color: #dc2626; }
+.btn-enable { background: #dcfce7; color: #16a34a; }
+
+.activity-logs-sidebar {
+  flex: 1; background: white; border-radius: 15px; padding: 20px; border: 1px solid #e2e8f0; height: fit-content;
+}
+
+.log-entry { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.log-entry p { margin: 5px 0; font-size: 13px; color: #475569; }
+.log-entry small { color: #94a3b8; font-size: 11px; }
+.admin-actions-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap; /* Mobile screen ke liye */
+}
+
+.backup-section-wrapper {
+  margin-right: 10px;
+}

@@ -1,0 +1,31 @@
+.supplier-container { padding: 20px; font-family: sans-serif;width: 80%; }
+.supplier-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.toggle-btn { padding: 10px 20px; background: #6f42c1; color: white; border: none; borderRadius: 5px; cursor: pointer; }
+
+.supplier-form { background: #f8f9fa; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+.form-grid input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+.save-btn { background: #28a745; color: white; border: none; padding: 10px 30px; border-radius: 4px; cursor: pointer; }
+
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 12px; border: 1px solid #eee; text-align: left; }
+th { background: #f4f4f4; }
+.total-cell { font-weight: bold; color: #d9534f; }
+.search-field {
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  width: 250px;
+  outline: none;
+  transition: 0.3s;
+}
+
+.search-field:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0,123,255,0.2);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}

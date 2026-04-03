@@ -1,0 +1,69 @@
+.form-group {
+    border: 1px solid #ccc;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+    border-radius: 10px;
+    margin: 10px;
+    overflow: hidden;
+}
+
+.form-group label {
+    padding: 10px;
+    font-size: 1.2em;
+}
+
+.form-group input {
+    padding: 10px;
+    /* font-size: 1.2em; */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin: 10px;
+
+}
+
+.title {
+    background-color: skyblue;
+    color: aliceblue;
+    font-size: 1.2em;
+    width: 100%;
+    padding: 10px;
+    text-align: start;
+    font-weight: 600;
+    /* margin: 10px; */
+}
+
+button {
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    margin: 10px;
+    font-size: 1em;
+    width: fit-content;
+    height: fit-content;
+}
+
+button:hover {
+    cursor: pointer;
+}
+
+.danger {
+    background-color: red;
+}
+
+.info {
+    background-color: rgb(1, 146, 203);
+}
+
+.success {
+    background-color: green;
+}
+
+.form-group select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin: 10px;
+}

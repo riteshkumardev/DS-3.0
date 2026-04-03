@@ -1,0 +1,99 @@
+/* --- SCREEN UI --- */
+.passbook-main-container { padding: 20px; background: #f8fafc; min-height: 100vh; }
+.title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.summary-cards { display: flex; gap: 10px; }
+.s-card { padding: 8px 15px; border-radius: 6px; font-weight: 800; color: white; font-size: 13px; text-align: center; min-width: 120px; }
+.s-card.in { background: #10b981; } .s-card.out { background: #ef4444; } 
+.s-card.bal.plus { background: #3b82f6; } .s-card.bal.minus { background: #f59e0b; }
+
+.passbook-form-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+.form-grid { display: flex; gap: 15px; }
+.f-group { flex: 1; display: flex; flex-direction: column; }
+.f-group label { font-size: 11px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+.f-group input, .f-group select { padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-weight: 600; outline: none; }
+.save-btn { background: #1e293b; color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: bold; cursor: pointer; height: 44px; margin-top: auto; }
+
+.statement-bar { margin: 20px 0; display: flex; gap: 10px; background: #fff; padding: 15px; border-radius: 10px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.statement-bar button { padding: 8px 15px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+.filter-btn { background: #4f46e5; color: white; }
+.print-btn { background: #000; color: white; }
+
+/* Table Style */
+.passbook-table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
+.passbook-table th { background: #1e293b; color: white; padding: 12px; text-align: left; font-size: 13px; border: 1px solid #334155; }
+.passbook-table td { padding: 10px 15px; border: 1px solid #f1f5f9; font-size: 13px; }
+.text-green { color: #059669; font-weight: bold; } .text-red { color: #dc2626; font-weight: bold; }
+.text-blue { color: #2563eb; } .text-orange { color: #ea580c; }
+.bold { font-weight: bold; } .nowrap { white-space: nowrap; }
+.small-text { font-size: 12px; color: #64748b; font-style: italic; }
+.txn-id { font-size: 10px; color: #94a3b8; }
+
+/* 🖨️ THE PRINT ENGINE FIX */
+.print-area { display: none; } /* Hide on screen */
+
+@media print {
+    /* 1. Reset the entire page viewport */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        
+    }
+
+    /* 2. Hide Dashboard UI completely */
+    .no-print, .passbook-header, .passbook-form-card, .statement-bar, .loader-container, #sidebar, .navbar {
+        display: none !important;
+        /* height: 0 !important; */
+    }
+
+    /* 3. Force the printable area to take over the page */
+    .passbook-main-container {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .print-area {
+        display: block !important;
+        visibility: visible !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+    }
+
+    /* 4. Formatting for Black & White PDF */
+    .print-header {
+        display: block !important;
+        text-align: center;
+        border-bottom: 2px solid #000;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+    }
+    .print-header h1 { font-size: 26px; margin: 0; color: black; }
+    .header-details { display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; }
+
+    .passbook-table {
+        border: 2px solid black !important;
+    }
+    .passbook-table th {
+        background: #f0f0f0 !important;
+        color: black !important;
+        border: 2px solid black !important;
+    }
+    .passbook-table td {
+        border: 1px solid black !important;
+        color: black !important;
+        padding: 8px !important;
+    }
+
+    .print-footer {
+        display: flex !important;
+        justify-content: space-between;
+        margin-top: 40px;
+        page-break-inside: avoid;
+    }
+    .signature { text-align: center; width: 200px; }
+    .signature .line { border-top: 2px solid black; margin-bottom: 5px; }
+}

@@ -1,0 +1,156 @@
+/* 🔹 Sidebar Overlay (Background Blur) */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+
+  /* Initially hidden */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+/* Active overlay */
+.sidebar-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 🔹 Sidebar Container */
+.sidebar-content {
+  width: 300px;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(106, 17, 203, 0.85) 0%,
+    rgba(37, 117, 252, 0.85) 50%,
+    rgba(16, 185, 129, 0.85) 100%
+  );
+  color: white;
+  padding: 25px;
+  box-shadow: 10px 0 20px rgba(0, 0, 0, 0.3);
+
+  display: flex;
+  flex-direction: column;
+
+  /* 👇 Slide logic (kam movement) */
+  transform: translateX(-40px);
+  opacity: 0;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+/* Sidebar slide in */
+.sidebar-overlay.active .sidebar-content {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* 🔹 Header */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+/* Close Button */
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.close-btn:hover {
+  color: #ff4d4d;
+  transform: rotate(90deg) scale(1.1);
+}
+
+/* 🔹 Sidebar Trigger (Navbar Button) */
+.sidebar-trigger {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 8px 15px;
+  border-radius: 8px;
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.sidebar-trigger:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+.sidebar-list {
+  list-style: none;
+  padding: 8px 0 0 10px; /* Thoda gap side se */
+  margin: 0;
+}
+
+/* 🔹 Individual List Item (The Modern Look) */
+.sidebar-list li {
+  padding: 10px 15px;
+  margin: 6px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  background: rgba(0, 0, 0, 0.1); /* Subtle dark background */
+}
+
+/* Link ke aage ka arrow icon logic */
+.sidebar-list li::before {
+  content: '→';
+  margin-right: 10px;
+  font-weight: bold;
+  opacity: 0.6;
+  transition: 0.3s;
+}
+
+/* 🔹 Hover & Active Effect */
+.sidebar-list li:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding-left: 20px; /* Smooth slide effect */
+  box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1), 
+              4px 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-list li:hover::before {
+  opacity: 1;
+  color: #4ade80; /* Agro Green color for arrow on hover */
+}
+
+/* Active item (optional) agar aap track karna chahen */
+.sidebar-list li:active {
+  transform: scale(0.97); /* 3D Click effect */
+}
+/* DashboardSidebar.css */
+@media (max-width: 768px) {
+  .dashboard-sidebar {
+    position: fixed;
+    left: -100%; /* Default hidden */
+    top: 0;
+    width: 280px;
+    height: 100vh;
+    z-index: 10000;
+    transition: 0.4s;
+    background: linear-gradient(135deg, #6a11cb, #2575fc); /* Screenshot theme */
+  }
+
+  /* Jab sidebar open ho */
+  .dashboard-sidebar.active {
+    left: 0;
+  }
+}

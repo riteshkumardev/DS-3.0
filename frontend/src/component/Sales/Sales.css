@@ -1,0 +1,354 @@
+/* Container ko poori screen me fit karne ke liye */
+.sales-container {
+  width: 98%;
+  margin: 10px auto; /* Margin kam ki */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Form ko upar se start karega */
+}
+
+.sales-card-wide {
+  background: #ffffff;
+  width: 100%;
+  max-width: 1300px; /* Width thodi aur badhayi */
+  padding: 20px 30px; /* Padding kam ki vertical space bachane ke liye */
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.form-title {
+  font-size: 22px; /* Title size chota kiya */
+  color: #134e4a;
+  margin-bottom: 15px; /* Bottom margin kam ki */
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 5px;
+}
+
+/* 4 Column Grid Layout (More Compact) */
+.sales-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 20px; /* Vertical gap (12px) kam kar di */
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Label aur Input ka gap kam kiya */
+}
+
+.input-group label {
+  font-weight: 600;
+  font-size: 13px; /* Label font chota kiya */
+  color: #4b5563;
+}
+
+.input-group input {
+  padding: 8px 12px; /* Input ki height kam ki */
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #f9fafb;
+}
+
+/* Remarks ko span 2 hi rakhein par height kam karein */
+.input-group.span-2 {
+  grid-column: span 2;
+}
+
+/* Financial Fields (Readonly) */
+.readonly-input {
+  background: #f1f5f9 !important;
+  font-weight: bold;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* Button Container Compact */
+.button-container-full {
+  grid-column: span 4;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.btn-reset-3d, .btn-submit-3d {
+  padding: 8px 24px; /* Button height kam ki */
+  font-size: 14px;
+}
+/* 🟢 Modern Green Save Button */
+.btn-submit-colored {
+  background: linear-gradient(135deg, #4405e2 0%, #790ff2 100%);
+  color: white;
+  padding: 12px 35px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-submit-colored:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  filter: brightness(1.1);
+}
+
+.btn-submit-colored:active {
+  transform: translateY(0);
+}
+
+/* Reset Button Style */
+.btn-reset-3d {
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 12px 25px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-reset-3d:hover {
+  background: #e5e7eb;
+}
+
+
+
+
+/* saletable */
+
+/* 🌍 Main Container Layout */
+.table-container-wide {
+  width: 98%;
+  margin: 15px auto;
+  /* height: calc(80vh); */
+  display: flex;
+  justify-content: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.table-card-wide {
+  background: #ffffff;
+  width: 100%;
+  max-width: 1400px;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* 🛠️ Header Logic (Title + Controls Side-by-Side) */
+.table-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.table-title {
+  font-size: 22px;
+  color: #134e4a; /* Dark Agro Green */
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+/* 🎛️ 3D Controls Row */
+.table-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+}
+
+/* 📥 3D Styled Professional Select & Search Box */
+.table-select-custom, .table-search-input {
+  appearance: none;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-bottom: 4px solid #cbd5e1; /* 3D Depth */
+  border-radius: 10px;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  transition: all 0.1s ease;
+  outline: none;
+}
+
+/* Dropdown Arrow for Select */
+.table-select-custom {
+  min-width: 180px;
+  padding: 0 35px 0 15px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+/* Search Input Specifics */
+.table-search-input {
+  width: 250px;
+  padding: 0 15px;
+  cursor: text;
+}
+
+/* 3D Interaction: Hover & Click */
+.table-select-custom:hover, .table-search-input:hover {
+  transform: translateY(-1px);
+  border-bottom-width: 5px;
+}
+
+.table-select-custom:focus, .table-search-input:focus {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  border-color: #10b981; /* Focus Green */
+  background-color: #fff;
+}
+
+/* 📊 Modern Table Core Styling */
+.table-responsive-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.modern-sales-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.modern-sales-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 12px;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: left;
+}
+
+.modern-sales-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.modern-sales-table tr:hover {
+  background-color: #f0fdf4; /* Agro Green Hover */
+}
+
+/* 🎨 Badges & Text Colors */
+.bill-tag {
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.cust-name-cell { font-weight: 600; }
+.bold-cell { font-weight: 800; color: #1e293b; }
+.success-text { color: #16a34a; font-weight: 700; }
+.danger-text { color: #dc2626; font-weight: 700; }
+
+/* 🔢 3D Pagination Styling */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.pg-btn {
+  padding: 10px 22px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #d1d5db;
+  border-bottom: 4px solid #cbd5e1;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.pg-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.pg-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+.pg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-bottom-width: 1px;
+}
+
+.pg-info {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* ⚙️ Action & Edit Buttons */
+.active-edit {
+  background-color: #f0fdfa !important;
+}
+
+.edit-input-field {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  outline: none;
+}
+
+.save-btn-ui, .cancel-btn-ui {
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.save-btn-ui { background: #10b981; color: white; margin-right: 5px; }
+.cancel-btn-ui { background: #ef4444; color: white; }
+
+/* 📱 Responsive */
+@media (max-width: 768px) {
+  .table-header-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .table-controls-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .table-select-custom, .table-search-input {
+    width: 100%;
+  }
+}

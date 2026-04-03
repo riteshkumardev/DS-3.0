@@ -1,0 +1,133 @@
+/* =========================
+   PAGE LAYOUT
+========================= */
+
+.eway-form-page {
+  width: 100%;
+  padding: 24px 32px;
+  background: #f4f6f8;
+  box-sizing: border-box;
+}
+
+/* =========================
+   FORM CONTAINER
+========================= */
+
+.eway-form-card {
+  width: 100%;
+  max-width: 1400px;      /* 🔥 KEY FIX */
+  margin: 0 auto;         /* center but full width feel */
+  background: #ffffff;
+  padding: 28px 32px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+
+/* Title */
+.eway-form-card h2 {
+  margin-bottom: 24px;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Section title */
+.eway-form-card h3 {
+  margin: 30px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* =========================
+   GRID SYSTEM (3 per row)
+========================= */
+
+.eway-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  width: 100%;
+}
+
+/* Inputs */
+.eway-form-grid input {
+  width: 100%;
+  padding: 13px 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #cfd4dc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.eway-form-grid input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Read-only */
+.eway-form-grid input[readonly] {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   ACTION BAR
+========================= */
+
+.eway-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 32px;
+}
+
+.eway-action-bar button {
+  padding: 12px 28px;
+  font-size: 15px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  color: white;
+  font-weight: 600;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1200px) {
+  .eway-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .eway-form-page {
+    padding: 16px;
+  }
+
+  .eway-form-card {
+    padding: 20px;
+  }
+
+  .eway-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   PRINT
+========================= */
+
+@media print {
+  .eway-form-page,
+  .eway-form-card {
+    display: none !important;
+  }
+}

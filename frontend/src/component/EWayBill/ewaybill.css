@@ -1,0 +1,222 @@
+/* =========================
+   SCREEN VIEW (UI)
+========================= */
+
+body {
+  background: #f4f6f8;
+}
+
+.eway-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 30px 0;
+}
+
+.eway-container {
+  width: 210mm;              /* A4 width */
+  background: #fff;
+  padding: 15mm;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+/* =========================
+   TOP BAR
+========================= */
+
+.eway-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* Print button */
+.no-print {
+  text-align: center;
+  width: 80%;
+}
+
+/* QR normal screen view */
+/* .qr-box {
+  top: 10mm;
+  margin-left: auto;
+  text-align: right;
+} */
+
+/* =========================
+   TEXT / TITLES
+========================= */
+
+.eway-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 16px;
+  margin: 6px 0;
+}
+
+.eway-meta {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.hr-line {
+  border-top: 2px solid #000;
+  margin: 6px 0 10px;
+}
+
+/* =========================
+   TABLE STYLES
+========================= */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+th,
+td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+th {
+  background: #f2f2f2;
+  font-weight: bold;
+  text-align: center;
+}
+
+.section-title {
+  font-weight: bold;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.eway-footer {
+  text-align: center;
+  margin-top: 12px;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* =========================
+   PRINT VIEW (PDF / PAPER)
+========================= */
+
+@media print {
+  body {
+    margin: 0;
+    background: #fff;
+  }
+
+  /* Hide UI elements */
+  .no-print,
+  header,
+  nav,
+  .navbar,
+  .topbar {
+    display: none !important;
+  }
+
+  .eway-wrapper {
+    padding: 0;
+    background: #fff;
+  }
+
+  .eway-container {
+    box-shadow: none;
+    padding: 10mm;
+    width: 210mm;
+    min-height: 297mm;
+    box-sizing: border-box;
+    page-break-inside: avoid;
+  }
+
+  /* ✅ QR FIX – ALWAYS TOP RIGHT */
+  .qr-box {
+    position: absolute;
+    top: -15mm;     /* ✅ positive value */
+    right: 10mm;
+    text-align: right;
+  }
+
+  /* Avoid unwanted page breaks */
+  table,
+  tr,
+  td,
+  th {
+    page-break-inside: avoid;
+  }
+}
+
+/* Force new page when needed */
+.page-break {
+  page-break-before: always;
+}
+/* ===== WATERMARK ===== */
+.eway-container {
+  position: relative;
+}
+
+.eway-container::before {
+  content: "DHARA SHAKTI";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-size: 80px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.06); /* 👈 light watermark */
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Make sure content stays above watermark */
+.eway-container > * {
+  position: relative;
+  z-index: 1;
+}
+/* --- Print Specific Fixes --- */
+@media print {
+  /* Browser ki default margins hatane ke liye */
+  @page {
+    size: A4;
+    margin: 0mm !important; 
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Invoice wrapper ko poora page cover karne ke liye */
+  .invoice-wrapper {
+    width: 210mm !important; /* A4 standard width */
+    height: 297mm !important; /* A4 standard height */
+    margin: 0 !important;
+    padding: 1mm !important; /* Content ke liye thoda sa padding */
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Screen par dekhne ke liye wrapper */
+.invoice-wrapper {
+  width: 210mm;
+  min-height: 290mm;
+  margin: 20px auto;
+  padding: 10mm;
+  background: #fff;
+  box-sizing: border-box;
+}

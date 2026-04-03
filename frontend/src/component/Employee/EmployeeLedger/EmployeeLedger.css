@@ -1,0 +1,204 @@
+/* 🏦 Main Ledger Dashboard */
+.ledger-main-wrapper {
+  display: flex;
+  gap: 20px;
+  height: calc(90vh - 120px);
+  padding: 15px;
+  background: #f8fafc; /* Professional light background */
+}
+
+/* 👥 Staff Selection Panel (Left) */
+.ledger-staff-list {
+  flex: 0.7;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-card-item {
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.staff-card-item:hover { background: #f1f5f9; transform: translateX(5px); }
+.staff-card-item.active-ledger {
+  background: #eff6ff;
+  border-left: 5px solid #4d47f3;
+}
+
+/* 📄 Detailed Ledger View (Right) */
+.ledger-detail-view {
+  flex: 2.3;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow-y: auto;
+}
+
+/* 💰 PRO PAYROLL GRID (Earnings vs Deductions) */
+.pro-payroll-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 20px;
+}
+
+.pro-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+.card-header-text {
+  font-size: 15px;
+  color: #1e293b;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 8px;
+  font-weight: 800;
+}
+
+/* Row Styling */
+.pay-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.pay-row span { color: #64748b; font-weight: 500; }
+.text-green { color: #10b981 !important; }
+.text-red { color: #ef4444 !important; }
+
+/* 🛠️ Input Fields in Card */
+.pay-input-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.pro-input-field label {
+  display: block;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.pro-input-field input {
+  width: 100%;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 700;
+  color: #1e293b;
+  outline: none;
+}
+
+.pro-input-field input:focus { border-color: #4d47f3; box-shadow: 0 0 0 2px rgba(77, 71, 243, 0.1); }
+
+/* 🟦 NET PAYABLE BOX (Premium Look) */
+.net-payable-box {
+  margin-top: 20px;
+  background: #1e293b; /* Corporate Dark Blue */
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 10px 15px -3px rgba(30, 41, 59, 0.3);
+}
+
+.net-label { font-size: 12px; letter-spacing: 2px; opacity: 0.8; margin-bottom: 5px; }
+.net-amount { font-size: 32px; font-weight: 900; color: #38bdf8; }
+
+/* 🚀 Quick Action Payment Bar */
+.pro-action-bar {
+  display: flex;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  border: 2px dashed #cbd5e1;
+  gap: 15px;
+  align-items: center;
+}
+
+.pro-action-bar input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+.pro-action-bar button {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.pro-action-bar button:hover { background: #059669; }
+
+/* Attendance Bar Customization */
+.attendance-summary-bar {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 12px 20px;
+  display: flex;
+  gap: 30px;
+}
+
+.summary-item b { font-size: 20px; }
+.yellow b { color: #f59e0b; }
+/* 🖥️ Screen par Payslip ko normal dikhao (Overlay ya Dashboard ke niche) */
+#printablePayslip {
+  background: white;
+  padding: 20px;
+  border: 1px solid #ddd;
+  margin-top: 20px;
+}
+
+/* 🖨️ PRINT LOGIC - Sabse Zaroori */
+@media print {
+  /* 1. Pure body ko hide karo */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* 2. Sirf printable area ko block karke dikhao */
+  #printablePayslip, 
+  #printablePayslip * {
+    visibility: visible !important;
+  }
+
+  /* 3. Payslip ko page ke top par fixed karo */
+  #printablePayslip {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    border: none !important;
+    padding: 10mm !important; /* Margins for printer */
+  }
+
+  /* 4. Extra header/footer (No Print) wali cheezein hatao */
+  .no-print, .print-trigger-box {
+    display: none !important;
+  }
+}

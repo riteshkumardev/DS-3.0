@@ -1,0 +1,86 @@
+/* 🖥️ SCREEN SETTINGS: Card ko dashboard par dikhane ke liye */
+.id-card-visualizer {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+}
+
+.id-card {
+  width: 210px;
+  height: 330px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #e2e8f0;
+}
+
+/* Header & Photo Styling */
+.card-header { background: linear-gradient(135deg, #1e293b, #0f172a); padding: 15px 10px; text-align: center; color: white; }
+.company-logo-text { font-weight: 900; font-size: 14px; letter-spacing: 1px; }
+.agro-text { font-size: 10px; opacity: 0.8; }
+.photo-container { width: 100px; height: 100px; margin: 15px auto; border: 3px solid #4d47f3; border-radius: 50%; overflow: hidden; background: #f8fafc; }
+.photo-container img { width: 100%; height: 100%; object-fit: cover; }
+.emp-details { text-align: center; padding: 0 10px; }
+.emp-name { font-size: 17px; margin: 0; color: #1e293b; text-transform: uppercase; font-weight: 800; }
+.emp-role { font-size: 12px; color: #64748b; margin-top: 5px; font-weight: 600; }
+.id-pill { display: inline-block; background: #4d47f3; color: white; padding: 4px 15px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 10px; }
+.card-footer-strip { position: absolute; bottom: 0; width: 100%; background: #4d47f3; color: white; font-size: 10px; text-align: center; padding: 5px 0; font-weight: bold; }
+.card-footer-strip.dark { background: #1e293b; }
+
+/* Back Styling */
+.back-content { padding: 15px; font-size: 11px; }
+.back-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 3px; }
+.red-text { color: #dc2626; font-weight: bold; }
+.address-section { margin-top: 10px; text-align: center; line-height: 1.3; font-size: 10px; }
+.qr-container-id { text-align: center; margin-top: 10px; }
+.scan-text { font-size: 8px; margin-top: 3px; color: #64748b; }
+
+/* 🖨️ PRINT LOGIC: Sabse zaroori fix */
+@media print {
+  /* 1. Dashboard ki saari chizein gayab kar do */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* 2. Sirf printable area ko force karke dikhao */
+  #printableIDCard, 
+  #printableIDCard * {
+    visibility: visible !important;
+  }
+
+  /* 3. Card ko page par fit karo taaki blank page na aaye */
+  #printableIDCard {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 15mm !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    padding: 10mm !important;
+    border: none !important;
+  }
+
+  .no-print, .print-btn-wrapper {
+    display: none !important;
+  }
+}
+@media print {
+  body {
+    visibility: hidden;
+  }
+  #bill-container { /* Aapka bill ka main div */
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

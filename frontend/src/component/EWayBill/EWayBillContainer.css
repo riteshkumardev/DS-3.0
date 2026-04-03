@@ -1,0 +1,46 @@
+@media print {
+  /* 1. Page size setup: Mobile browsers ko batana padta hai ki ye A4 ya Letter hai */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  /* 2. Body fix: Mobile par 'fixed' ya 'flex' layout printing mein problem karta hai */
+  body {
+    visibility: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important; /* Colors and images fix */
+    print-color-adjust: exact !important;
+  }
+
+  /* 3. Main Container fix: Mobile browsers auto-height handle nahi karte */
+  #printableInvoice {
+    visibility: visible !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important; /* Mobile ke liye 100% width behtar hai */
+    max-width: 210mm; /* A4 width limit */
+    margin: 0 !important;
+    padding: 10px !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* 4. Parent stacking fix: Sabhi parents ko reset karein */
+  html, body, #root, div {
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Sabhi nested elements ko visible karein */
+  #printableInvoice * {
+    visibility: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

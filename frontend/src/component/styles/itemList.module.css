@@ -1,0 +1,40 @@
+.table__header {
+    background-color: rgb(184, 183, 183);
+    border: 2px solid black;
+}
+
+.table,th,td {
+    border: 2px solid black;
+}
+.table {
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    box-sizing: border-box;
+    margin: 10px 0px;
+    width:100%;
+}
+
+.totals {
+    background-color: rgb(184, 183, 183);
+    font-weight: 700;
+    text-align:center;
+}
+
+tfoot > tr > td {
+    font-weight: 700;
+    text-align: left;
+}
+
+.words {
+    display: block;
+}
+
+.sign {
+    text-align: end;
+}
+
+.sign > span {
+    font-weight: 700;
+    display: block;
+}
+

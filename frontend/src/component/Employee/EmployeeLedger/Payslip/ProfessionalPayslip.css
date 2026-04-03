@@ -1,0 +1,62 @@
+@media print {
+  .only-print { display: block !important; }
+  .no-print { display: none !important; }
+}
+
+.payslip-wrapper {
+  padding: 40px;
+  background: white;
+  font-family: 'Segoe UI', sans-serif;
+  border: 1px solid #eee;
+}
+
+.payslip-header-modern {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 3px solid #1e293b;
+  padding-bottom: 20px;
+}
+
+.qr-box { text-align: center; font-size: 10px; color: #666; }
+
+.payslip-staff-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 20px 0;
+  gap: 30px;
+  font-size: 14px;
+}
+
+.payslip-table-modern {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.payslip-table-modern th {
+  background: #f1f5f9;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.payslip-table-modern td {
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.net-pay-section {
+  background: #1e293b;
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 50px;
+}
+
+.sig-line { border-top: 1px solid #000; width: 150px; margin-bottom: 5px; }

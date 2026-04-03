@@ -1,0 +1,289 @@
+/* Backdrop */
+.alert-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Alert Box */
+.alert-box {
+  width: 360px;
+  padding: 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  color: #fff;
+  animation: scaleIn 0.35s ease;
+}
+
+/* Icon */
+.alert-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+/* Text */
+.alert-box h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.alert-box p {
+  margin: 12px 0 22px;
+  font-size: 15px;
+  opacity: 0.85;
+}
+
+/* Buttons */
+.alert-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+/* Cancel */
+.btn.cancel {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* OK */
+.btn.ok {
+  background: linear-gradient(135deg, #ff0055, #ff7a00);
+  color: #fff;
+}
+
+.btn.ok:hover {
+  transform: scale(1.05);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+/* ///////////////////////////////////////over due//////////////////////////////////////////// */
+/* Main Wrapper */
+.overdue-3d-wrapper {
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Side by Side Flex Container */
+.overdue-flex-container {
+  display: flex;
+  flex-direction: row; /* Horizontal layout */
+  gap: 30px;           /* Gap between left and right */
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;     /* Mobile par niche lane ke liye */
+}
+
+/* Individual Side Box */
+.flex-item {
+  flex: 1;             /* Dono boxes barabar jagah lenge */
+  min-width: 400px;    /* Mobile par stack hone se pehle isse chota nahi hoga */
+  max-width: 600px;    /* Bahut zyada stretch na ho Dashboard par */
+  background: #f0f2f5;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 10px 10px 20px #bebebe, -10px -10px 20px #ffffff;
+}
+
+/* Card Style (3D Depth) */
+.card-3d {
+  background: #f8fafc;
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 5px 5px 10px #d1d9e6, -5px -5px 10px #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.scroll-area-3d {
+  max-height: 350px; /* Thoda lamba kiya side layout ke liye */
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+/* Responsive: Mobile Layout */
+@media (max-width: 900px) {
+  .overdue-flex-container {
+    flex-direction: column; /* Mobile par uper-niche ho jayega */
+    align-items: center;
+  }
+  .flex-item {
+    width: 100%;
+    min-width: 100%;
+  }
+}
+
+/* Baaki color aur button styles pehle wali hi use karein */
+.name { font-weight: bold; color: #2d3748; margin: 0; font-size: 0.9rem; }
+.amt-3d { font-weight: 800; font-size: 1rem; margin: 3px 0; }
+.red-text { color: #e53e3e; }
+.orange-text { color: #dd6b20; }
+.sub { font-size: 0.7rem; color: #718096; margin: 0; }
+.whatsapp-icon-btn {
+  background: #e6fffa !important; /* Light Green */
+  color: #25D366 !important;     /* WhatsApp Green */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px !important;
+  border-radius: 50% !important; /* Circle Button */
+  width: 38px;
+  height: 38px;
+  box-shadow: 4px 4px 8px #d1d9e6, -4px -4px 8px #ffffff !important;
+  transition: all 0.3s ease;
+  border: none;
+  text-decoration: none;
+}
+
+.whatsapp-icon-btn:hover {
+  background: #25D366 !important;
+  color: white !important;
+  transform: scale(1.1);
+  box-shadow: 2px 2px 5px #b8c2d1, -2px -2px 5px #ffffff !important;
+}
+
+.actions-3d {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Scrollbar adjustment for professional look */
+.scroll-area-3d::-webkit-scrollbar {
+  width: 5px;
+}
+.scroll-area-3d::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 10px;
+}
+.card-3d-grouped {
+  background: #f8fafc;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 8px #d1d9e6, -4px -4px 8px #ffffff;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.main-info {
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.bill-dropdown-3d {
+  background: #f1f5f9;
+  padding: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.inner-bill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border-bottom: 1px dashed #0b71df;
+}
+
+.btn-mini-3d {
+  background: #1b1fee;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  width: 30%;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+/* /////////////////////////////////Financial Summary/////////////////////////////////////////// */
+.financial-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 25px;
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.summary-card-3d {
+  background: #f0f2f5;
+  border-radius: 20px;
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 8px 8px 16px #d1d9e6, -8px -8px 16px #ffffff;
+  border: 1px solid rgba(255,255,255,0.4);
+  transition: transform 0.3s;
+}
+
+.summary-card-3d:hover {
+  transform: translateY(-5px);
+}
+
+.summary-icon {
+  font-size: 2.5rem;
+  background: #fff;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+}
+
+.summary-info p { margin: 0; color: #666; font-size: 0.9rem; font-weight: 600; }
+.summary-info h3 { margin: 5px 0; font-size: 0.9rem; color: #2d3748; font-weight: 800; }
+.summary-info small { color: #a0aec0; font-size: 0.75rem; }
+
+.receive { border-left: 6px solid #e53e3e; }
+.pay { border-left: 6px solid #dd6b20; }
+.net { border-left: 6px solid #3182ce; }

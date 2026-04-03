@@ -1,0 +1,159 @@
+:root {
+  --bg-color: #e0e5ec;
+  --neo-shadow-dark: #bec3c9;
+  --neo-shadow-light: #ffffff;
+  --accent-blue: #4466f2;
+}
+
+.bot-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--bg-color);
+  padding: 20px;
+  font-family: 'Inter', sans-serif;
+}
+
+.bot-3d-card {
+  width: 100%;
+  max-width: 600px;
+  background: var(--bg-color);
+  padding: 40px;
+  border-radius: 40px;
+  box-shadow: 20px 20px 60px var(--neo-shadow-dark), -20px -20px 60px var(--neo-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.bot-title {
+  font-size: 24px;
+  font-weight: 900;
+  text-align: center;
+  color: #313131;
+  margin-bottom: 30px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.version-tag {
+  font-size: 10px;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 10px;
+  box-shadow: inset 2px 2px 5px var(--neo-shadow-dark);
+  color: var(--accent-blue);
+  vertical-align: middle;
+}
+
+.bot-section-3d {
+  margin-bottom: 30px;
+}
+
+.section-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: #666;
+  margin-bottom: 12px;
+  padding-left: 10px;
+}
+
+.neo-input-wrapper {
+  background: var(--bg-color);
+  padding: 15px;
+  border-radius: 20px;
+  box-shadow: inset 6px 6px 12px var(--neo-shadow-dark), inset -6px -6px 12px var(--neo-shadow-light);
+}
+
+/* Neumorphic Grid Cards */
+.neo-grid {
+  display: grid;
+  grid-template-cols: 1fr 1fr;
+  gap: 15px;
+}
+
+.neo-checkbox-card {
+  padding: 15px;
+  border-radius: 15px;
+  background: var(--bg-color);
+  box-shadow: 6px 6px 12px var(--neo-shadow-dark), -6px -6px 12px var(--neo-shadow-light);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.neo-checkbox-card.active {
+  box-shadow: inset 4px 4px 8px var(--neo-shadow-dark), inset -4px -4px 8px var(--neo-shadow-light);
+  border-color: var(--accent-blue);
+}
+
+.neo-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #444;
+}
+
+.neo-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent-blue);
+  font-weight: 900;
+}
+
+/* 3D Button */
+.bot-3d-btn {
+  width: 100%;
+  margin-top: 25px;
+  padding: 20px;
+  border-radius: 20px;
+  border: none;
+  background: var(--accent-blue);
+  color: white;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow: 10px 10px 20px var(--neo-shadow-dark), -10px -10px 20px var(--neo-shadow-light);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.bot-3d-btn:active {
+  transform: scale(0.96);
+  box-shadow: inset 5px 5px 10px rgba(0,0,0,0.2);
+}
+
+/* Matrix Logs View */
+.bot-logs-container {
+  margin-top: 30px;
+  background: #1a1a1a;
+  border-radius: 25px;
+  padding: 20px;
+  box-shadow: 10px 10px 30px var(--neo-shadow-dark);
+}
+
+.logs-header {
+  font-family: monospace;
+  color: #444;
+  font-size: 10px;
+  margin-bottom: 10px;
+}
+
+.logs-screen {
+  height: 150px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: #00ff41; /* Matrix Green */
+}
+
+/* Animations */
+@keyframes fadeInLog {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-log {
+  animation: fadeInLog 0.3s ease-out forwards;
+}

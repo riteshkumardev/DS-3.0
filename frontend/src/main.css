@@ -1,0 +1,513 @@
+/* 🔹 Professional Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+:root {
+  --primary: #6a11cb;
+  --secondary: #2575fc;
+  --glass: rgba(255, 255, 255, 0.9);
+}
+
+body {
+  overflow-x: hidden;
+  background: #f3f4f6;
+}
+
+/* 🔹 Smooth RGB Background Animation */
+@keyframes rgbMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Form upar se start ho scrollable banane ke liye */
+  padding: 40px 20px;
+  /* background: linear-gradient(270deg, #3bac72, #2b64ff, #8000ff, #3060e3); */
+  background-size: 400% 400%;
+  animation: rgbMove 15s ease infinite;
+}
+
+/* 🔹 Navbar Styling (Pro Look) */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5%;
+  height: 70px;
+background: linear-gradient(
+    135deg, 
+    rgba(106, 17, 203, 0.8) 0%,   /* Aapka Purple */
+    rgba(37, 117, 252, 0.8) 50%,  /* Royal Blue */
+    rgba(16, 185, 129, 0.8) 100%  /* Agro Green */
+  );
+
+  /* 🔹 Glass Effect & 3D Border */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.1); /* 3D highlight */
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.nav-left .logo {
+  margin-top: 5%;
+  height: 170px;
+  width: auto;
+  transition: transform 0.3s ease;
+}
+
+.nav-left .logo:hover {
+  transform: scale(1.05);
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+  list-style: none;
+}
+
+.nav-links li a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 15px;
+  transition: all 0.3s;
+  padding: 8px 12px;
+  border-radius: 5px;
+}
+
+.nav-links li a:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 🔐 Login Card (Pro Look) */
+.login-box {
+  background: var(--glass);
+  width: 100%;
+  max-width: 380px;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-box h2 {
+  text-align: center;
+  color: #1a202c;
+  font-size: 28px;
+  margin-bottom: 30px;
+  font-weight: 800;
+}
+
+.login-box input {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s;
+}
+
+.login-box input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(106, 17, 203, 0.1);
+}
+
+.login-box button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.login-box button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(106, 17, 203, 0.3);
+}
+
+/* 🔹 Mobile Menu */
+@media (max-width: 768px) {
+  .menu-btn { display: block; color: white; font-size: 28px; cursor: pointer; }
+  .nav-links {
+    position: fixed;
+    top: 70px;
+    right: -100%;
+    width: 250px;
+    height: calc(100vh - 70px);
+    background: #1a202c;
+    flex-direction: column;
+    padding: 40px;
+    transition: 0.4s;
+  }
+  .nav-links.show { right: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* //////////////////////////////////Home/////////////////////////////// */
+/* 🔹 Home Container */
+.home-container {
+  width: 100%;
+}
+
+/* 🔹 Hero Section with Image/Gradient */
+.hero-section {
+  height: 80vh;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+              url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: white;
+  padding: 0 20px;
+}
+
+.hero-content h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+
+.highlight {
+  color: #4ade80; /* Light Green */
+}
+
+.hero-content p {
+  font-size: 1.2rem;
+  max-width: 700px;
+  margin: 0 auto 30px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+/* 🔹 Buttons */
+.hero-btns {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.btn-primary {
+  padding: 12px 30px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-primary:hover {
+  background: #059669;
+  transform: translateY(-3px);
+}
+
+.btn-secondary {
+  padding: 12px 30px;
+  background: transparent;
+  color: white;
+  border: 2px solid white;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-secondary:hover {
+  background: white;
+  color: #10b981;
+}
+
+/* 🔹 Features Cards */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+  padding: 80px 10%;
+  background: #f9fafb;
+}
+
+.feature-card {
+  background: white;
+  padding: 40px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  transition: 0.3s;
+  border-bottom: 4px solid #10b981;
+}
+
+.feature-card:hover {
+  transform: translateY(-10px);
+}
+
+.feature-card h3 {
+  margin-bottom: 15px;
+  color: #1f2937;
+}
+
+.about-preview {
+  padding: 80px 10%;
+  text-align: center;
+}
+
+.green-text {
+  color: #059669;
+}
+
+/* 🔹 Responsive Mobile */
+@media (max-width: 768px) {
+  .hero-content h1 { font-size: 2.5rem; }
+  .hero-btns { flex-direction: column; }
+}
+/* 🔹 Login/Logout Buttons 3D Style */
+.nav-btn {
+  padding: 8px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 0px rgba(0, 0, 0, 0.2); /* 3D Depth */
+}
+
+.nav-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+.login {
+  background: linear-gradient(135deg, #4ade80, #22c55e); /* Greenish 3D */
+  color: white;
+}
+
+.logout {
+  background: linear-gradient(135deg, #f87171, #ef4444); /* Redish 3D */
+  color: white;
+}
+
+.nav-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* 🔹 Desktop/Mobile Visibility Utility */
+.desktop-only {
+  display: flex;
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-only { display: none; }
+  .mobile-only { display: block; width: 100%; text-align: center; }
+  
+  .nav-btn {
+    width: 80%; /* Mobile menu mein bada button */
+    margin-top: 10px;
+  }
+}
+
+
+
+/* //////////////////////////////home page ////////////////////// */
+/* 🔹 Mini Profile Card Styling */
+.profile-mini-card {
+  display: flex;
+  align-items: center;
+  background: white;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  width: fit-content;
+  margin-bottom: 25px;
+  border: 1px solid #eef2f6;
+  animation: fadeInDown 0.5s ease;
+}
+
+.profile-avatar-wrapper {
+  margin-right: 15px;
+}
+
+.mini-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #2563eb;
+}
+
+.mini-avatar-placeholder {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.profile-mini-info h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.emp-id-tag {
+  margin: 2px 0;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.role-badge {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* 🎈 Floating Card Style */
+.floating-profile-card {
+  position: fixed;   /* Isse card hawa mein fix ho jayega */
+  top: 85px;         /* Navbar se thoda niche */
+  right: 30px;       /* Right side se thodi doori */
+  z-index: 1000;     /* Taaki ye sabse upar dikhe */
+  
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.85); /* Glass effect */
+  backdrop-filter: blur(10px);           /* Piche ka dhundhla dikhega */
+  border-radius: 50px 15px 15px 50px;    /* Stylish Shape */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); /* Perchayi (Shadow) */
+  transition: all 0.3s ease;
+}
+
+.floating-profile-card:hover {
+  transform: translateY(-5px); /* Hover karne par thoda aur upar uthega */
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.avatar-box img, .letter-avatar {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  object-fit: cover;
+}
+
+.letter-avatar {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 22px;
+}
+
+.mini-info {
+  text-align: right;
+}
+
+.mini-info h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.mini-info p {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: bold;
+}
+
+.mini-info .badge {
+  font-size: 9px;
+  background: #2563eb;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+/* //////////////////////////////home page end  ////////////////////// */
+.DharashaktiH3 {
+  margin: auto;
+  text-align: center;
+  
+}
+
+
+
+.nav-profile {
+  width: 38px;
+  height: 38px;
+  margin-right: 12px;
+}
+
+.nav-profile img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 8px rgba(56,189,248,.6);
+}

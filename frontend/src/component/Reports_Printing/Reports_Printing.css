@@ -1,0 +1,171 @@
+/* --- 1. Screen View Settings --- */
+.reports-full-screen {
+    padding: 5px;
+    background-color: #f4f7f6;
+}
+
+.report-controls {
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* Screen par printable area ko hidden rakhein agar aap sirf preview chahte hain */
+.printable-report-wrapper {
+    display: none; 
+}
+
+/* Red Text for Due Amounts */
+.red-text {
+    color: red !important;
+    font-weight: bold;
+}
+
+/* --- 2. 🖨️ Master Print Engine (Consolidated & Smooth) --- */
+@media print {
+    /* 1. Global Reset */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* 2. Hide UI elements */
+    body * {
+        visibility: hidden !important;
+    }
+
+    /* 3. Show ONLY the Printable Area */
+    .printable-report-wrapper, 
+    .printable-report-wrapper * {
+        visibility: visible !important;
+    }
+
+    .printable-report-wrapper {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+    }
+
+    @page {
+        size: A4 landscape; /* Recommended for many columns */
+        margin: 10mm !important;
+    }
+
+    /* --- 3. Table Alignment Logic --- */
+    .print-main-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        table-layout: fixed; /* Fixed layout ensures columns align perfectly */
+    }
+
+    .print-main-table th, .print-main-table td {
+        border: 1px solid #000 !important;
+        padding: 6px 4px !important;
+        color: #000 !important;
+        font-size: 9pt !important;
+        word-wrap: break-word;
+        vertical-align: middle;
+    }
+
+    .print-main-table th {
+        background-color: #f2f2f2 !important;
+        text-align: center !important;
+        font-weight: bold !important;
+    }
+
+    /* Column Specific Alignments & Widths */
+    /* Date & Bill No */
+    .print-main-table td:nth-child(1),
+    .print-main-table td:nth-child(2) {
+        text-align: center !important;
+        width: 60px;
+    }
+
+    /* Party Name & Product Details (Left Aligned) */
+    .print-main-table td:nth-child(3),
+    .print-main-table td:nth-child(4) {
+        text-align: left !important;
+        padding-left: 8px !important;
+    }
+
+    /* Values: Rate, Qty, Freight, Total, Paid, Due (Right Aligned) */
+    .print-main-table td:nth-child(5),
+    .print-main-table td:nth-child(6),
+    .print-main-table td:nth-child(7),
+    .print-main-table td:nth-child(8),
+    .print-main-table td:nth-child(9),
+    .print-main-table td:nth-child(10) {
+        text-align: right !important;
+        padding-right: 8px !important;
+    }
+
+    /* Formatting for first child (Date) as per your previous rule */
+    .print-main-table td:first-child {
+        white-space: nowrap !important;
+    }
+
+    /* --- 4. Footer & Totals --- */
+    .report-summary-footer {
+        display: table-row-group !important;
+    }
+
+    .report-summary-footer tr td {
+        border-top: 2px solid #000 !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important;
+        padding: 8px !important;
+    }
+
+    .print-main-table tr {
+        page-break-inside: avoid !important;
+    }
+
+    /* --- 5. Header & Signature --- */
+    .print-header-top {
+        text-align: center;
+        border-bottom: 2px solid #000;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+    }
+
+    .signature-section {
+        margin-top: 50px;
+        display: flex !important;
+        justify-content: space-between !important;
+        visibility: visible !important;
+    }
+
+    .sig-box {
+        width: 200px;
+        text-align: center;
+        visibility: visible !important;
+    }
+
+    .sig-line {
+        border-top: 1px solid #000;
+        margin-bottom: 5px;
+        visibility: visible !important;
+    }
+}
+@media print {
+  body {
+    visibility: hidden;
+  }
+  #bill-container { /* Aapka bill ka main div */
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

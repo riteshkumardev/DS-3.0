@@ -1,0 +1,75 @@
+.pl-container {
+  /* height: 73vh; */
+  padding: 0 20px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* No Scroll */
+}
+
+.pl-header {
+  padding: 15px 0;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.pl-table-wrapper {
+  flex-grow: 1;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 30px;
+}
+
+.pl-table {
+  width: 100%; /* Full Width */
+  border-collapse: collapse;
+  font-family: 'Segoe UI', sans-serif;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+  border: 1px solid #e2e8f0;
+}
+
+.pl-table th {
+  background: #f8fafc;
+  color: #475569;
+  text-align: left;
+  padding: 18px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pl-table td {
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  font-size: 16px;
+}
+
+.text-right { text-align: right; }
+
+/* 🎨 Color Accents */
+.amount-plus { color: #10b981; font-weight: 700; }
+.amount-minus { color: #ef4444; font-weight: 600; }
+
+.badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.inc { background: #dcfce7; color: #166534; }
+.exp { background: #fee2e2; color: #991b1b; }
+
+/* 🏆 Final Result Row */
+.final-row {
+  background: #f1f5f9;
+}
+.final-row td {
+  padding: 25px 20px;
+  font-size: 18px;
+}
+.total-final {
+  font-size: 24px !important;
+  font-weight: 900;
+}
+.total-final.pos { color: #059669; }
+.total-final.neg { color: #dc2626; }

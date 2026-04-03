@@ -1,0 +1,71 @@
+/* Center wrapper */
+.loader-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  background: transparent;
+}
+
+/* Loader body */
+.neon-loader {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  transform-style: preserve-3d;
+  perspective: 800px;
+}
+
+/* Rings */
+.neon-loader span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  animation: spin 2.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  filter: drop-shadow(0 0 12px currentColor);
+}
+
+/* Each ring with different axis + color */
+.neon-loader span:nth-child(1) {
+  border-top-color: #ff2d95;
+  color: #ff2d95;
+  transform: rotateX(65deg);
+  animation-delay: 0s;
+}
+
+.neon-loader span:nth-child(2) {
+  border-right-color: #00e5ff;
+  color: #00e5ff;
+  transform: rotateY(65deg);
+  animation-delay: -0.4s;
+}
+
+.neon-loader span:nth-child(3) {
+  border-bottom-color: #7cff00;
+  color: #7cff00;
+  transform: rotateX(-65deg);
+  animation-delay: -0.8s;
+}
+
+.neon-loader span:nth-child(4) {
+  border-left-color: #ffb300;
+  color: #ffb300;
+  transform: rotateY(-65deg);
+  animation-delay: -1.2s;
+}
+
+/* Animation */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.4;
+  }
+}

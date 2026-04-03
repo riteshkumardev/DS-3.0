@@ -1,0 +1,120 @@
+/* 🖥️ Screen Styles */
+.passbook-container {
+  padding: 20px;
+  background: white;
+  border: 1px solid #303030;
+  margin-top: 20px;
+}
+
+.passbook-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.passbook-table th,
+.passbook-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+}
+
+/* 🖨️ PRINT LOGIC – EXACTLY LIKE PAYSLIP */
+@media print {
+
+  /* 1️⃣ Sab kuch hide */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* 2️⃣ Sirf passbook dikhao */
+  #printablePassbook,
+  #printablePassbook * {
+    visibility: visible !important;
+  }
+
+  /* 3️⃣ Page ke top par lao */
+  #printablePassbook {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    background: white !important;
+    border: none !important;
+    padding: 10mm !important; /* printer-safe margin */
+  }
+
+  /* 4️⃣ Button hide */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 5️⃣ Strong borders for printer */
+  .passbook-table,
+  .passbook-table th,
+  .passbook-table td {
+    border: 1px solid black !important;
+    color: black !important;
+  }
+}
+@media print {
+  .only-print { display: block !important; }
+  .no-print { display: none !important; }
+}
+
+.passbook-container {
+  padding: 40px;
+  background: white;
+  font-family: 'Segoe UI', sans-serif;
+  border: 1px solid #eee;
+}
+
+.payslip-header-modern {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 3px solid #1e293b;
+  padding-bottom: 20px;
+}
+
+.qr-box { text-align: center; font-size: 10px; color: #666; }
+
+.payslip-staff-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 20px 0;
+  gap: 30px;
+  font-size: 14px;
+}
+
+.payslip-table-modern {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.payslip-table-modern th {
+  background: #f1f5f9;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.payslip-table-modern td {
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.net-pay-section {
+  background: #1e293b;
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 50px;
+}
+
+.sig-line { border-top: 1px solid #000; width: 150px; margin-bottom: 5px; }

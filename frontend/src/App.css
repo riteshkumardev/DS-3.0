@@ -1,0 +1,222 @@
+/* ============================= */
+/* 1. Tailwind Directives */
+/* ============================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* ============================= */
+/* 2. Root Colors */
+/* ============================= */
+:root {
+  --bg-main: #eef2f7;
+  --bg-dark: #050507;
+}
+
+
+/* ============================= */
+/* 3. Cinematic Background */
+/* ============================= */
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+
+  background:
+    radial-gradient(circle at 15% 20%, rgba(16,185,129,0.08), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgba(99,102,241,0.08), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(0,0,0,0.03), transparent 60%),
+    linear-gradient(to bottom, #f8fafc, #eef2f7);
+
+  @apply text-zinc-900 transition-colors duration-500;
+}
+
+
+/* Dark Mode */
+.dark body {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(16,185,129,0.15), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(99,102,241,0.15), transparent 40%),
+    linear-gradient(to bottom, #0a0a0c, #050507);
+
+  @apply text-zinc-100;
+}
+
+
+/* ============================= */
+/* 4. Section Containers */
+/* ============================= */
+.home-container,
+.table-container-wide,
+.sales-container,
+.profile-wrapper {
+  @apply p-6 md:p-10 w-full max-w-[1550px] mx-auto min-h-screen relative;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+
+/* Soft Glow Layer */
+.home-container::before,
+.table-container-wide::before,
+.sales-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(16,185,129,0.06), transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+
+/* ============================= */
+/* 5. Premium Floating Cards */
+/* ============================= */
+.card-pro,
+.table-card-wide,
+.supplier-form,
+.stat-card-3d,
+.user-control-card,
+.login-box {
+
+  @apply bg-white/85 dark:bg-zinc-900/85
+         backdrop-blur-xl
+         rounded-[2.5rem]
+         border border-white/60 dark:border-zinc-800/80
+         transition-all duration-500;
+
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.04),
+    0 20px 50px rgba(0,0,0,0.06),
+    0 40px 80px rgba(0,0,0,0.04);
+}
+
+
+/* Dark Card Depth */
+.dark .card-pro {
+  background: linear-gradient(145deg, #18181b, #09090b);
+  box-shadow:
+    0 25px 60px rgba(0,0,0,0.6),
+    inset 0 1px 1px rgba(255,255,255,0.05);
+}
+
+
+/* Hover Floating */
+.card-pro:hover {
+  transform: translateY(-8px) scale(1.02);
+  @apply border-emerald-400/50;
+
+  box-shadow:
+    0 20px 40px rgba(16,185,129,0.15),
+    0 40px 80px rgba(16,185,129,0.10);
+}
+
+
+/* ============================= */
+/* 6. Glass Table */
+/* ============================= */
+.table-responsive-wrapper {
+  @apply rounded-[2rem] overflow-hidden
+         border border-zinc-200/60 dark:border-zinc-800/60;
+
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(18px);
+
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+}
+
+.dark .table-responsive-wrapper {
+  background: rgba(18,18,20,0.85);
+}
+
+
+/* IMPORTANT: FIXED TABLE WIDTH CLASS */
+.modern-sales-table {
+  @apply min-w-[900px] w-full text-left border-collapse;
+}
+
+
+/* Table Hover */
+.modern-sales-table tr {
+  @apply transition-colors duration-200;
+}
+
+.modern-sales-table tr:hover {
+  @apply bg-emerald-500/5 dark:bg-emerald-500/10;
+}
+
+
+/* ============================= */
+/* 7. Inputs */
+/* ============================= */
+input,
+select,
+textarea {
+  @apply bg-zinc-100/60 dark:bg-zinc-800/60
+         border border-zinc-200 dark:border-zinc-700
+         rounded-2xl px-5 py-4
+         outline-none transition-all duration-300;
+
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.03),
+    0 1px 2px rgba(0,0,0,0.03);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  @apply bg-white dark:bg-zinc-900
+         border-emerald-500
+         ring-4 ring-emerald-500/10;
+
+  transform: scale(1.01);
+}
+
+
+/* ============================= */
+/* 8. Buttons */
+/* ============================= */
+.btn-primary {
+  @apply bg-emerald-600 hover:bg-emerald-500
+         text-white font-bold
+         py-4 px-8 rounded-2xl
+         transition-all duration-300
+         active:scale-95;
+
+  box-shadow: 0 10px 25px rgba(16,185,129,0.25);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 20px 40px rgba(16,185,129,0.35);
+}
+
+
+/* ============================= */
+/* 9. Scrollbar */
+/* ============================= */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-300 dark:bg-zinc-700
+         rounded-full;
+}
+
+
+/* ============================= */
+/* 10. Loader */
+/* ============================= */
+.loader-line {
+  @apply h-1 bg-emerald-500 fixed top-0 left-0 z-[9999];
+  box-shadow: 0 0 15px #10b981;
+}
