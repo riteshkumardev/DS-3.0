@@ -1,53 +1,71 @@
 import mongoose from "mongoose";
 
 const expenseSchema = new mongoose.Schema({
-  // Transaction ki date (YYYY-MM-DD format)
+  // Transaction date (YYYY-MM-DD format) - Consistent with Sale/Purchase/Salary
   date: { 
     type: String, 
     required: true 
   },
-  // Kisko payment kiya ya kisse aaya (Supplier/Party Name)
+  
+  // Kisko payment kiya ya kisse aaya (Supplier/Party/Employee Name)
   partyName: { 
     type: String, 
     required: true,
     trim: true 
   },
-  // 'Payment In' (Aaya/Received) ya 'Payment Out' (Gaya/Paid)
+
+  // 'Payment In' = CREDIT (Paisa Aaya)
+  // 'Payment Out' = DEBIT (Paisa Gaya)
   type: { 
     type: String, 
     required: true, 
     enum: ['Payment In', 'Payment Out'],
     default: 'Payment Out'
   },
-  // Transaction amount
+
   amount: { 
     type: Number, 
-    required: true 
+    required: true,
+    min: [0, "Amount cannot be negative"] 
   },
-  // Purani 'category' field (Ab optional hai ya 'Others' default rakh sakte hain)
+
+  // Category fix: 'Fuel', 'Salary', 'Maintenance' ko humne side rakha hai, 
+  // par yahan "General", "Office", "Food" etc. ho sakta hai.
   category: { 
     type: String, 
-    default: "General" 
+    default: "General",
+    trim: true
   },
-  // Transaction ID / UTR No / Cheque No
+
+  // Payment Mode (Zaroori hai taaki pata chale Cash balance kam hua ya Bank)
+  paymentMode: {
+    type: String,
+    enum: ['Cash', 'Bank', 'UPI', 'Cheque'],
+    default: 'Cash'
+  },
+
+  // Transaction ID / UTR No / Reference No
   txnId: { 
     type: String, 
-    trim: true 
+    trim: true,
+    default: "N/A"
   },
-  // Narration ya extra details
+
   remark: { 
     type: String, 
     trim: true 
   },
-  // Entry ka waqt
+
+  // Entry time (Automated via timestamps, but manual override if needed)
   time: { 
     type: String 
   }
 }, { 
-  timestamps: true // Isse 'createdAt' aur 'updatedAt' apne aap ban jayenge
+  timestamps: true 
 });
 
-// Indexing taaki party-wise aur date-wise search fast ho
+// Indexing for performance
 expenseSchema.index({ partyName: 1, date: -1 });
+expenseSchema.index({ type: 1 }); // Quick filtering for Total In vs Total Out
 
 export default mongoose.model("Expense", expenseSchema);

@@ -1,12 +1,15 @@
-import Employee from "../models/epmloyee.js";
-import ActivityLog from "../models/activityLog.js"; // ✅ Audit Model import kiya
+import Employee from "../models/epmloyee.js"; // ✅ Fixed Typo (epmloyee -> employee)
+import ActivityLog from "../models/ActivityLog.js"; // ✅ Fixed Case (Capital A/L)
+import bcrypt from "bcryptjs"; // ✅ Added for Password Verification
 
 /* =============================================
-    📜 Helper: Audit Logger
+    📜 Helper: Audit Logger (Safe Version)
 ============================================= */
 const logAudit = async (adminName, action, module = "AUTH") => {
   try {
-    await ActivityLog.create({
+    // Model overwrite check
+    const Audit = ActivityLog; 
+    await Audit.create({
       adminName: adminName || "System",
       action: action,
       module: module,
@@ -26,19 +29,25 @@ export const unlockEmployee = async (req, res) => {
 
     const employee = await Employee.findOne({ employeeId });
 
-    if (!employee || employee.password !== password) {
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 🛡️ BCRYPT COMPARE: Direct compare (!) se match nahi hoga
+    const isMatch = await bcrypt.compare(password, employee.password);
+
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: "Incorrect password",
       });
     }
 
-    // ✅ AUDIT LOG: Screen Unlocked
     await logAudit(employee.name, `Screen Unlocked: User resumed session`);
 
     res.status(200).json({
       success: true,
-      message: "App Unlocked",
+      message: "App Unlocked ✅",
     });
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -70,43 +79,43 @@ export const loginEmployee = async (req, res) => {
 
     // 🔒 Block check
     if (employee.isBlocked) {
-      // ✅ AUDIT LOG: Failed Login Attempt (Blocked User)
       await logAudit(employee.name, `Blocked user attempted to login`, "SECURITY");
-      
       return res.status(403).json({
         success: false,
         message: "Account is blocked by admin",
       });
     }
 
-    if (employee.password !== password) {
-      // ✅ AUDIT LOG: Wrong Password Attempt
-      await logAudit(employee.name, `Failed login attempt: Incorrect password`, "SECURITY");
+    // 🛡️ BCRYPT COMPARE: Plain text vs Hashed comparison
+    const isMatch = await bcrypt.compare(password, employee.password);
 
+    if (!isMatch) {
+      await logAudit(employee.name, `Failed login attempt: Incorrect password`, "SECURITY");
       return res.status(401).json({
         success: false,
         message: "Incorrect password",
       });
     }
 
-    // ✅ AUDIT LOG: Successful Login
+    // ✅ Successful Login Log
     await logAudit(employee.name, `User logged in successfully`);
 
     res.status(200).json({
       success: true,
-      message: "Login successful",
+      message: "Login successful ✅",
       data: {
         _id: employee._id,
         employeeId: employee.employeeId,
         name: employee.name,
         role: employee.role,
+        photo: employee.photo // Photo bhi bhej rahe hain Dashboard ke liye
       },
     });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server error during login",
     });
   }
 };

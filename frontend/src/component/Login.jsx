@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ShieldCheck, User as UserIcon, Lock, 
-  RefreshCcw, LogIn, Hash, AlertCircle 
+  RefreshCcw, LogIn, Hash 
 } from "lucide-react";
 import Loader from "./Core_Component/Loader/Loader";
 import CustomSnackbar from "./Core_Component/Snackbar/CustomSnackbar";
@@ -45,19 +45,30 @@ function Login({ setUser }) {
     if (savedUser) navigate("/", { replace: true });
   }, [navigate]);
 
+  // ✅ SMART VALIDATION: Handles DS-XXXX format
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 1. Captcha Validation
     if (parseInt(userCaptcha) !== captcha.total) {
       showMsg("❌ Invalid Captcha. Try again.");
       refreshCaptcha();
       return;
     }
 
-    if (!/^\d{8}$/.test(employeeId.trim())) {
-      showMsg("Please enter a valid 8-digit Employee ID.", "warning");
+    // 2. Employee ID Validation (DS-XXXX format support)
+    const rawId = employeeId.trim().toUpperCase();
+    
+    // Regex allows "DS-1234" or just "1234" (will auto-fix to DS-1234)
+    const idPattern = /^(DS-)?\d{4,7}$/; 
+    
+    if (!idPattern.test(rawId)) {
+      showMsg("Please enter a valid Employee ID (e.g., DS-1553)", "warning");
       return;
     }
+
+    // Final ID ensure kar rha hai ki "DS-" prefixed ho
+    const finalId = rawId.startsWith("DS-") ? rawId : `DS-${rawId}`;
 
     setLoading(true);
 
@@ -66,7 +77,7 @@ function Login({ setUser }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeId: employeeId.trim(),
+          employeeId: finalId, // Sending DS-XXXX
           password,
         }),
       });
@@ -74,7 +85,7 @@ function Login({ setUser }) {
       const data = await res.json();
 
       if (!res.ok) {
-        showMsg(data.message || "Login failed");
+        showMsg(data.message || "Login failed", "error");
         refreshCaptcha();
         setLoading(false);
         return;
@@ -92,7 +103,7 @@ function Login({ setUser }) {
       }, 500);
     } catch (err) {
       console.error("Login error:", err);
-      showMsg("Server error. Please try again.");
+      showMsg("Server error. Please check your connection.");
       refreshCaptcha();
       setLoading(false);
     }
@@ -118,17 +129,16 @@ function Login({ setUser }) {
           
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
-              <UserIcon size={12}/> Employee Identity (8-Digit)
+              <UserIcon size={12}/> Employee Identity (DS-XXXX)
             </label>
             <div className="relative group">
               <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-300 group-focus-within:text-emerald-500 transition-colors" size={18} />
               <input
                 type="text"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                maxLength="8"
+                onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
                 className="w-full pl-12 pr-4 py-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all dark:text-white"
-                placeholder="00000000"
+                placeholder="DS-1553"
                 required
               />
             </div>

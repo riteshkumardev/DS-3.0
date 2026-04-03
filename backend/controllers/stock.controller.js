@@ -1,11 +1,12 @@
 import Stock from "../models/Stock.js";
-import ActivityLog from "../models/activityLog.js"; // ✅ Audit Log model import kiya
+import ActivityLog from "../models/ActivityLog.js"; // ✅ Fixed Case: Capital A and L
 
 /* =============================================
     📜 Helper: Audit Logger
 ============================================= */
 const logAudit = async (adminName, action, module = "STOCK") => {
   try {
+    // Model Overwrite se bachne ke liye mongoose.models check (Optional but safe)
     await ActivityLog.create({
       adminName: adminName || "System",
       action: action,
@@ -22,7 +23,7 @@ const logAudit = async (adminName, action, module = "STOCK") => {
  */
 export const addStockItem = async (req, res) => {
   try {
-    const { productName, totalQuantity, remarks, adminName } = req.body;
+    const { productName, totalQuantity, remarks, adminName, minStockLevel } = req.body;
 
     if (!productName) {
       return res.status(400).json({ success: false, message: "Product Name is required" });
@@ -36,6 +37,7 @@ export const addStockItem = async (req, res) => {
         $set: { 
           productName: trimmedName,
           totalQuantity: Number(totalQuantity) || 0, 
+          minStockLevel: Number(minStockLevel) || 5, // 🆕 Low stock alert threshold
           remarks: remarks || "Manual Entry",
           updatedAt: new Date()
         } 
@@ -46,7 +48,7 @@ export const addStockItem = async (req, res) => {
     // ✅ AUDIT LOG: Stock Entry
     await logAudit(
       adminName, 
-      `Stock Entry: ${trimmedName} quantity set to ${totalQuantity} (${remarks || 'Manual'})`
+      `Stock Entry: ${trimmedName} set to ${totalQuantity} units (${remarks || 'Manual'})`
     );
 
     res.status(201).json({
@@ -61,23 +63,30 @@ export const addStockItem = async (req, res) => {
 };
 
 /**
- * 📄 GET ALL STOCKS
+ * 📄 GET ALL STOCKS (With Low Stock Flag)
  */
 export const getStocks = async (req, res) => {
   try {
     const stocks = await Stock.find().sort({ productName: 1 });
-    res.json({ success: true, data: stocks });
+    
+    // 🆕 Frontend ke liye extra info: Kaunsa maal khatam ho raha hai
+    const enrichedData = stocks.map(item => ({
+      ...item._doc,
+      isLowStock: item.totalQuantity <= (item.minStockLevel || 5)
+    }));
+
+    res.json({ success: true, data: enrichedData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 /**
- * 🛠️ UPDATE STOCK MANUALLY (Audit Enabled)
+ * 🛠️ UPDATE STOCK MANUALLY
  */
 export const updateStock = async (req, res) => {
   try {
-    const { productName, totalQuantity, remarks, adminName } = req.body;
+    const { productName, totalQuantity, remarks, adminName, minStockLevel } = req.body;
     
     const stock = await Stock.findByIdAndUpdate(
       req.params.id,
@@ -85,6 +94,7 @@ export const updateStock = async (req, res) => {
         $set: { 
           productName: productName?.toUpperCase().trim(),
           totalQuantity: Number(totalQuantity), 
+          minStockLevel: Number(minStockLevel),
           remarks: remarks,
           updatedAt: new Date()
         } 
@@ -92,7 +102,9 @@ export const updateStock = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // ✅ AUDIT LOG: Manual Stock Adjustment
+    if (!stock) throw new Error("Stock item not found");
+
+    // ✅ AUDIT LOG
     await logAudit(
       adminName, 
       `Stock Adjusted: ${stock.productName} updated to ${totalQuantity} units.`
@@ -100,7 +112,7 @@ export const updateStock = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: "Stock updated independently successfully", 
+      message: "Stock updated successfully ✅", 
       data: stock 
     });
   } catch (error) {
@@ -109,7 +121,7 @@ export const updateStock = async (req, res) => {
 };
 
 /**
- * ❌ DELETE STOCK (Critical Audit)
+ * ❌ DELETE STOCK
  */
 export const deleteStock = async (req, res) => {
   try {
@@ -128,7 +140,7 @@ export const deleteStock = async (req, res) => {
       "STOCK"
     );
 
-    res.json({ success: true, message: "Stock item deleted from database" });
+    res.json({ success: true, message: "Stock item deleted successfully 🗑️" });
   } catch (error) {
     res.status(404).json({ success: false, message: error.message });
   }

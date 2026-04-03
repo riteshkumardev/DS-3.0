@@ -1,12 +1,11 @@
 import mongoose from "mongoose";
 
-// ⚠️ Yahan se purana import hata diya gaya hai kyunki ye khud wahi file hai
-
 const salaryPaymentSchema = new mongoose.Schema({
     employeeId: { 
         type: String, 
-        required: true 
+        required: true // Employee model ke employeeId se match karega
     },
+    employeeName: { type: String }, // Optional: Reporting ke liye aasaan rahega
     amount: { 
         type: Number, 
         required: true 
@@ -18,9 +17,14 @@ const salaryPaymentSchema = new mongoose.Schema({
     type: { 
         type: String, 
         enum: ["Advance", "Salary"], 
-        default: "Advance" 
-    }
+        default: "Salary" 
+    },
+    paymentMode: { 
+        type: String, 
+        enum: ["Cash", "Bank", "UPI"], 
+        default: "Cash" 
+    },
+    remarks: { type: String }
 }, { timestamps: true });
 
-// Export karte waqt dhayan rakhein ki naam wahi ho jo controllers mein use ho raha hai
 export default mongoose.model("SalaryPayment", salaryPaymentSchema);

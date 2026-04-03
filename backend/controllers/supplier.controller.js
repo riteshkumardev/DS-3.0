@@ -1,14 +1,16 @@
 import Supplier from "../models/Supplier.js";
 import Transaction from "../models/Transaction.js";
-import ActivityLog from "../models/activityLog.js";
+import ActivityLog from "../models/ActivityLog.js"; // ✅ Fixed Case (Capital A/L)
 import mongoose from "mongoose";
 
 /* =============================================
-   📜 Helper: Audit Logger
+    📜 Helper: Audit Logger (Overwrite Safe)
 ============================================= */
 const logAudit = async (adminName, action, module = "SUPPLIER") => {
   try {
-    await ActivityLog.create({
+    // Overwrite error se bachne ke liye safe model check
+    const Audit = mongoose.models.ActivityLog || ActivityLog;
+    await Audit.create({
       adminName: adminName || "System",
       action,
       module,
@@ -20,31 +22,25 @@ const logAudit = async (adminName, action, module = "SUPPLIER") => {
 };
 
 /* =============================================
-   🔹 Helper: Transaction Support
+    🔹 Helper: Transaction Support
 ============================================= */
 const canUseTransaction = () => {
   return mongoose.connection.client?.topology?.description?.type === "ReplicaSetWithPrimary";
 };
 
 /* =============================================
-   🔹 Helper: Safe ID Query (string + ObjectId)
+    🔹 Helper: Safe ID Query
 ============================================= */
 const findSupplierByIdSafe = async (id, session = null) => {
-  const query = {
-    $expr: { $eq: [{ $toString: "$_id" }, String(id)] }
-  };
-
-  return session
-    ? Supplier.findOne(query).session(session)
-    : Supplier.findOne(query);
+  const query = { $expr: { $eq: [{ $toString: "$_id" }, String(id)] } };
+  return session ? Supplier.findOne(query).session(session) : Supplier.findOne(query);
 };
 
 /* =============================================
-   1️⃣ Create Supplier
+    1️⃣ Create Supplier (Opening Bal Entry)
 ============================================= */
 export const createSupplier = async (req, res) => {
   let session;
-
   try {
     if (canUseTransaction()) {
       session = await mongoose.startSession();
@@ -56,271 +52,142 @@ export const createSupplier = async (req, res) => {
 
     if (gstin) {
       const existing = await Supplier.findOne({ gstin }).session(session);
-      if (existing) throw new Error("Supplier with this GSTIN already exists");
+      if (existing) throw new Error("GSTIN pehle se register hai!");
     }
 
     const [supplier] = await Supplier.create([{
-      name,
-      gstin,
-      phone,
-      address,
+      name, gstin, phone, address,
       previousBalance: openingBal,
       totalOwed: openingBal,
       currentBalance: openingBal,
       currentBillsTotal: 0
     }], { session });
 
+    // Ledger mein Opening Balance ki entry
     if (openingBal !== 0) {
       await Transaction.create([{
         partyId: supplier._id,
+        partyModel: 'Supplier',
+        partyName: supplier.name,
         type: "OUT",
         amount: openingBal,
         description: "Opening Balance (Account Setup)",
         remainingBalance: openingBal,
-        date: new Date()
+        date: new Date().toISOString().split('T')[0]
       }], { session });
     }
 
-    await logAudit(adminName, `New Supplier Registered: ${name} (Opening Bal: ₹${openingBal})`);
+    await logAudit(adminName, `Registered: ${name} (Opening Bal: ₹${openingBal})`);
 
     if (session) await session.commitTransaction();
-
     res.status(201).json({ success: true, data: supplier });
 
   } catch (error) {
-
     if (session) await session.abortTransaction();
-
     res.status(400).json({ success: false, message: error.message });
-
   } finally {
-
     if (session) session.endSession();
-
   }
 };
 
 /* =============================================
-   2️⃣ Get All Suppliers
+    2️⃣ Get All Suppliers
 ============================================= */
 export const getAllSuppliers = async (req, res) => {
   try {
-
-    const suppliers = await Supplier.find().sort({ createdAt: -1 });
-
+    const suppliers = await Supplier.find().sort({ name: 1 }); // Sort by Name
     res.status(200).json({ success: true, data: suppliers });
-
   } catch (error) {
-
-    res.status(500).json({ success: false, message: "Error fetching suppliers" });
-
+    res.status(500).json({ success: false, message: "Suppliers fetch failed" });
   }
 };
 
 /* =============================================
-   3️⃣ Update Supplier
+    3️⃣ Update Supplier (Balance Adjustment Logic)
 ============================================= */
 export const updateSupplier = async (req, res) => {
-
   let session;
-
   try {
-
     if (canUseTransaction()) {
       session = await mongoose.startSession();
       session.startTransaction();
     }
 
     const { id } = req.params;
-
-    const {
-      name,
-      address,
-      phone,
-      gstin,
-      previousBalance,
-      lastBillNo,
-      lastBillDate,
-      adminName
-    } = req.body;
+    const { name, address, phone, gstin, previousBalance, adminName } = req.body;
 
     const oldSupplier = await findSupplierByIdSafe(id, session);
-
-    if (!oldSupplier) throw new Error("Supplier not found");
+    if (!oldSupplier) throw new Error("Supplier nahi mila");
 
     const oldPrevBal = Number(oldSupplier.previousBalance || 0);
     const newPrevBal = Number(previousBalance || 0);
-
     const diff = newPrevBal - oldPrevBal;
 
-    const updatedData = {
-      name,
-      address,
-      phone,
-      gstin,
-      previousBalance: newPrevBal,
-      lastBillNo,
-      lastBillDate,
-      totalOwed: newPrevBal + (oldSupplier.currentBillsTotal || 0),
-      currentBalance: (oldSupplier.currentBalance || 0) + diff
-    };
-
-    const supplier = await Supplier.findOneAndUpdate(
-      { $expr: { $eq: [{ $toString: "$_id" }, String(id)] } },
-      updatedData,
+    const supplier = await Supplier.findByIdAndUpdate(
+      oldSupplier._id,
+      { 
+        name, address, phone, gstin, 
+        previousBalance: newPrevBal,
+        $inc: { totalOwed: diff, currentBalance: diff } 
+      },
       { new: true, session }
     );
 
     if (diff !== 0) {
-
       await Transaction.create([{
-        partyId: oldSupplier._id,
+        partyId: supplier._id,
+        partyModel: 'Supplier',
+        partyName: supplier.name,
         type: diff > 0 ? "OUT" : "IN",
         amount: Math.abs(diff),
-        description: "Manual Adjustment: Opening Balance Update",
-        remainingBalance: supplier.totalOwed,
-        date: new Date()
+        description: `Manual Adjustment: Opening Balance changed from ${oldPrevBal} to ${newPrevBal}`,
+        remainingBalance: supplier.currentBalance,
+        date: new Date().toISOString().split('T')[0]
       }], { session });
-
     }
 
-    await logAudit(adminName, `Supplier Info Updated: ${name} (Balance Adjusted by ₹${diff})`);
-
+    await logAudit(adminName, `Updated: ${name} (Bal Adjusted: ₹${diff})`);
     if (session) await session.commitTransaction();
-
     res.status(200).json({ success: true, data: supplier });
 
   } catch (error) {
-
     if (session) await session.abortTransaction();
-
     res.status(400).json({ success: false, message: error.message });
-
   } finally {
-
     if (session) session.endSession();
-
   }
 };
 
 /* =============================================
-   4️⃣ Update Supplier Balance
-============================================= */
-export const updateSupplierBalance = async (req, res) => {
-
-  let session;
-
-  try {
-
-    if (canUseTransaction()) {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    }
-
-    const { supplierId, billAmount, billNo, adminName } = req.body;
-
-    const supplier = await findSupplierByIdSafe(supplierId, session);
-
-    if (!supplier) throw new Error("Supplier not found");
-
-    const amount = Number(billAmount || 0);
-
-    supplier.currentBillsTotal = (supplier.currentBillsTotal || 0) + amount;
-    supplier.totalOwed = (supplier.totalOwed || 0) + amount;
-    supplier.currentBalance = (supplier.currentBalance || 0) + amount;
-
-    await supplier.save({ session });
-
-    await Transaction.create([{
-      partyId: supplier._id,
-      type: "OUT",
-      amount,
-      description: `Purchase: Bill No ${billNo || "N/A"}`,
-      remainingBalance: supplier.totalOwed,
-      date: new Date()
-    }], { session });
-
-    await logAudit(adminName, `Manual Balance Update: Bill No ${billNo} added to ${supplier.name} (Amt: ₹${amount})`);
-
-    if (session) await session.commitTransaction();
-
-    res.status(200).json({
-      success: true,
-      message: "Balance & Ledger Updated ✅"
-    });
-
-  } catch (error) {
-
-    if (session) await session.abortTransaction();
-
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
-
-  } finally {
-
-    if (session) session.endSession();
-
-  }
-};
-
-/* =============================================
-   5️⃣ Delete Supplier
+    4️⃣ Delete Supplier (Critical Cleanup)
 ============================================= */
 export const deleteSupplier = async (req, res) => {
-
   let session;
-
   try {
-
     if (canUseTransaction()) {
       session = await mongoose.startSession();
       session.startTransaction();
     }
 
-    const supplierId = req.params.id;
-    const adminName = req.query.adminName || "Unknown Admin";
+    const { id } = req.params;
+    const adminName = req.query.adminName;
 
-    const supplier = await findSupplierByIdSafe(supplierId, session);
+    const supplier = await findSupplierByIdSafe(id, session);
+    if (!supplier) throw new Error("Supplier record missing");
 
-    if (!supplier) throw new Error("Supplier not found");
+    await Supplier.deleteOne({ _id: supplier._id }).session(session);
+    // Delete all linked history to keep database clean
+    await Transaction.deleteMany({ partyId: supplier._id }).session(session);
 
-    await Supplier.deleteOne({
-      $expr: { $eq: [{ $toString: "$_id" }, String(supplierId)] }
-    }).session(session);
-
-    await Transaction.deleteMany({
-      $expr: { $eq: [{ $toString: "$partyId" }, String(supplierId)] }
-    }).session(session);
-
-    await logAudit(
-      adminName,
-      `⚠️ CRITICAL: Supplier Deleted! ${supplier.name} and all transactions removed`,
-      "SUPPLIER"
-    );
+    await logAudit(adminName, `⚠️ CRITICAL: Supplier ${supplier.name} deleted!`, "SUPPLIER");
 
     if (session) await session.commitTransaction();
-
-    res.status(200).json({
-      success: true,
-      message: "Supplier and history removed ✅"
-    });
+    res.status(200).json({ success: true, message: "Supplier & Ledger Deleted ✅" });
 
   } catch (error) {
-
     if (session) await session.abortTransaction();
-
-    console.error("DELETE SUPPLIER ERROR:", error.message);
-
-    res.status(500).json({
-      success: false,
-      message: "Delete failed"
-    });
-
+    res.status(500).json({ success: false, message: "Delete operation failed" });
   } finally {
-
     if (session) session.endSession();
-
   }
 };

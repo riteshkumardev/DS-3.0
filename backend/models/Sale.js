@@ -9,17 +9,15 @@ const goodsSchema = new mongoose.Schema({
 }, { _id: false });
 
 const saleSchema = new mongoose.Schema({
-  billNo: { type: String, 
-    required: true,
-    unique: true },
+  billNo: { type: String, required: true, unique: true },
   date: { type: String, required: true },
   customerName: { type: String, required: true },
-  gstin: { type: String },
+  gstin: { type: String, default: "N/A" },
   mobile: { type: String },
   address: { type: String },
   vehicleNo: { type: String },
   
-  // Professional Fields
+  // Professional Logistics Fields
   deliveryNote: { type: String },
   paymentMode: { type: String, default: "BY BANK" },
   buyerOrderNo: { type: String },
@@ -31,50 +29,36 @@ const saleSchema = new mongoose.Schema({
   lrRrNo: { type: String },
   termsOfDelivery: { type: String },
 
-  // Flat fields for backend logic
-  productName: { type: String },
-  quantity: { type: Number, default: 0 },
-  rate: { type: Number, default: 0 },
+  // Items
   goods: [goodsSchema],
 
-  // Financials
+  // Financials (Fixed Logic)
   freight: { type: Number, default: 0 },
   taxableValue: { type: Number, default: 0 },
-  cashDiscount: { type: Number, default: 0 },
+  cashDiscount: { type: Number, default: 0 }, // Percentage or Flat (Hum yahan Flat treat kar rahe hain)
   cgst: { type: Number, default: 0 },
   sgst: { type: Number, default: 0 },
   igst: { type: Number, default: 0 },
-  totalAmount: { type: Number, default: 0 },
-  amountReceived: { type: Number, default: 0 },
+  totalAmount: { type: Number, default: 0 }, // Grand Total
+  amountReceived: { type: Number, default: 0 }, // Yeh hamara "CREDIT" transaction banega
   paymentDue: { type: Number, default: 0 },
 
   remarks: { type: String },
   si: { type: Number }
 }, { timestamps: true });
 
+// Auto-calculation before saving
 saleSchema.pre("save", function (next) {
-  // 1. Goods Array Sync: Agar goods khali hai toh productName/qty se bharo
-  if ((!this.goods || this.goods.length === 0) && this.productName) {
-    this.goods = [{
-      product: this.productName,
-      quantity: Number(this.quantity) || 0,
-      rate: Number(this.rate) || 0,
-      taxableAmount: (Number(this.quantity) || 0) * (Number(this.rate) || 0)
-    }];
-  }
-
-  // 2. Calculation Logic
   this.taxableValue = this.goods.reduce((sum, g) => {
     g.taxableAmount = (Number(g.quantity) || 0) * (Number(g.rate) || 0);
     return sum + g.taxableAmount;
   }, 0);
 
-  const discount = (this.taxableValue * (Number(this.cashDiscount) || 0)) / 100;
+  // Formula: (Taxable + Freight + Taxes) - Discount
+  const totalTaxes = (Number(this.cgst) || 0) + (Number(this.sgst) || 0) + (Number(this.igst) || 0);
+  this.totalAmount = (this.taxableValue + Number(this.freight) + totalTaxes) - (Number(this.cashDiscount) || 0);
   
-  // Tax (CGST/SGST 0 as per your requirement currently)
-  this.totalAmount = this.taxableValue + (Number(this.freight) || 0) - discount;
   this.paymentDue = this.totalAmount - (Number(this.amountReceived) || 0);
-
   next();
 });
 

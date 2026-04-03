@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 
 const employeeSchema = new mongoose.Schema(
   {
-    employeeId: { type: String, unique: true, sparse: true },
+    // unique: true zaroori hai taaki attendance aur salary isi se map ho
+    employeeId: { type: String, unique: true, required: true }, 
     name: { type: String, required: [true, "Name is required"], trim: true },
     fatherName: { type: String, trim: true },
     phone: { type: String, required: [true, "Phone number is required"] },
@@ -11,16 +12,16 @@ const employeeSchema = new mongoose.Schema(
       type: String, 
       unique: true, 
       required: [true, "Aadhar is required"],
-      minlength: [12, "Aadhar must be 12 digits"],
-      maxlength: [12, "Aadhar must be 12 digits"]
+      minlength: 12,
+      maxlength: 12
     },
     address: { type: String, trim: true },
     designation: String,
-    joiningDate: { type: Date, default: Date.now }, 
+    joiningDate: { type: String, required: true }, // Format: YYYY-MM-DD
     salary: { 
       type: Number, 
       required: [true, "Salary is required"],
-      min: [0, "Salary cannot be negative"],
+      min: 0,
       default: 0 
     },
     bankName: String,
@@ -38,6 +39,7 @@ const employeeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✨ Yahan Change Hai: Pehle variable mein store karein phir default export karein
-const Employee = mongoose.model("Employee", employeeSchema);
+// 🛡️ YE HAI FIX: Pehle check karega ki model exist karta hai ya nahi
+const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
+
 export default Employee;
