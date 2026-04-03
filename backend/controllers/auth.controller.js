@@ -1,4 +1,4 @@
-import Employee from "../models/Epmloyee.js"; // ✅ Fixed Typo (epmloyee -> employee)
+import Employee from "../models/Employee.js"; // ✅ Fixed Typo (epmloyee -> employee)
 import ActivityLog from "../models/ActivityLog.js"; // ✅ Fixed Case (Capital A/L)
 import bcrypt from "bcryptjs"; // ✅ Added for Password Verification
 

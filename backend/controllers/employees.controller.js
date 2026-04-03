@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Employee from "../models/Epmloyee.js"; // ✅ Typo Fixed (epmloyee -> employee)
+import Employee from "../models/Employee.js"; // ✅ Typo Fixed (epmloyee -> employee)
 import ActivityLog from "../models/ActivityLog.js"; // ✅ Case-Sensitive Fixed
 import bcrypt from "bcryptjs";
 import fs from "fs";

@@ -1,5 +1,5 @@
 import Attendance from "../models/Attendance.js";
-import Employee from "../models/Epmloyee.js"; // ✅ Fixed Typo (epmloyee -> employee)
+import Employee from "../models/Employee.js"; // ✅ Fixed Typo (epmloyee -> employee)
 import ActivityLog from "../models/ActivityLog.js"; // ✅ Match Case (Capital A/L)
 import mongoose from "mongoose";
 

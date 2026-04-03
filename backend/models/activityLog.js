@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 
 // ⚠️ TYPO FIXED: 'epmloyee' ko 'employee' kiya gaya hai
 // Note: Agar aapne file ka naam hi galat rakha hai, toh use rename karke 'employee.js' kar dein.
-import Employee from "./Epmloyee.js"; 
+
+import Employee from "./Employee.js"; 
 
 const activityLogSchema = new mongoose.Schema({
   // Kisne action liya (Admin/Manager ka Naam ya ID)

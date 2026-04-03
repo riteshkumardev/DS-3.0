@@ -1,6 +1,6 @@
 import SalaryPayment from "../models/SalaryPayment.js";
 import Transaction from "../models/Transaction.js"; // 🆕 Cash balance sync ke liye
-import Employee from "../models/Epmloyee.js";     // 🆕 Employee verify karne ke liye
+import Employee from "../models/Employee.js";     // 🆕 Employee verify karne ke liye
 import ActivityLog from "../models/ActivityLog.js"; 
 import mongoose from "mongoose";
 
