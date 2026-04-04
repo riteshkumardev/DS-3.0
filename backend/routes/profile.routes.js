@@ -1,5 +1,4 @@
 import express from "express";
-import multer from "multer";
 import { 
   uploadProfileImage, 
   updateProfile, 
@@ -7,19 +6,17 @@ import {
   logoutUser 
 } from "../controllers/profile.controller.js";
 
+// ✅ 1. Purana local multer hata kar Cloudinary wala upload import karein
+import { upload } from "../cloudinaryConfig.js"; 
+
 const router = express.Router();
 
-// Multer Config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
-});
-const upload = multer({ storage });
+// ✅ 2. Ab ye 'upload' wahi hai jo CloudinaryStorage use kar raha hai
+// Frontend API: /api/profile/upload
+router.post("/upload", upload.single("photo"), uploadProfileImage); 
 
-// Saare routes POST rakhe hain taaki frontend se match karein
-router.post("/upload", upload.single("photo"), uploadProfileImage); // Frontend API: /api/profile/upload
-router.post("/update", updateProfile);                              // Frontend API: /api/profile/update
-router.post("/change-password", changePassword);                    // Frontend API: /api/profile/change-password
-router.post("/logout", logoutUser);                                 // Frontend API: /api/profile/logout
+router.post("/update", updateProfile);
+router.post("/change-password", changePassword);
+router.post("/logout", logoutUser);
 
 export default router;
