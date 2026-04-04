@@ -81,25 +81,25 @@ export default function Profile({ user, setUser }) {
   };
 
   // 🖼️ Handle Image Upload
+// 🖼️ Handle Image Upload
 const handleImageChange = async (e) => {
-
   const file = e.target.files[0];
-
   if (!file) return;
 
+  // Validation
   if (file.size > 2 * 1024 * 1024) {
     return showMsg("File size too large (Max 2MB)", "warning");
   }
 
   const formData = new FormData();
-
-  formData.append("image", file);
+  
+  // 🔴 FIX: Yahan "image" ki jagah "photo" hona chahiye 
+  // kyunki backend upload.single("photo") ka intezar kar raha hai
+  formData.append("photo", file); 
   formData.append("employeeId", user.employeeId);
 
   try {
-
     setLoading(true);
-
     const res = await axios.post(
       `${API_URL}/api/profile/upload`,
       formData,
@@ -111,37 +111,22 @@ const handleImageChange = async (e) => {
     );
 
     if (res.data.success) {
-
-      const newPhotoPath = res.data.photo;
-
-      const updatedUser = {
-        ...user,
-        photo: newPhotoPath
-      };
+      const newPhotoPath = res.data.photo; // Cloudinary URL milega
+      const updatedUser = { ...user, photo: newPhotoPath };
 
       localStorage.setItem("user", JSON.stringify(updatedUser));
-
       setUser(updatedUser);
+      setPhotoURL(newPhotoPath); // Direct Cloudinary URL set karein
 
-      setPhotoURL(getImageUrl(newPhotoPath));
-
-      showMsg("✅ Photo updated successfully");
-
+      showMsg("✅ Profile photo updated successfully");
     }
-
   } catch (err) {
-
-    console.error(err);
-
-    showMsg(
-      err.response?.data?.message || "Upload failed",
-      "error"
-    );
-
+    console.error("Upload Error Details:", err.response?.data);
+    showMsg(err.response?.data?.message || "Upload failed", "error");
   } finally {
     setLoading(false);
+    e.target.value = null; // Taaki same file dobara select ho sake
   }
-
 };
   // 🚪 Logout logic cleaned up
   const logout = async () => {
