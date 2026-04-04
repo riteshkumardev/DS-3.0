@@ -35,11 +35,13 @@ const transactionSchema = new mongoose.Schema({
     min: 0
   },
 
-  paymentMethod: { 
-    type: String, 
-    enum: ['Cash', 'Bank', 'UPI', 'Cheque'],
-    default: "Cash" 
-  },
+paymentMethod: {
+  type: String,
+  required: true,
+  // ✅ यहाँ 'Credit' को भी लिस्ट में जोड़ दें
+  enum: ["Cash", "Online", "Cheque", "Credit", "UPI"], 
+  default: "Cash"
+},
 
   description: { 
     type: String, 
