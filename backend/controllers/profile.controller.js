@@ -1,10 +1,10 @@
-import Employee from "../models/Employee.js"; // ✅ Fixed Typo (epmloyee -> employee)
-import ActivityLog from "../models/ActivityLog.js"; // ✅ Match Case
-import fs from "fs/promises"; 
-import path from "path";
-import bcrypt from "bcryptjs"; // ✅ Added for Secure Password
+import Employee from "../models/Employee.js"; 
+import ActivityLog from "../models/ActivityLog.js"; 
+import bcrypt from "bcryptjs"; 
 
-/* ================= Helper: Audit Logger ================= */
+/* ==========================================================
+   📜 Helper: Audit Logger
+   ========================================================== */
 const logAudit = async (adminName, action, module = "PROFILE") => {
   try {
     await ActivityLog.create({
@@ -17,21 +17,32 @@ const logAudit = async (adminName, action, module = "PROFILE") => {
     console.error("Audit Logging Failed:", err);
   }
 };
-/* ================= 📸 IMAGE UPLOAD (Cloudinary Version) ================= */
+
+/* ==========================================================
+   📸 IMAGE UPLOAD (Cloudinary Version - NO LOCAL FS)
+   ========================================================== */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId, adminName } = req.body;
 
     // 1. Validation
     if (!req.file || !employeeId) {
-      return res.status(400).json({ success: false, message: "Image or employeeId missing" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Image or employeeId missing" 
+      });
     }
 
     const employee = await Employee.findOne({ employeeId });
-    if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Employee not found" 
+      });
+    }
 
-    // 2. Cloudinary Path Fix
-    // req.file.path में अब https://res.cloudinary.com/... वाला पूरा लिंक होगा
+    // 2. Cloudinary Path logic
+    // req.file.path mein Cloudinary ka HTTPS URL hota hai
     const imagePath = req.file.path; 
 
     // 3. Update Database
@@ -44,15 +55,20 @@ export const uploadProfileImage = async (req, res) => {
     res.json({ 
       success: true, 
       message: "Profile photo updated successfully ✅", 
-      photo: imagePath // Frontend को अब पूरा URL मिलेगा
+      photo: imagePath 
     });
   } catch (err) {
     console.error("Upload Error:", err);
-    res.status(500).json({ success: false, message: "Server error during upload" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error during upload" 
+    });
   }
 };
 
-/* ================= ✏️ UPDATE PROFILE DETAILS ================= */
+/* ==========================================================
+   ✏️ UPDATE PROFILE DETAILS
+   ========================================================== */
 export const updateProfile = async (req, res) => {
   try {
     const { employeeId, name, phone, adminName } = req.body;
@@ -63,25 +79,39 @@ export const updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Employee not found" 
+      });
+    }
 
     await logAudit(adminName || employee.name, `Profile updated: ${name} (${phone})`);
-    res.json({ success: true, message: "Profile updated successfully ✅", data: employee });
+    res.json({ 
+      success: true, 
+      message: "Profile updated successfully ✅", 
+      data: employee 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: "Update failed" });
   }
 };
 
-/* ================= 🔐 CHANGE PASSWORD (RE-HASHED) ================= */
+/* ==========================================================
+   🔐 CHANGE PASSWORD
+   ========================================================== */
 export const changePassword = async (req, res) => {
   try {
     const { employeeId, password, adminName } = req.body; 
 
     if (!password || password.length < 6) {
-      return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Password must be at least 6 characters" 
+      });
     }
 
-    // 🛡️ SECURITY FIX: Always hash password before saving!
+    // Security: Hash password before saving
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -91,7 +121,12 @@ export const changePassword = async (req, res) => {
       { new: true }
     );
 
-    if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Employee not found" 
+      });
+    }
 
     await logAudit(adminName || employee.name, `Security Alert: Password changed`, "SECURITY");
     res.json({ success: true, message: "Password updated successfully ✅" });
@@ -100,12 +135,13 @@ export const changePassword = async (req, res) => {
   }
 };
 
-/* ================= 🚪 LOGOUT ================= */
+/* ==========================================================
+   🚪 LOGOUT
+   ========================================================== */
 export const logoutUser = async (req, res) => {
   try {
     const { employeeId, adminName } = req.body;
     
-    // Clear session from DB
     const employee = await Employee.findOneAndUpdate(
       { employeeId }, 
       { currentSessionId: null }, 
