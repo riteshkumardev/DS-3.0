@@ -17,12 +17,12 @@ const logAudit = async (adminName, action, module = "PROFILE") => {
     console.error("Audit Logging Failed:", err);
   }
 };
-
-/* ================= 📸 IMAGE UPLOAD ================= */
+/* ================= 📸 IMAGE UPLOAD (Cloudinary Version) ================= */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId, adminName } = req.body;
 
+    // 1. Validation
     if (!req.file || !employeeId) {
       return res.status(400).json({ success: false, message: "Image or employeeId missing" });
     }
@@ -30,24 +30,24 @@ export const uploadProfileImage = async (req, res) => {
     const employee = await Employee.findOne({ employeeId });
     if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
 
-    // Old photo delete logic (Prevent storage full)
-    if (employee.photo) {
-      const oldFilePath = path.join(process.cwd(), employee.photo);
-      try { 
-        await fs.unlink(oldFilePath); 
-      } catch (e) { 
-        console.log("Old file not found, skipping delete"); 
-      }
-    }
+    // 2. Cloudinary Path Fix
+    // req.file.path में अब https://res.cloudinary.com/... वाला पूरा लिंक होगा
+    const imagePath = req.file.path; 
 
-    // Path fix for frontend display
-    const imagePath = `uploads/${req.file.filename}`;
+    // 3. Update Database
     employee.photo = imagePath;
     await employee.save();
 
-    await logAudit(adminName || employee.name, "Profile photo updated", "MEDIA");
-    res.json({ success: true, message: "Profile photo updated successfully ✅", photo: imagePath });
+    // 4. Audit Log
+    await logAudit(adminName || employee.name, "Profile photo updated (Cloudinary)", "MEDIA");
+
+    res.json({ 
+      success: true, 
+      message: "Profile photo updated successfully ✅", 
+      photo: imagePath // Frontend को अब पूरा URL मिलेगा
+    });
   } catch (err) {
+    console.error("Upload Error:", err);
     res.status(500).json({ success: false, message: "Server error during upload" });
   }
 };
