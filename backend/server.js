@@ -52,6 +52,7 @@ const app = express();
 const allowedOrigins = [
   "https://dharashakti30.vercel.app",
   "https://dharashaktionline.vercel.app",
+  "https://dharashaktiv3.vercel.app/",
   "http://localhost:3000"
 ];
 
