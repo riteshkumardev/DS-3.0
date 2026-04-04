@@ -39,7 +39,7 @@ paymentMethod: {
   type: String,
   required: true,
   // ✅ यहाँ 'Credit' को भी लिस्ट में जोड़ दें
-  enum: ["Cash", "Online", "Cheque", "Credit", "UPI"], 
+ enum: ["Cash", "Online", "Cheque", "Credit", "UPI", "Cash/Bank"],, 
   default: "Cash"
 },
 
