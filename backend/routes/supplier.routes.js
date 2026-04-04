@@ -13,5 +13,5 @@ router.get("/list", getAllSuppliers);
 // Update route add karein
 router.put("/update/:id", updateSupplier);
 router.delete("/delete/:id", deleteSupplier);
-
+router.post("/", createSupplier);
 export default router;
