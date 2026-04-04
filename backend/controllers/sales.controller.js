@@ -3,7 +3,7 @@ import Sale from "../models/Sale.js";
 import Transaction from "../models/Transaction.js";
 import Supplier from "../models/Supplier.js";
 import Stock from "../models/Stock.js"; // New: Added for Stock tracking
-import ActivityLog from "../models/activityLog.js";
+import ActivityLog from "../models/ActivityLog.js";
 
 
 
