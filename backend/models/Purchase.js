@@ -9,7 +9,7 @@ const purchaseGoodsSchema = new mongoose.Schema({
 }, { _id: false });
 
 const purchaseSchema = new mongoose.Schema({
-  billNo: { type: String, required: true }, // Supplier's Invoice No
+  billNo: { type: String, required: false }, // Supplier's Invoice No
   date: { type: String, required: true },
   supplierName: { type: String, required: true },
   gstin: { type: String, default: "N/A" }, 
