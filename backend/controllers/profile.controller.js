@@ -17,7 +17,7 @@ const logAudit = async (adminName, action, module = "PROFILE") => {
     console.error("Audit Logging Failed:", err);
   }
 };
-
+ 
 /* ==========================================================
    📸 IMAGE UPLOAD (Cloudinary Version - NO LOCAL FS)
    ========================================================== */
