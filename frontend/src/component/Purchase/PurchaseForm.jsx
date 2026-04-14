@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; 
+// 1. Modular API Import
+import { createPurchase } from "../../api/purchaseApi"; 
+import { fetchPartiesList } from "../../api/partyApi"; // Agar suppliers list yahan se aati hai
 import { 
   Calendar, User, Hash, Truck, MapPin, Package, 
-  Layers, CreditCard, Info, Save, X, Plus, Minus, ShieldAlert, MessageSquare
+  Layers, CreditCard, Info, Save, X, Plus, Minus, MessageSquare,
+  ShieldAlert
 } from "lucide-react";
 
-// 🏗️ Core Components Import
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
-const PurchaseForm = ({user,onCancel }) => {
-  const role=user.role
-  console.log();
-  
-  console.log(user,"onCancel");
-  
-  // 🔐 Permission Check
-  const isAuthorized = role === "Admin" || role === "Accountant";
+const toSafeNumber = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const PurchaseForm = ({ user, onCancel }) => {
+  const role = user?.role?.toUpperCase();
+  const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
 
   const initialState = {
     date: new Date().toISOString().split("T")[0],
@@ -41,34 +43,32 @@ const PurchaseForm = ({user,onCancel }) => {
   const [suppliers, setSuppliers] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  
-  // 🆕 Traveling Cost Mode State (+ ya - select karne ke liye)
   const [travelMode, setTravelMode] = useState("-"); 
-
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  const productList = ["Corn", "Corn Greet", "Cattle Feed", "Aatarice", "Rice Greet", "Packing Bag","Rice Broken"];
+  const productList = ["Corn", "Corn Greet", "Cattle Feed", "Aatarice", "Rice Greet", "Packing Bag", "Rice Broken"];
 
+  // 2. Fetch Suppliers using modular API pattern
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const loadSuppliers = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`${API_URL}/api/suppliers/list`); 
-        if (res.data && res.data.success) {
+        // Note: Make sure fetchPartiesList exists in your partyApi
+        const res = await fetchPartiesList('SUPPLIER'); 
+        if (res.data?.success) {
           setSuppliers(res.data.data);
         }
       } catch (err) { 
-        showMsg("Suppliers load नहीं हो पाए", "error");
+        showMsg("Suppliers load nahi ho paye", "error");
       } finally {
         setLoading(false);
       }
     };
-    fetchSuppliers();
-  }, [API_URL]);
+    loadSuppliers();
+  }, []);
 
   const handleSupplierSelect = (e) => {
     const selectedName = e.target.value;
@@ -77,16 +77,16 @@ const PurchaseForm = ({user,onCancel }) => {
     if (supplier) {
       let finalName = supplier.name;
       if (supplier.name === "Local customer") {
-        const customName = prompt("कृपया बिल के लिए लोकल कस्टमर का नाम दर्ज करें:");
+        const customName = prompt("Enter Local Supplier Name:");
         if (customName) finalName = customName;
       }
 
       setFormData((prev) => ({
         ...prev,
         supplierName: finalName,
-        gstin: supplier.gstin || "N/A",
-        mobile: supplier.phone || "N/A",
-        address: supplier.address || "N/A",
+        gstin: supplier.gstin || "URD",
+        mobile: supplier.phone || "",
+        address: supplier.address?.street || "", // Adjusted to match your party model
       }));
     } else {
       setFormData((prev) => ({ 
@@ -98,22 +98,23 @@ const PurchaseForm = ({user,onCancel }) => {
 
   // 🧮 Live Calculations
   useEffect(() => {
-    const qty = Number(formData.quantity) || 0;
-    const rate = Number(formData.rate) || 0;
-    const travel = Number(formData.travelingCost) || 0;
-    const cdPercent = Number(formData.cashDiscount) || 0;
+    const qty = toSafeNumber(formData.quantity);
+    const rate = toSafeNumber(formData.rate);
+    const travel = toSafeNumber(formData.travelingCost);
+    const cdPercent = toSafeNumber(formData.cashDiscount);
+    const paid = toSafeNumber(formData.paidAmount);
 
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
     const travelEffect = travelMode === "+" ? travel : -travel;
 
     const total = basePrice - discountAmount + travelEffect; 
-    const balance = total - (Number(formData.paidAmount) || 0);
+    const balance = total - paid;
 
     setFormData((prev) => ({
       ...prev,
-      totalAmount: total,
-      balanceAmount: balance,
+      totalAmount: Math.round(total),
+      balanceAmount: Math.round(balance),
     }));
   }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount, formData.travelingCost, travelMode]);
 
@@ -122,33 +123,41 @@ const PurchaseForm = ({user,onCancel }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // 3. Updated Submit using createPurchase API
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAuthorized) return showMsg("Unauthorized!", "error");
+    if (!isAuthorized) return showMsg("Access Denied!", "error");
+    if (!formData.supplierName) return showMsg("Please select a supplier", "error");
 
     setLoading(true);
     try {
       const payload = {
         ...formData,
         travelMode: travelMode,
-        quantity: Number(formData.quantity),
-        rate: Number(formData.rate),
-        travelingCost: Number(formData.travelingCost) || 0,
-        cashDiscount: Number(formData.cashDiscount) || 0,
-        paidAmount: Number(formData.paidAmount) || 0
+        quantity: toSafeNumber(formData.quantity),
+        rate: toSafeNumber(toSafeNumber(formData.rate)),
+        travelingCost: toSafeNumber(formData.travelingCost),
+        cashDiscount: toSafeNumber(formData.cashDiscount),
+        paidAmount: toSafeNumber(formData.paidAmount),
+        performedBy: user?._id // Backend validation ke liye zaroori hai
       };
-      const res = await axios.post(`${API_URL}/api/purchases`, payload);
+
+      const res = await createPurchase(payload); // ✅ API call
+      
       if (res.data.success) {
-        showMsg("✅ Purchase Record Saved Successfully!");
+        showMsg("✅ Purchase Record Saved!");
         setFormData(initialState);
         if (onCancel) setTimeout(() => onCancel(), 1000); 
       }
     } catch (error) {
-      showMsg("❌ Data save नहीं हो पाया।", "error");
+      showMsg(error.response?.data?.message || "Data save nahi ho paya", "error");
     } finally {
       setLoading(false);
-    }
+    } 
   };
+
+  if (loading && suppliers.length === 0) return <Loader />;
+
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 font-sans">
