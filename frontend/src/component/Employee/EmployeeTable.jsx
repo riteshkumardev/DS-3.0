@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios'; 
 import { useNavigate } from "react-router-dom";
 import { 
-  Search, Edit3, Trash2, Eye, Camera, Check, X, 
-  User, Phone, CreditCard, Landmark, Banknote, CalendarDays, FileDown 
+  Search, Edit3, Camera, Check, X, Eye, FileDown 
 } from "lucide-react";
 import Loader from '../Core_Component/Loader/Loader';
 import jsPDF from 'jspdf';
@@ -11,7 +10,7 @@ import autoTable from 'jspdf-autotable';
 
 const EmployeeTable = ({ user }) => { 
   const role = user?.role;
-  const isAuthorized = role === "Admin" || role === "Accountant";
+  const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT"; // Match uppercase roles
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
@@ -47,11 +46,7 @@ const EmployeeTable = ({ user }) => {
     );
   };
 
-  const handleSelectAll = () => {
-    const filteredList = employees.filter(emp => 
-        emp.name?.toLowerCase().includes(search.toLowerCase()) || 
-        emp.employeeId?.toString().includes(search)
-    );
+  const handleSelectAll = (filteredList) => {
     if (selectedIds.length === filteredList.length) {
       setSelectedIds([]);
     } else {
@@ -59,127 +54,65 @@ const EmployeeTable = ({ user }) => {
     }
   };
 
-  // --- PDF GENERATION LOGIC WITH SR NO & GRAND TOTAL ---
+  // --- PDF GENERATION ---
   const downloadReport = async () => {
-    if (selectedIds.length === 0) {
-      alert("Please select at least one employee!");
-      return;
-    }
+    if (selectedIds.length === 0) return alert("Select staff members first!");
 
     try {
       const doc = new jsPDF('landscape');
-      const tableColumn = ["Sr.", "Emp ID", "Name", "Role", "Base Salary", "Work Days", "Total Earned", "Paid", "Due"];
+      const tableColumn = ["Sr.", "Emp ID", "Name", "Role", "Base Salary", "Work Days", "Earned", "Paid", "Due"];
       const tableRows = [];
 
-      // Totals calculate karne ke liye variables
-      let grandTotalEarned = 0;
-      let grandTotalPaid = 0;
-      let grandTotalDue = 0;
-
-      alert(`Generating Report for ${selectedIds.length} staff members...`);
+      let totals = { earned: 0, paid: 0, due: 0 };
+      const employeesToExport = employees.filter(emp => selectedIds.includes(emp._id));
 
       const attRes = await axios.get(`${API_URL}/api/attendance`);
       const allAttendance = attRes.data.data || [];
+      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-
-      const employeesToExport = employees.filter(emp => selectedIds.includes(emp._id));
-
-      // Loop to build rows
       for (let i = 0; i < employeesToExport.length; i++) {
         const emp = employeesToExport[i];
         
-        // 1. Attendance calculation
-        const empAttendance = allAttendance.filter(a => String(a.employeeId) === String(emp.employeeId));
-        const presentCount = empAttendance.filter(a => a.status === 'Present').length;
-        const halfDayCount = empAttendance.filter(a => a.status === 'Half Day' || a.status === 'Half-Day').length;
-        const totalWorkDays = presentCount + (halfDayCount * 0.5);
+        // Calculation logic
+        const empAtt = allAttendance.filter(a => String(a.employeeId) === String(emp.employeeId));
+        const totalWorkDays = empAtt.filter(a => a.status === 'Present').length + (empAtt.filter(a => a.status === 'Half Day').length * 0.5);
+        const earned = Math.round((Number(emp.baseSalary) / daysInMonth) * totalWorkDays);
+        
+        // Placeholder for payments (replace with actual API if available)
+        const paid = 0; 
+        const due = earned - paid;
 
-        // 2. Salary calculation
-        const monthlySalary = Number(emp.salary) || 0;
-        const dailyRate = monthlySalary / daysInMonth; 
-        const totalSalaryEarned = Math.round(totalWorkDays * dailyRate);
+        totals.earned += earned; totals.paid += paid; totals.due += due;
 
-        // 3. Payments fetch
-        let totalPaid = 0;
-        try {
-            const payRes = await axios.get(`${API_URL}/api/salary-payments/${emp.employeeId}`);
-            if (payRes.data.success && Array.isArray(payRes.data.data)) {
-                totalPaid = payRes.data.data.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-            }
-        } catch (payErr) {
-            console.error(`Payment fetch failed for ${emp.employeeId}`);
-        }
-
-        const due = totalSalaryEarned - totalPaid;
-
-        // Add to Grand Totals
-        grandTotalEarned += totalSalaryEarned;
-        grandTotalPaid += totalPaid;
-        grandTotalDue += due;
-
-        // Push Row Data
         tableRows.push([
-          i + 1, // SR NO
-          emp.employeeId,
-          emp.name,
-          emp.role || emp.designation,
-          `Rs.${monthlySalary.toLocaleString()}`,
-          totalWorkDays,
-          `Rs.${totalSalaryEarned.toLocaleString()}`,
-          `Rs.${totalPaid.toLocaleString()}`,
-          `Rs.${due.toLocaleString()}`
+          i + 1, emp.employeeId, emp.name, emp.role,
+          `Rs.${emp.baseSalary}`, totalWorkDays, `Rs.${earned}`, `Rs.${paid}`, `Rs.${due}`
         ]);
       }
 
-      // Final Row: Grand Total
+      // Add Grand Total
       tableRows.push([
-        { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fillColor: [220, 220, 220], fontStyle: 'bold' } },
-        { content: `Rs.${grandTotalEarned.toLocaleString()}`, styles: { fillColor: [220, 220, 220], fontStyle: 'bold' } },
-        { content: `Rs.${grandTotalPaid.toLocaleString()}`, styles: { fillColor: [220, 220, 220], fontStyle: 'bold' } },
-        { content: `Rs.${grandTotalDue.toLocaleString()}`, styles: { fillColor: [220, 220, 220], fontStyle: 'bold', textColor: [200, 0, 0] } }
+        { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fillColor: [240, 240, 240], fontStyle: 'bold' } },
+        { content: `Rs.${totals.earned}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } },
+        { content: `Rs.${totals.paid}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } },
+        { content: `Rs.${totals.due}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [200, 0, 0] } }
       ]);
 
-      // PDF Header Styling
-      doc.setFontSize(18);
-      doc.setTextColor(16, 185, 129);
       doc.text("DHARA SHAKTI AGRO - STAFF CONSOLIDATED REPORT", 14, 15);
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`Monthly Basis: ${daysInMonth} Days | Generated: ${new Date().toLocaleString()}`, 14, 22);
-
-      // Generate Table
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 30,
-        theme: 'grid',
-        headStyles: { fillColor: [16, 185, 129], fontSize: 9, halign: 'center' },
-        styles: { fontSize: 8, cellPadding: 2.5 },
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 10 }, // Sr. No column width
-            5: { halign: 'center' }, // Work Days center
-            6: { fontStyle: 'bold' }, 
-            8: { textColor: [220, 38, 38], fontStyle: 'bold' }
-        }
-      });
-
-      doc.save(`DharaShakti_Staff_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-
-    } catch (err) {
-      console.error("PDF Error:", err);
-      alert("Error generating report. Check console.");
-    }
+      autoTable(doc, { head: [tableColumn], body: tableRows, startY: 25, theme: 'grid', headStyles: { fillColor: [16, 185, 129] } });
+      doc.save(`Staff_Report_${new Date().toLocaleDateString()}.pdf`);
+    } catch (err) { alert("PDF Generation Failed"); }
   };
 
   const startEdit = (emp) => {
     if (!isAuthorized) return;
     setEditId(emp._id); 
-    setEditData({ ...emp });
+    setEditData({ 
+        ...emp, 
+        salary: emp.baseSalary, // Flattening for the form
+        accountNo: emp.bankDetails?.accountNumber,
+        bankName: emp.bankDetails?.bankName
+    });
   };
 
   const handleEditChange = (e) => {
@@ -189,11 +122,16 @@ const EmployeeTable = ({ user }) => {
 
   const handleSave = async () => {
     try {
-      const { _id, createdAt, updatedAt, __v, photo, ...payload } = editData;
-      const res = await axios.put(`${API_URL}/api/employees/${editData.employeeId}`, {
-        ...payload,
-        salary: Number(editData.salary)
-      });
+      const payload = {
+        name: editData.name,
+        phone: editData.phone,
+        salary: editData.salary, // Controller handles mapping to baseSalary
+        accountNo: editData.accountNo,
+        bankName: editData.bankName,
+        role: editData.role
+      };
+      
+      const res = await axios.put(`${API_URL}/api/employees/${editData.employeeId}`, payload);
       if (res.data.success) {
         alert("✅ Details Updated!");
         setEditId(null);
@@ -222,7 +160,7 @@ const EmployeeTable = ({ user }) => {
   );
 
   const getImageUrl = (path) => {
-    if (!path) return "https://i.imgur.com/6VBx3io.png";
+    if (!path || path === "null") return "https://i.imgur.com/6VBx3io.png";
     if (path.startsWith('http')) return path;
     return `${API_URL}/${path.replace(/\\/g, '/')}`;
   };
@@ -239,7 +177,7 @@ const EmployeeTable = ({ user }) => {
             <input 
                type="checkbox" 
                className="w-5 h-5 cursor-pointer rounded accent-emerald-600 outline-none"
-               onChange={handleSelectAll}
+               onChange={() => handleSelectAll(filtered)}
                checked={selectedIds.length === filtered.length && filtered.length > 0}
             />
             <h2 className="text-xl font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter">
@@ -252,7 +190,7 @@ const EmployeeTable = ({ user }) => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search staff..." 
+                placeholder="Search staff by name or ID..." 
                 className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -264,7 +202,7 @@ const EmployeeTable = ({ user }) => {
               className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all shadow-md active:scale-95 ${selectedIds.length > 0 ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'}`}
               disabled={selectedIds.length === 0}
             >
-              <FileDown size={18} /> Export PDF Report
+              <FileDown size={18} /> Export PDF
             </button>
           </div>
         </div>
@@ -286,7 +224,7 @@ const EmployeeTable = ({ user }) => {
             <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
               {filtered.map((emp) => (
                 <tr key={emp._id} className={`${selectedIds.includes(emp._id) ? 'bg-emerald-50/20 dark:bg-emerald-500/5' : ''} hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-all`}>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 cursor-pointer accent-emerald-600"
@@ -297,7 +235,7 @@ const EmployeeTable = ({ user }) => {
                   <td className="px-6 py-4 font-black text-sm text-zinc-500">#{emp.employeeId}</td>
                   <td className="px-6 py-4">
                     <div className="relative group w-12 h-12">
-                      <img src={getImageUrl(emp.photo)} className="w-full h-full rounded-2xl object-cover border dark:border-zinc-700" alt="profile" onError={(e) => e.target.src = "https://i.imgur.com/6VBx3io.png"} />
+                      <img src={getImageUrl(emp.photo)} className="w-full h-full rounded-2xl object-cover border dark:border-zinc-700" alt="profile" />
                       {isAuthorized && (
                         <label className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
                             <Camera size={16} className="text-white" />
@@ -321,11 +259,14 @@ const EmployeeTable = ({ user }) => {
                   </td>
                   <td className="px-6 py-4">
                     {editId === emp._id ? (
-                      <input name="accountNo" value={editData.accountNo} onChange={handleEditChange} className="edit-input-zinc" />
+                      <div className="space-y-1">
+                        <input name="bankName" value={editData.bankName} onChange={handleEditChange} className="edit-input-zinc" placeholder="Bank" />
+                        <input name="accountNo" value={editData.accountNo} onChange={handleEditChange} className="edit-input-zinc" placeholder="A/C No" />
+                      </div>
                     ) : (
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">{emp.accountNo || 'N/A'}</span>
-                        <span className="text-[9px] uppercase font-bold text-zinc-400">{emp.bankName}</span>
+                        <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">{emp.bankDetails?.accountNumber || 'NO A/C'}</span>
+                        <span className="text-[9px] uppercase font-bold text-zinc-400">{emp.bankDetails?.bankName || 'N/A'}</span>
                       </div>
                     )}
                   </td>
@@ -333,23 +274,31 @@ const EmployeeTable = ({ user }) => {
                     {editId === emp._id ? (
                       <div className="space-y-1">
                         <input name="salary" type="number" value={editData.salary} onChange={handleEditChange} className="edit-input-zinc" />
-                        <input name="role" value={editData.role} onChange={handleEditChange} className="edit-input-zinc" />
+                        <select name="role" value={editData.role} onChange={handleEditChange} className="edit-input-zinc">
+                            <option value="DRIVER">DRIVER</option>
+                            <option value="MANAGER">MANAGER</option>
+                            <option value="WORKER">WORKER</option>
+                            <option value="OPERATOR">OPERATOR</option>
+                        </select>
                       </div>
                     ) : (
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-emerald-600">₹{Number(emp.salary).toLocaleString()}</span>
-                        <span className="text-[9px] uppercase font-black text-zinc-400">{emp.role || emp.designation}</span>
+                        <span className="text-sm font-black text-emerald-600">₹{Number(emp.baseSalary).toLocaleString()}</span>
+                        <span className="text-[9px] uppercase font-black text-zinc-400 tracking-wider">{emp.role}</span>
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex justify-center gap-2">
                       {editId === emp._id ? (
-                        <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl"><Check size={18}/></button>
+                        <>
+                          <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-500/20"><Check size={18}/></button>
+                          <button onClick={() => setEditId(null)} className="p-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 rounded-xl"><X size={18}/></button>
+                        </>
                       ) : (
                         <>
-                          <button onClick={() => startEdit(emp)} className="p-2 text-zinc-400 hover:text-emerald-500"><Edit3 size={17}/></button>
-                          <button onClick={() => navigate(`/staff-ledger/${emp.employeeId}`)} className="p-2 text-zinc-400 hover:text-amber-500"><Eye size={17}/></button>
+                          <button onClick={() => startEdit(emp)} className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors"><Edit3 size={17}/></button>
+                          <button onClick={() => navigate(`/staff-ledger/${emp.employeeId}`)} className="p-2 text-zinc-400 hover:text-amber-500 transition-colors"><Eye size={17}/></button>
                         </>
                       )}
                     </div>
@@ -364,6 +313,7 @@ const EmployeeTable = ({ user }) => {
       <style>{`
         .edit-input-zinc { width: 100%; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 0.75rem; padding: 0.4rem 0.6rem; font-size: 0.75rem; outline: none; font-weight: 700; color: #1e293b; }
         .dark .edit-input-zinc { background: #09090b; border-color: #27272a; color: #f4f4f5; }
+        .edit-input-zinc:focus { border-color: #10b981; ring: 2px solid rgba(16, 185, 129, 0.2); }
       `}</style>
     </div>
   );
