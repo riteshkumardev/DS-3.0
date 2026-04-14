@@ -22,7 +22,7 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         enum: [
             'SALE', 'PURCHASE', 'PAYMENT_IN', 'PAYMENT_OUT', 
-            'EXPENSE', 'SALARY', 'OPENING_BALANCE'
+            'EXPENSE', 'SALARY', 'OPENING_BALANCE','REVERSAL'
         ],
         required: true
     },
