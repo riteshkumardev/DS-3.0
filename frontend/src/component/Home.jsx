@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios"; 
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   TrendingUp, ShoppingCart, Package, ShieldCheck, 
   ChevronRight, LayoutDashboard, BellRing, User as UserIcon,
-  ArrowUpRight, Clock, PlusCircle, History, Zap
+  ArrowUpRight, PlusCircle, History, Zap
 } from "lucide-react";
+
+// ✅ Importing your API services
+import { getAllSales } from "../api/saleApi";
+import { getAllPurchases } from "../api/purchaseApi";
+import { getInventory } from "../api/stockApi";
+
 import Loader from "./Core_Component/Loader/Loader";
 import OverdueAlerts from "./Core_Component/Alert/OverdueAlerts";
 import MasterSmartBot from "./Bot/MasterSmartBot";
@@ -17,36 +22,48 @@ const Home = ({ user }) => {
   const [allPurchases, setAllPurchases] = useState([]); 
   const [loading, setLoading] = useState(true);
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  // 🔄 Fetch Dashboard Data using your centralized API functions
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Promise.all to fetch everything simultaneously
+      const [salesRes, purchaseRes, stockRes] = await Promise.all([
+        getAllSales(),
+        getAllPurchases(),
+        getInventory()
+      ]);
+
+      // Extracting data safely from your API structure
+      const salesData = salesRes.data.data || [];
+      const purchaseData = purchaseRes.data.data || [];
+      const stockData = stockRes.data.data || [];
+      
+      setAllSales(salesData);
+      setAllPurchases(purchaseData);
+      
+      setStats({
+        salesCount: salesData.length,
+        purchaseCount: purchaseData.length,
+        stockCount: stockData.length
+      });
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+      // If token expired or invalid, redirect to login
+      if (err.response?.status === 401) {
+        navigate("/login");
+      }
+    } finally {
+      // Small timeout for smooth loader transition
+      setTimeout(() => setLoading(false), 600);
+    }
+  }, [navigate]);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        const [salesRes, purchaseRes, stockRes] = await Promise.all([
-          axios.get(`${API_URL}/sales`),
-          axios.get(`${API_URL}/purchases`),
-          axios.get(`${API_URL}/stocks`)
-        ]);
-
-        const salesData = salesRes.data.data || [];
-        const purchaseData = purchaseRes.data.data || [];
-        
-        setAllSales(salesData);
-        setAllPurchases(purchaseData);
-        setStats({
-          salesCount: salesData.length,
-          purchaseCount: purchaseData.length,
-          stockCount: stockRes.data.data?.length || 0
-        });
-      } catch (err) {
-        console.error("Dashboard load error:", err);
-      } finally {
-        setTimeout(() => setLoading(false), 600);
-      }
-    };
-    fetchDashboardData();
-  }, [API_URL]);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user, fetchDashboardData]);
 
   if (loading) return <Loader />;
 
@@ -78,7 +95,9 @@ const Home = ({ user }) => {
               {user?.photo ? (
                 <img src={user.photo} className="w-full h-full object-cover rounded-full" alt="User" />
               ) : (
-                <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-800 dark:text-white font-black">{user?.name?.charAt(0)}</div>
+                <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-800 dark:text-white font-black">
+                  {user?.name?.charAt(0)}
+                </div>
               )}
             </div>
             <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full" />
@@ -99,10 +118,10 @@ const Home = ({ user }) => {
           <ActionButton label="New Sale" icon={<PlusCircle size={18}/>} onClick={() => navigate("/sales-entry")} color="emerald" />
           <ActionButton label="Add Stock" icon={<Package size={18}/>} onClick={() => navigate("/stock-management")} color="sky" />
           <ActionButton label="Reports" icon={<History size={18}/>} onClick={() => navigate("/Reports_Printing")} color="zinc" />
-          <ActionButton label="Insights" icon={<Zap size={18}/>}onClick={() => navigate("/analysis-page")} color="amber" />
+          <ActionButton label="Insights" icon={<Zap size={18}/>} onClick={() => navigate("/analysis-page")} color="amber" />
         </section>
 
-        🚩 CRITICAL ALERTS
+        {/* 🚩 CRITICAL ALERTS */}
         <section className="mb-12">
           <div className="flex items-center gap-3 mb-6 ml-2">
             <div className="p-2 bg-rose-500/10 rounded-lg"><BellRing size={18} className="text-rose-500" /></div>
@@ -112,7 +131,7 @@ const Home = ({ user }) => {
             salesData={allSales} 
             purchaseData={allPurchases} 
             daysLimit={10} 
-            onViewDetails={(item, type) => navigate(type === 'SALE' ? "/invoices" : "/purchase-list")} 
+            onViewDetails={(item, type) => navigate(type === 'SALE' ? "/sales-table" : "/purchase-table")} 
           />
         </section>
 
@@ -142,6 +161,7 @@ const Home = ({ user }) => {
             onClick={() => navigate("/stock-management")}
             subText="Active items"
           />
+          
           <div className="bg-gradient-to-br from-zinc-900 to-black dark:from-zinc-800 dark:to-zinc-900 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full group-hover:bg-emerald-500/20 transition-all" />
             <UserIcon className="text-zinc-700 mb-4" size={28} />
@@ -154,8 +174,7 @@ const Home = ({ user }) => {
         </section>
       </main>
 
-    
-        <MasterSmartBot />
+      <MasterSmartBot />
     </div>
   );
 };
