@@ -29,7 +29,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     emergencyPhone: "",
     aadhar: "",
     address: "",
-    designation: "Worker",
+    designation: "WORKER",
     joiningDate: new Date().toISOString().split("T")[0],
     salary: "",
     bankName: "",
@@ -195,14 +195,22 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Designation</label>
-                <select name="designation" value={formData.designation} onChange={handleChange} className="form-input-zinc appearance-none cursor-pointer">
-                  <option value="Admin">Admin</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Operator">Operator</option>
-                  <option value="Worker">Worker</option>
-                  <option value="Driver">Driver</option>
-                  <option value="Helper">Helper</option>
-                </select>
+          <select 
+  name="designation" 
+  value={formData.designation} 
+  onChange={handleChange} 
+  className="form-input-zinc appearance-none cursor-pointer"
+>
+  <option value="">Select Designation</option> {/* Ek default empty option achha rehta hai */}
+  <option value="MANAGER">Manager</option>
+  <option value="ACCOUNTANT">Accountant</option>
+  <option value="OPERATOR">Operator</option>
+  <option value="DRIVER">Driver</option>
+  <option value="LOADER">Loader</option>
+  <option value="SALES_MAN">Sales Man</option>
+  <option value="WORKER">Worker</option>
+  <option value="OTHER">Other</option>
+</select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CalendarDays size={12}/> Joining Date</label>
