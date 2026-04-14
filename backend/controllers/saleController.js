@@ -153,3 +153,90 @@ export const deleteSale = async (req, res, next) => {
         session.endSession();
     }
 };
+// 5. UPDATE SALE (Reversal + Re-apply Logic)
+export const updateSale = async (req, res, next) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const saleId = req.params.id;
+        const oldSale = await Sale.findById(saleId).session(session);
+        
+        if (!oldSale) {
+            return res.status(404).json({ success: false, message: "Sale record not found" });
+        }
+
+        const { partyId, goods, billNo, paymentMode, grandTotal } = req.body;
+
+        // --- STEP A: REVERSE OLD DATA ---
+        
+        // 1. Purana Stock wapas add karein (Inventory Reversal)
+        for (const item of oldSale.goods) {
+            await inventoryService.updateStock({
+                productId: item.productId,
+                quantity: item.quantity,
+                type: STOCK_TRANSACTION_TYPES.INWARD, // Outward ka ulta Inward
+                remarks: `STOCK REVERSAL (EDITING BILL: ${oldSale.billNo})`,
+                performedBy: req.user._id,
+                referenceId: oldSale._id
+            }, session);
+        }
+
+        // 2. Purana Ledger Entry reverse karein (Credit the party to nullify old Debit)
+        await ledgerService.postTransaction({
+            partyId: oldSale.partyId,
+            type: ACCOUNT_TYPES.REVERSAL,
+            credit: oldSale.grandTotal,
+            description: `REVERSAL FOR EDIT: BILL NO ${oldSale.billNo}`.toUpperCase(),
+            referenceId: oldSale._id,
+            performedBy: req.user._id
+        }, session);
+
+
+        // --- STEP B: APPLY NEW DATA ---
+
+        // 3. Sale Document Update Karein
+        const updatedSale = await Sale.findByIdAndUpdate(
+            saleId,
+            { ...req.body, performedBy: req.user._id },
+            { new: true, session, runValidators: true }
+        );
+
+        // 4. Naya Stock deduct karein (New Inventory Sync)
+        for (const item of goods) {
+            await inventoryService.updateStock({
+                productId: item.productId,
+                quantity: item.quantity,
+                type: STOCK_TRANSACTION_TYPES.OUTWARD,
+                remarks: `UPDATED SALE BILL NO: ${billNo}`,
+                performedBy: req.user._id,
+                referenceId: updatedSale._id
+            }, session);
+        }
+
+        // 5. Naya Ledger Entry post karein (New Debit)
+        await ledgerService.postTransaction({
+            partyId: partyId,
+            type: ACCOUNT_TYPES.SALE,
+            debit: grandTotal,
+            description: `UPDATED SALE BILL NO: ${billNo}`.toUpperCase(),
+            referenceId: updatedSale._id,
+            paymentMode: paymentMode,
+            performedBy: req.user._id
+        }, session);
+
+        // Transaction Commit
+        await session.commitTransaction();
+        res.status(200).json({ 
+            success: true, 
+            message: "Sale updated and inventory/ledger synced", 
+            data: updatedSale 
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        next(error);
+    } finally {
+        session.endSession();
+    }
+};

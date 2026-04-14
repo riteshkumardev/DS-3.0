@@ -7,6 +7,7 @@ import {
     createSale, 
     getAllSales, 
     getSaleById, 
+    updateSale, // 👈 Isko controller se import karein
     deleteSale 
 } from "../controllers/saleController.js";
 
@@ -19,16 +20,17 @@ import { protect, authorize } from "../middlewares/authMiddleware.js";
  */
 
 // 1. List & Create: Sales staff entries kar sakte hain
-// Filters support: ?customerName=...&billNo=...&startDate=...&endDate=...
 router.route("/")
     .get(protect, getAllSales)
     .post(protect, createSale);
 
-// 2. Single Sale Detail: Bill print karne ya view karne ke liye
-router.get("/:id", protect, getSaleById);
-
-// 3. Delete: Sale delete karna sabse bada risk hai (Stock/Ledger reverse hota hai)
-// Isliye sirf ADMIN ko hi ye power di gayi hai
-router.delete("/:id", protect, authorize('ADMIN'), deleteSale);
+// 2. Single Sale Detail, Update & Delete
+router.route("/:id")
+    .get(protect, getSaleById)
+    // ✅ Update Route Added
+    // Inventory aur Ledger recalculation ke liye 'ADMIN' ya 'ACCOUNTANT' authorize karna safe rahega
+    .put(protect, authorize('ADMIN', 'ACCOUNTANT'), updateSale) 
+    // Delete: Sirf ADMIN ke liye
+    .delete(protect, authorize('ADMIN'), deleteSale);
 
 export default router;

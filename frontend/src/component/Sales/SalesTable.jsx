@@ -154,7 +154,7 @@ const SalesTable = ({ user }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await axios.put(`${process.env.REACT_APP_API_URL}/api/sales/${editId}`, editData);
+      const res = await axios.put(`${process.env.REACT_APP_API_URL}/sales/${editId}`, editData);
       if (res.data.success) { 
         showMsg("Bill Updated Successfully!"); 
         setEditId(null); 
