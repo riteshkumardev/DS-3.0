@@ -4,32 +4,47 @@ import { ROLES } from "../utils/constants.js";
 import logger from "../utils/logger.js";
 
 /**
- * Professional Staff Controller (Full CRUD with Advanced Filters)
- * Dharashakti Agro Products ERP
+ * Professional Staff Controller - Updated for Dharashakti Agro Products ERP
  */
 
 // 1. CREATE STAFF
 export const createStaff = async (req, res, next) => {
     try {
-        const { employeeId, phone, name } = req.body;
+        const { phone, name, salary, aadhar, bankName, accountNo, ifscCode } = req.body;
 
-        // Check for existing employee
-        const existingStaff = await Staff.findOne({ 
-            $or: [{ employeeId }, { phone }] 
-        });
+        // Check for existing employee by phone (Phone is unique)
+        const existingStaff = await Staff.findOne({ phone });
         
         if (existingStaff) {
             res.status(400);
-            throw new Error("Employee ID or Phone already exists");
+            throw new Error("Phone number already registered with another employee");
         }
 
-        const staff = new Staff({
+        // Mapping Flat JSON to Schema Structure
+        const staffData = {
             ...req.body,
-            name: name.toUpperCase()
-        });
+            name: name.toUpperCase(),
+            baseSalary: salary, // Mapping 'salary' to 'baseSalary'
+            kycDetails: {
+                aadharNumber: aadhar
+            },
+            bankDetails: {
+                bankName: bankName,
+                accountNumber: accountNo,
+                ifscCode: ifscCode
+            }
+        };
 
+        const staff = new Staff(staffData);
         const savedStaff = await staff.save();
-        res.status(201).json({ success: true, data: savedStaff });
+
+        logger.info(`New Employee Created: ${savedStaff.employeeId}`);
+
+        res.status(201).json({ 
+            success: true, 
+            message: "Employee created successfully",
+            data: savedStaff 
+        });
     } catch (error) {
         next(error);
     }
@@ -41,22 +56,14 @@ export const getAllStaff = async (req, res, next) => {
         const { role, status, search, city } = req.query;
         let query = {};
 
-        // Filter by Role
-        if (role && role !== 'ALL') {
-            query.role = role;
-        }
+        if (role && role !== 'ALL') query.role = role;
+        if (status) query.status = status;
 
-        // Filter by Status (Active/Left)
-        if (status) {
-            query.status = status;
-        }
-
-        // Filter by City
+        // City filter (nested field check)
         if (city) {
             query['address.city'] = { $regex: city, $options: 'i' };
         }
 
-        // Search by Name or Phone
         if (search) {
             query.$or = [
                 { name: { $regex: search, $options: 'i' } },
@@ -65,7 +72,7 @@ export const getAllStaff = async (req, res, next) => {
             ];
         }
 
-        const staffList = await Staff.find(query).sort({ name: 1 });
+        const staffList = await Staff.find(query).sort({ createdAt: -1 });
         
         res.status(200).json({ 
             success: true, 
@@ -77,7 +84,7 @@ export const getAllStaff = async (req, res, next) => {
     }
 };
 
-// 3. GET STAFF BY ID (With Basic Stats)
+// 3. GET STAFF BY ID
 export const getStaffById = async (req, res, next) => {
     try {
         const staff = await Staff.findById(req.params.id);
@@ -94,21 +101,31 @@ export const getStaffById = async (req, res, next) => {
 // 4. UPDATE STAFF DETAILS
 export const updateStaff = async (req, res, next) => {
     try {
-        const staff = await Staff.findById(req.params.id);
-        if (!staff) {
+        const { salary, aadhar, bankName, accountNo, ifscCode } = req.body;
+
+        // Prepare update object for nested fields
+        let updateData = { ...req.body };
+        
+        if (salary) updateData.baseSalary = salary;
+        if (aadhar) updateData['kycDetails.aadharNumber'] = aadhar;
+        if (bankName) updateData['bankDetails.bankName'] = bankName;
+        if (accountNo) updateData['bankDetails.accountNumber'] = accountNo;
+        if (ifscCode) updateData['bankDetails.ifscCode'] = ifscCode;
+
+        const updatedStaff = await Staff.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedStaff) {
             res.status(404);
             throw new Error("Staff member not found");
         }
 
-        const updatedStaff = await Staff.findByIdAndUpdate(
-            req.params.id,
-            { $set: req.body },
-            { new: true, runValidators: true }
-        );
-
         res.status(200).json({ 
             success: true, 
-            message: "Staff details updated", 
+            message: "Staff details updated successfully", 
             data: updatedStaff 
         });
     } catch (error) {
@@ -116,7 +133,7 @@ export const updateStaff = async (req, res, next) => {
     }
 };
 
-// 5. DELETE/TERMINATE STAFF
+// 5. TERMINATE STAFF (Soft Delete)
 export const deleteStaff = async (req, res, next) => {
     try {
         const staff = await Staff.findById(req.params.id);
@@ -125,14 +142,13 @@ export const deleteStaff = async (req, res, next) => {
             throw new Error("Staff member not found");
         }
 
-        // Professional Approach: Hard delete ke bajaye status 'LEFT' ya 'TERMINATED' karein
-        // Taaki purane records (Attendance/Salary) na bigdein.
+        // Marking as LEFT to preserve transaction/ledger history
         staff.status = 'LEFT';
         await staff.save();
 
         res.status(200).json({ 
             success: true, 
-            message: "Staff marked as LEFT. Records preserved for audit." 
+            message: `Employee ${staff.name} status updated to LEFT.` 
         });
     } catch (error) {
         next(error);

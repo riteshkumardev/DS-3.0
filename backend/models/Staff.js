@@ -1,15 +1,13 @@
-// Staff.js
 import mongoose from "mongoose";
 
 const staffSchema = new mongoose.Schema({
     // --- Unique Identification ---
     employeeId: { 
         type: String, 
-        required: [true, "Employee ID is required"], 
         unique: true,
         uppercase: true,
-        trim: true,
-        placeholder: "e.g., DS-EMP-001"
+        trim: true
+        // 'required' hata diya hai kyunki hum ise save hone se pehle backend me generate karenge
     },
     name: { 
         type: String, 
@@ -17,6 +15,7 @@ const staffSchema = new mongoose.Schema({
         trim: true, 
         uppercase: true 
     },
+    fatherName: { type: String, trim: true, uppercase: true }, // Added from your JSON
     role: { 
         type: String, 
         enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR', 'OTHER'],
@@ -30,12 +29,8 @@ const staffSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    alternatePhone: { type: String, trim: true },
-    address: {
-        street: String,
-        city: { type: String, default: 'Samastipur' },
-        state: { type: String, default: 'Bihar' }
-    },
+    emergencyPhone: { type: String, trim: true }, // Added from your JSON
+    address: { type: String, trim: true }, // Simplified to match your input
     
     // --- Employment & Salary Config ---
     joiningDate: { type: Date, default: Date.now },
@@ -49,38 +44,40 @@ const staffSchema = new mongoose.Schema({
         required: [true, "Base salary is required"],
         min: 0
     },
-    salaryType: {
-        type: String,
-        enum: ['MONTHLY', 'DAILY_WAGES'],
-        default: 'MONTHLY'
-    },
+    password: { type: String, required: true }, // Added for Login/Ledger access
 
-    // --- Banking & KYC (Critical for Professional Setup) ---
+    // --- Banking & KYC ---
     kycDetails: {
         aadharNumber: { type: String, trim: true },
         panNumber: { type: String, trim: true, uppercase: true }
     },
     bankDetails: {
-        accountHolderName: String,
-        accountNumber: String,
+        accountNumber: { type: String },
         ifscCode: { type: String, uppercase: true },
-        bankName: String
+        bankName: { type: String }
     },
 
-    // --- Performance Tracking ---
+    // --- Performance & Ledger Link ---
     currentBalance: {
         type: Number,
         default: 0,
-        comment: "Tracks Advance taken (-) or Salary due (+)"
-    },
-    
-    remarks: { type: String, trim: true }
+        comment: "Negative means advance, Positive means payable salary"
+    }
 }, { 
     timestamps: true 
 });
 
-// Indexing for faster searching
+// --- Middleware: Auto-generate Employee ID before saving ---
+staffSchema.pre('save', async function (next) {
+    if (!this.employeeId) {
+        // Logic: DS-2026-001 (Example)
+        const year = new Date().getFullYear();
+        const count = await mongoose.model('Staff').countDocuments();
+        this.employeeId = `DS-${year}-${(count + 1).toString().padStart(3, '0')}`;
+    }
+    next();
+});
+
 staffSchema.index({ employeeId: 1, phone: 1 });
-staffSchema.index({ status: 1 });
 
 export default mongoose.model('Staff', staffSchema);
