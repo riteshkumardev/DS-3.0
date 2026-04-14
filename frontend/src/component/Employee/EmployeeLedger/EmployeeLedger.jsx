@@ -19,6 +19,8 @@ const getDaysInMonth = (monthStr) => {
 };
 
 const EmployeeLedger = ({ user }) => {
+  console.log(user,"user info ");
+  
   const role = user?.role;
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
   const isBoss = isAuthorized || role === "MANAGER";
