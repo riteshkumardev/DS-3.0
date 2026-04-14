@@ -12,7 +12,6 @@ class InventoryService {
      * @desc    Update Stock and Record Log (Handles HSN or ObjectId)
      */
     async updateStock(data, session = null) {
-        // Frontend se aane wale extra fields (totalQuantity, hsn, unit, category) ko extract kiya
         const { 
             productId, 
             productName, 
@@ -31,18 +30,26 @@ class InventoryService {
         try {
             // 1. Find Product in Master (Flexible Search: ID or HSN)
             let product;
-            if (productId && productId.length === 24) {
-                product = await Product.findById(productId).session(session);
+            // Ensure productId is treated as string for length check
+            const pidStr = String(productId || "");
+
+            if (pidStr && pidStr.length === 24) {
+                product = await Product.findById(pidStr).session(session);
             } else {
-                product = await Product.findOne({ hsnCode: productId }).session(session);
+                product = await Product.findOne({ hsnCode: pidStr }).session(session);
             }
 
-            // 🚀 AUTO-CREATE PRODUCT: Agar DB khali hai toh details ke sath create karein
+            // 🚀 AUTO-CREATE PRODUCT: Fix for .toUpperCase() error
             if (!product) {
-                console.log(`📦 Creating missing product master for: ${productName || productId}`);
+                // We convert to String before calling toUpperCase to prevent crashes
+                const safeName = String(productName || pidStr || "UNKNOWN PRODUCT").toUpperCase();
+                const safeHsn = String(hsn || pidStr || "N/A");
+
+                console.log(`📦 Creating missing product master for: ${safeName}`);
+                
                 product = new Product({
-                    name: (productName || productId).toUpperCase(),
-                    hsnCode: hsn || productId,
+                    name: safeName,
+                    hsnCode: safeHsn,
                     unit: unit || "KG",
                     category: category || "GRAINS",
                     currentStock: 0,
@@ -52,28 +59,27 @@ class InventoryService {
                 await product.save({ session });
             }
 
-            // 2. Fetch or Create Stock Record (Stock.js validation fix)
+            // 2. Fetch or Create Stock Record
             let stock = await Stock.findOne({ productId: product._id }).session(session);
             
             if (!stock) {
                 stock = new Stock({
                     productId: product._id,
                     productName: product.name,
-                    category: product.category || category || "GRAINS", // Fixed: category requirement
+                    category: product.category || category || "GRAINS",
                     unit: product.unit || unit || "KG",
                     currentQuantity: 0,
-                    pricePerUnit: rate || product.purchasePrice || 1, // Fixed: pricePerUnit requirement
+                    pricePerUnit: rate || product.purchasePrice || 0,
                     avgPurchasePrice: rate || product.purchasePrice || 0,
                     lastUpdatedBy: performedBy
                 });
             }
 
-            const previousStock = stock.currentQuantity || 0;
+            const previousStock = toSafeNumber(stock.currentQuantity);
             let newStock = previousStock;
 
             // 3. Logic for Inward/Outward (Industrial Weight logic)
-            // Use totalQuantity (Weight) if available, else fallback to quantity (Bags)
-            const stockDelta = Number(totalQuantity) || Number(quantity) || 0;
+            const stockDelta = toSafeNumber(totalQuantity) || toSafeNumber(quantity) || 0;
 
             const inwardTypes = ['INWARD', 'RETURN_IN'];
             const outwardTypes = ['OUTWARD', 'WASTAGE', 'RETURN_OUT', 'SALE'];
@@ -83,10 +89,10 @@ class InventoryService {
                 
                 // Valuation logic (Moving Average)
                 if (rate && rate > 0) {
-                    const oldVal = previousStock * (stock.avgPurchasePrice || 0);
-                    const newVal = stockDelta * Number(rate);
-                    stock.avgPurchasePrice = (oldVal + newVal) / newStock;
-                    stock.pricePerUnit = rate; // Current transaction rate as base price
+                    const oldVal = previousStock * toSafeNumber(stock.avgPurchasePrice);
+                    const newVal = stockDelta * toSafeNumber(rate);
+                    stock.avgPurchasePrice = newStock > 0 ? (oldVal + newVal) / newStock : rate;
+                    stock.pricePerUnit = rate; 
                 }
             } else if (outwardTypes.includes(type)) {
                 newStock -= stockDelta;
@@ -108,7 +114,7 @@ class InventoryService {
                 previousStock,
                 newStock,
                 referenceId,
-                remarks: remarks?.toUpperCase() || `SYNC: ${type}`,
+                remarks: remarks ? String(remarks).toUpperCase() : `SYNC: ${type}`,
                 performedBy
             });
 
@@ -121,23 +127,27 @@ class InventoryService {
         }
     }
 
-    /**
-     * @desc Check availability safely
-     */
     async checkAvailability(productId, requestedQty) {
         let product;
-        if (productId && productId.length === 24) {
-            product = await Product.findById(productId);
+        const pidStr = String(productId || "");
+        if (pidStr && pidStr.length === 24) {
+            product = await Product.findById(pidStr);
         } else {
-            product = await Product.findOne({ hsnCode: productId });
+            product = await Product.findOne({ hsnCode: pidStr });
         }
 
-        const currentQty = product ? product.currentStock : 0;
+        const currentQty = product ? toSafeNumber(product.currentStock) : 0;
         return { 
             available: currentQty >= requestedQty, 
             current: currentQty 
         };
     }
 }
+
+// Internal Helper
+const toSafeNumber = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+};
 
 export default new InventoryService();
