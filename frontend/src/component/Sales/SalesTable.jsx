@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "./Sales.css";
-import axios from "axios";
+// 1. Import your modular API functions
+import { getAllSales, deleteSale, createSale } from "../../api/saleApi"; 
 import { 
   Search, Trash2, Edit3, Check, X, 
-  ChevronLeft, ChevronRight, Receipt, Calendar, Truck, MessageSquare 
+  ChevronLeft, ChevronRight, Receipt, Calendar, Truck, MessageSquare, Printer 
 } from "lucide-react";
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
+import axios from "axios";
 
 /* =========================
     🔒 Helper (NaN Safe)
@@ -17,7 +19,7 @@ const toSafeNumber = (v) => {
 };
 
 const SalesTable = ({ user }) => {
-  const role=user.role
+  const role = user?.role;
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [salesList, setSalesList] = useState([]);
@@ -31,21 +33,25 @@ const SalesTable = ({ user }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showMsg = (msg, type = "success") => setSnackbar({ open: true, message: msg, severity: type });
 
-  const fetchSales = async () => {
+  // 2. Updated Fetch Function using modular API
+  const fetchSales = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/sales`);
-      if (res.data.success) setSalesList(res.data.data);
-    } catch { showMsg("Server connection error.", "error"); } 
-    finally { setLoading(false); }
-  };
+      const res = await getAllSales(); // Using the saleApi function
+      if (res.data.success) {
+        setSalesList(res.data.data);
+      }
+    } catch (err) { 
+      showMsg("Server connection error.", "error"); 
+    } finally { 
+      setLoading(false); 
+    }
+  }, []);
 
-  useEffect(() => { fetchSales(); }, [API_URL]);
+  useEffect(() => { fetchSales(); }, [fetchSales]);
 
   /* =========================
       🧮 Enhanced Live Calculation
@@ -107,17 +113,26 @@ const SalesTable = ({ user }) => {
   const currentRows = processedList.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
+  // 3. Updated Delete Function
   const handleDelete = async (id) => {
     if (!isAuthorized) return showMsg("Permission denied.", "error");
     if (!window.confirm("Are you sure?")) return;
     try {
       setLoading(true);
-      const res = await axios.delete(`${API_URL}/api/sales/${id}`);
-      if (res.data.success) { showMsg("Deleted!"); fetchSales(); }
-    } catch { showMsg("Delete failed.", "error"); } 
-    finally { setLoading(false); }
+      const res = await deleteSale(id); // Using the saleApi function
+      if (res.data.success) { 
+        showMsg("Deleted!"); 
+        fetchSales(); 
+      }
+    } catch { 
+      showMsg("Delete failed.", "error"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
+  // 4. Updated Save Function (Assuming PUT logic is in a general 'updateSale' or similar)
+  // Note: Since you provided createSale, I'll use a standard Axios put for update unless you add updateSale to your api file.
   const handleSave = async () => {
     try {
       setLoading(true);
@@ -131,10 +146,21 @@ const SalesTable = ({ user }) => {
             taxableAmount: toSafeNumber(g.quantity) * toSafeNumber(g.rate)
         }))
       };
-      const res = await axios.put(`${API_URL}/api/sales/${editId}`, payload);
-      if (res.data.success) { showMsg("Updated!"); setEditId(null); fetchSales(); }
-    } catch { showMsg("Update failed.", "error"); } 
-    finally { setLoading(false); }
+      
+      // If you add updateSale to saleApi.js, use it here. 
+      // Otherwise, using the createSale logic or direct API call.
+      const res = await axios.put(`${process.env.REACT_APP_API_URL}/api/sales/${editId}`, payload);
+      
+      if (res.data.success) { 
+        showMsg("Updated!"); 
+        setEditId(null); 
+        fetchSales(); 
+      }
+    } catch { 
+      showMsg("Update failed.", "error"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const startEdit = (sale) => {
@@ -190,65 +216,63 @@ const SalesTable = ({ user }) => {
               {currentRows.map((sale) => (
                 <tr key={sale._id} className={`${editId === sale._id ? 'bg-emerald-50/20 dark:bg-emerald-900/10' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20'}`}>
                   {editId === sale._id ? (
-                    /* ✏️ EDIT MODE */
+                    /* ✏️ EDIT MODE (UI remains same, logic updated above) */
                     <td colSpan="7" className="p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-top-2">
-                        {/* Column 1: Basic Info */}
-                        <div className="space-y-3 bg-white dark:bg-zinc-800 p-4 rounded-2xl border">
-                          <label className="text-[10px] font-black text-emerald-600 uppercase">1. General Info</label>
-                          <input type="date" className="w-full border rounded-lg p-2 text-xs" value={editData.date?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} />
-                          <div className="grid grid-cols-2 gap-2">
-                            <input placeholder="Bill #" className="border rounded-lg p-2 text-xs" value={editData.billNo} onChange={(e) => setEditData({ ...editData, billNo: e.target.value })} />
-                            <input placeholder="Vehicle" className="border rounded-lg p-2 text-xs" value={editData.vehicleNo} onChange={(e) => setEditData({ ...editData, vehicleNo: e.target.value })} />
-                          </div>
-                          <input placeholder="Customer Name" className="w-full border rounded-lg p-2 text-xs font-bold" value={editData.customerName} onChange={(e) => setEditData({ ...editData, customerName: e.target.value })} />
-                          <textarea placeholder="Remarks..." className="w-full border rounded-lg p-2 text-xs" rows="2" value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} />
-                        </div>
+                        {/* ... (Existing Edit Form UI) ... */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                           <div className="space-y-3 bg-white dark:bg-zinc-800 p-4 rounded-2xl border">
+                             <label className="text-[10px] font-black text-emerald-600 uppercase">1. General Info</label>
+                             <input type="date" className="w-full border rounded-lg p-2 text-xs" value={editData.date?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} />
+                             <div className="grid grid-cols-2 gap-2">
+                               <input placeholder="Bill #" className="border rounded-lg p-2 text-xs" value={editData.billNo} onChange={(e) => setEditData({ ...editData, billNo: e.target.value })} />
+                               <input placeholder="Vehicle" className="border rounded-lg p-2 text-xs" value={editData.vehicleNo} onChange={(e) => setEditData({ ...editData, vehicleNo: e.target.value })} />
+                             </div>
+                             <input placeholder="Customer Name" className="w-full border rounded-lg p-2 text-xs font-bold" value={editData.customerName} onChange={(e) => setEditData({ ...editData, customerName: e.target.value })} />
+                             <textarea placeholder="Remarks..." className="w-full border rounded-lg p-2 text-xs" rows="2" value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} />
+                           </div>
 
-                        {/* Column 2: Goods */}
-                        <div className="space-y-3 bg-white dark:bg-zinc-800 p-4 rounded-2xl border">
-                          <label className="text-[10px] font-black text-emerald-600 uppercase">2. Goods Details</label>
-                          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                            {editData.goods.map((g, idx) => (
-                              <div key={idx} className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border">
-                                <span className="text-[10px] font-bold w-24 truncate">{g.product}</span>
-                                <input type="number" className="w-full p-1.5 text-xs rounded border" value={g.quantity} onChange={(e) => handleGoodsChange(idx, 'quantity', e.target.value)} />
-                                <span className="text-zinc-400">@</span>
-                                <input type="number" className="w-full p-1.5 text-xs rounded border" value={g.rate} onChange={(e) => handleGoodsChange(idx, 'rate', e.target.value)} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                           <div className="space-y-3 bg-white dark:bg-zinc-800 p-4 rounded-2xl border">
+                             <label className="text-[10px] font-black text-emerald-600 uppercase">2. Goods Details</label>
+                             <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                               {editData.goods.map((g, idx) => (
+                                 <div key={idx} className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border">
+                                   <span className="text-[10px] font-bold w-24 truncate">{g.product}</span>
+                                   <input type="number" className="w-full p-1.5 text-xs rounded border" value={g.quantity} onChange={(e) => handleGoodsChange(idx, 'quantity', e.target.value)} />
+                                   <span className="text-zinc-400">@</span>
+                                   <input type="number" className="w-full p-1.5 text-xs rounded border" value={g.rate} onChange={(e) => handleGoodsChange(idx, 'rate', e.target.value)} />
+                                 </div>
+                               ))}
+                             </div>
+                           </div>
 
-                        {/* Column 3: Finance & Save */}
-                        <div className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-100">
-                           <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="text-[9px] font-black uppercase">Freight (±)</label>
-                                <div className="flex gap-1 mt-1">
-                                  <button onClick={() => setFreightMode(p => p === "+" ? "-" : "+")} className={`w-8 rounded font-bold text-white ${freightMode === "+" ? 'bg-emerald-500' : 'bg-red-500'}`}>{freightMode}</button>
-                                  <input type="number" className="w-full p-1.5 text-xs rounded border" value={editData.freight} onChange={(e) => setEditData({ ...editData, freight: e.target.value })} />
+                           <div className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-100">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-[9px] font-black uppercase">Freight (±)</label>
+                                  <div className="flex gap-1 mt-1">
+                                    <button onClick={() => setFreightMode(p => p === "+" ? "-" : "+")} className={`w-8 rounded font-bold text-white ${freightMode === "+" ? 'bg-emerald-500' : 'bg-red-500'}`}>{freightMode}</button>
+                                    <input type="number" className="w-full p-1.5 text-xs rounded border" value={editData.freight} onChange={(e) => setEditData({ ...editData, freight: e.target.value })} />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-black uppercase">CD (%)</label>
+                                  <input type="number" className="w-full mt-1 p-1.5 text-xs rounded border" value={editData.cashDiscount} onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} />
                                 </div>
                               </div>
                               <div>
-                                <label className="text-[9px] font-black uppercase">CD (%)</label>
-                                <input type="number" className="w-full mt-1 p-1.5 text-xs rounded border" value={editData.cashDiscount} onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} />
+                                <label className="text-[9px] font-black uppercase text-emerald-700">Amount Received</label>
+                                <input type="number" className="w-full mt-1 p-2 text-sm font-black text-emerald-600 rounded-lg border-2 border-emerald-200" value={editData.amountReceived} onChange={(e) => setEditData({ ...editData, amountReceived: e.target.value })} />
+                              </div>
+                              <div className="flex justify-between items-center border-t border-emerald-200 pt-2">
+                                <div className="text-xs font-bold text-red-500">Due: ₹{editData.paymentDue?.toLocaleString()}</div>
+                                <div className="text-xl font-black text-zinc-900 tracking-tighter">Total: ₹{editData.totalAmount?.toLocaleString()}</div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black" onClick={handleSave}><Check size={16} className="inline mr-2"/> SAVE</button>
+                                <button className="px-4 py-3 bg-zinc-200 rounded-xl text-xs font-black" onClick={() => setEditId(null)}><X size={16}/></button>
                               </div>
                            </div>
-                           <div>
-                              <label className="text-[9px] font-black uppercase text-emerald-700">Amount Received</label>
-                              <input type="number" className="w-full mt-1 p-2 text-sm font-black text-emerald-600 rounded-lg border-2 border-emerald-200" value={editData.amountReceived} onChange={(e) => setEditData({ ...editData, amountReceived: e.target.value })} />
-                           </div>
-                           <div className="flex justify-between items-center border-t border-emerald-200 pt-2">
-                              <div className="text-xs font-bold text-red-500">Due: ₹{editData.paymentDue?.toLocaleString()}</div>
-                              <div className="text-xl font-black text-zinc-900 tracking-tighter">Total: ₹{editData.totalAmount?.toLocaleString()}</div>
-                           </div>
-                           <div className="flex gap-2">
-                              <button className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black" onClick={handleSave}><Check size={16} className="inline mr-2"/> SAVE</button>
-                              <button className="px-4 py-3 bg-zinc-200 rounded-xl text-xs font-black" onClick={() => setEditId(null)}><X size={16}/></button>
-                           </div>
                         </div>
-                      </div>
                     </td>
                   ) : (
                     /* 📄 VIEW MODE */
@@ -294,6 +318,8 @@ const SalesTable = ({ user }) => {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex justify-center gap-2">
+                          {/* Added Print Icon */}
+                          <button className="p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 hover:text-blue-500 rounded-xl border"><Printer size={16}/></button>
                           <button onClick={() => startEdit(sale)} className="p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 hover:text-emerald-500 rounded-xl border"><Edit3 size={16}/></button>
                           <button onClick={() => handleDelete(sale._id)} className="p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 hover:text-red-500 rounded-xl border"><Trash2 size={16}/></button>
                         </div>
