@@ -187,21 +187,21 @@ const PurchaseTable = ({ user }) => {
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in slide-in-from-top-2">
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-emerald-600 uppercase">Basic Info</label>
-                          <input type="date" className="edit-input-zinc" value={editData.purchaseDate?.split('T')[0]} onChange={e => setEditData({...editData, purchaseDate: e.target.value})} />
-                          <input className="edit-input-zinc" value={editData.billNo} placeholder="Bill No" onChange={e => setEditData({...editData, billNo: e.target.value})} />
+                          <input type="date" className="w-full border rounded-lg p-2 text-xs" value={editData.purchaseDate?.split('T')[0]} onChange={e => setEditData({...editData, purchaseDate: e.target.value})} />
+                          <input className="w-full border rounded-lg p-2 text-xs" value={editData.billNo} placeholder="Bill No" onChange={e => setEditData({...editData, billNo: e.target.value})} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-emerald-600 uppercase">Details</label>
                           <input className="edit-input-zinc font-bold" value={editData.supplierName} readOnly />
-                          <input className="edit-input-zinc" value={editData.productName} onChange={e => setEditData({...editData, productName: e.target.value})} />
+                          <input className="w-full border rounded-lg p-2 text-xs" value={editData.productName} onChange={e => setEditData({...editData, productName: e.target.value})} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-emerald-600 uppercase">Numbers</label>
                           <div className="flex gap-2">
-                            <input type="number" className="edit-input-zinc" placeholder="Qty" value={editData.quantity} onChange={e => setEditData({...editData, quantity: e.target.value})} />
-                            <input type="number" className="edit-input-zinc" placeholder="Rate" value={editData.rate} onChange={e => setEditData({...editData, rate: e.target.value})} />
+                            <input type="number" className="w-full border rounded-lg p-2 text-xs" placeholder="Qty" value={editData.quantity} onChange={e => setEditData({...editData, quantity: e.target.value})} />
+                            <input type="number" className="w-full border rounded-lg p-2 text-xs" placeholder="Rate" value={editData.rate} onChange={e => setEditData({...editData, rate: e.target.value})} />
                           </div>
-                          <input type="number" className="edit-input-zinc" placeholder="Amount Paid" value={editData.amountPaid} onChange={e => setEditData({...editData, amountPaid: e.target.value})} />
+                          <input type="number" className="w-full border rounded-lg p-2 text-xs" placeholder="Amount Paid" value={editData.amountPaid} onChange={e => setEditData({...editData, amountPaid: e.target.value})} />
                         </div>
                         <div className="flex flex-col justify-between items-end bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border dark:border-zinc-800">
                           <div className="text-right">
