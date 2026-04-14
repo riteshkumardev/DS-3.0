@@ -31,23 +31,26 @@ import AuditPage from "./component/MasterPanel/AuditPage";
 import AnalysisPage from "./component/ProfitLoss/AnalysisPage";
 import Service from "./component/Service";
 
-
 function App() {
-  // ✅ 1. Dark Mode State
+  // ✅ 1. Dark Mode State Management
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem("darkMode");
     return savedMode === "true";
   });
 
-  // ✅ SAFE localStorage read
+  // ✅ 2. Session Management (Using 'userInfo' key for consistency)
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("user");
-    return saved ? JSON.parse(saved) : null;
+    const saved = localStorage.getItem("userInfo");
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   const [isLocked, setIsLocked] = useState(false);
 
-  // ✅ 2. Dark Mode Effect
+  // ✅ Dark Mode Effect Sync
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
@@ -57,48 +60,60 @@ function App() {
     localStorage.setItem("darkMode", darkMode);
   }, [darkMode]);
 
-  // 🔒 AUTO-LOCK TIMER (5 min)
+  // 🔒 AUTO-LOCK TIMER (5 min inactivity)
   useEffect(() => {
     if (!user) return;
+    
     let timeoutId;
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
+      // 300,000ms = 5 Minutes
       timeoutId = setTimeout(() => setIsLocked(true), 300000); 
     };
+
     const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
     events.forEach((event) => window.addEventListener(event, resetTimer));
-    resetTimer();
+    
+    resetTimer(); // Start timer
+
     return () => {
       events.forEach((event) => window.removeEventListener(event, resetTimer));
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [user]);
 
+  // 🚪 Standard Logout Logic
   const logoutUser = () => {
-    localStorage.removeItem("user");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("user"); // Clear legacy keys
     setUser(null);
   };
 
-  // 🛡️ PROTECTED ROUTE LOGIC
+  // 🛡️ ROLE-BASED ACCESS CONTROL (RBAC)
   const ProtectedRoute = ({ children, adminOnly = false, managerAllowed = false }) => {
     if (!user) return <Navigate to="/login" replace />;
-    const isBoss = user.role === "Admin" || user.role === "Manager";
     
-    if (adminOnly && user.role !== "Admin") {
-      alert("⚠️ Restricted: Admin Access Only.");
+    // Normalize role string to uppercase for comparison
+    const userRole = user.role?.toUpperCase();
+    const isAdmin = userRole === "ADMIN";
+    const isManager = userRole === "MANAGER";
+    const isBoss = isAdmin || isManager;
+    
+    if (adminOnly && !isAdmin) {
       return <Navigate to="/dashboard" replace />;
     }
+    
     if (managerAllowed && !isBoss) {
-      alert("⚠️ Restricted: Management Access Only.");
       return <Navigate to="/dashboard" replace />;
     }
+    
     return children;
   };
 
   return (
     <Router>
       <div className={`app-container min-h-screen transition-all duration-500 
-        ${darkMode ? 'dark bg-zinc-950 text-white' : 'bg-[#f0f2f5] text-zinc-900'}`}
+        ${darkMode ? 'dark bg-zinc-950 text-white' : 'bg-[#f8fafc] text-zinc-900'}`}
         style={{
           backgroundImage: darkMode 
             ? `radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
@@ -107,8 +122,10 @@ function App() {
                radial-gradient(at 100% 0%, rgba(77, 71, 243, 0.03) 0px, transparent 50%)`
         }}>
         
+        {/* Screen Lock Overlay */}
         {isLocked && user && <ScreenLock user={user} setIsLocked={setIsLocked} />}
 
+        {/* Global Navigation */}
         {user && (
           <Navbar 
             user={user} 
@@ -121,17 +138,17 @@ function App() {
 
         <div className="page-content relative z-10">
           <Routes>
-            {/* 🌍 PUBLIC */}
+            {/* 🌍 PUBLIC ROUTES */}
             <Route path="/" element={!user ? <LandingPage /> : <Navigate to="/dashboard" />} />
             <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/dashboard" />} />
 
-            {/* 📊 BASIC DASHBOARD (All Staff) */}
+            {/* 📊 STAFF LEVEL (Basic Access) */}
             <Route path="/dashboard" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger user={user} /></ProtectedRoute>} />
             <Route path="/invoice" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
 
-            {/* 💼 MANAGEMENT (Manager & Admin) */}
+            {/* 💼 MANAGEMENT LEVEL (Manager & Admin Only) */}
             <Route path="/profit-loss" element={<ProtectedRoute managerAllowed><ProfitLoss /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute managerAllowed><ExpenseManager user={user} /></ProtectedRoute>} />
             <Route path="/sales-entry" element={<ProtectedRoute managerAllowed><SalesEntry user={user} /></ProtectedRoute>} />
@@ -145,15 +162,16 @@ function App() {
             <Route path="/suppliers" element={<ProtectedRoute managerAllowed><SupplierManager /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute managerAllowed><Attendance /></ProtectedRoute>} />
 
-            {/* 🛡️ ADMIN ONLY (Secure Operations) */}
+            {/* 🛡️ SYSTEM ADMIN LEVEL (Strict Security) */}
             <Route path="/master-panel" element={<ProtectedRoute adminOnly><MasterPanel user={user} /></ProtectedRoute>} />
-            <Route path="/audit-trail" element={<ProtectedRoute adminOnly><AuditPage /></ProtectedRoute>} /> {/* ✅ Naya Audit Route */}
+            <Route path="/audit-trail" element={<ProtectedRoute adminOnly><AuditPage /></ProtectedRoute>} />
             <Route path="/employee-add" element={<ProtectedRoute adminOnly><EmployeeAdd user={user} /></ProtectedRoute>} />
             <Route path="/add-transaction" element={<ProtectedRoute adminOnly><AddTransaction /></ProtectedRoute>} />
             <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory/></ProtectedRoute>} />
             <Route path="/analysis-page" element={<ProtectedRoute adminOnly><AnalysisPage /></ProtectedRoute>} />
             <Route path="/service" element={<ProtectedRoute adminOnly><Service/></ProtectedRoute>} />
 
+            {/* Fallback Redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

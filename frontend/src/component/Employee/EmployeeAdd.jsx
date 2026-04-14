@@ -4,13 +4,15 @@ import {
   CalendarDays, Briefcase, MapPin, Lock, Camera, Rocket, X
 } from "lucide-react";
 
+// Professional API Service Import (Jo humne pehle banayi thi)
+ 
+
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
+import { addStaff } from "../../api/staffApi";
+
 
 const EmployeeAdd = ({ onEntrySaved }) => {
-
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
 
@@ -38,135 +40,81 @@ const EmployeeAdd = ({ onEntrySaved }) => {
   });
 
   const showMsg = (msg, type = "success") => {
-    setSnackbar({
-      open: true,
-      message: msg,
-      severity: type
-    });
+    setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // cleanup preview
+  // Cleanup photo preview to prevent memory leaks
   useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-    };
+    return () => { if (preview) URL.revokeObjectURL(preview); };
   }, [preview]);
 
   const handleChange = (e) => {
-
     const { name, value } = e.target;
-
+    // Length Validations
     if ((name === "phone" || name === "emergencyPhone") && value.length > 10) return;
     if (name === "aadhar" && value.length > 12) return;
 
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handlePhotoChange = (e) => {
-
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      return showMsg("Only image files allowed", "error");
-    }
+    if (!file.type.startsWith("image/")) return showMsg("Only image files allowed", "error");
+    if (file.size > 2 * 1024 * 1024) return showMsg("Image must be less than 2MB", "error");
 
-    if (file.size > 2 * 1024 * 1024) {
-      return showMsg("Image must be less than 2MB", "error");
-    }
-
-    setFormData({
-      ...formData,
-      photo: file
-    });
-
+    setFormData({ ...formData, photo: file });
     setPreview(URL.createObjectURL(file));
   };
 
-  const removePhoto = () => {
-    setFormData({
-      ...formData,
-      photo: null
-    });
-    setPreview(null);
-  };
-
   const handleSubmit = async (e) => {
-
     e.preventDefault();
 
-    if (formData.phone.length !== 10)
-      return showMsg("Mobile number must be 10 digits", "error");
-
-    if (formData.aadhar.length !== 12)
-      return showMsg("Aadhar must be 12 digits", "error");
+    // Field Validations
+    if (formData.phone.length !== 10) return showMsg("Mobile number must be 10 digits", "error");
+    if (formData.aadhar.length !== 12) return showMsg("Aadhar must be 12 digits", "error");
+    if (formData.password.length < 4) return showMsg("Password must be at least 4 digits", "error");
 
     setLoading(true);
 
     try {
-
+      // 📦 Using FormData for multipart/form-data (Photo Upload support)
       const data = new FormData();
-
       Object.keys(formData).forEach((key) => {
-
         if (key === "photo" && formData[key]) {
-          data.append("image", formData[key]); // backend multer key
+          data.append("image", formData[key]); // 'image' key as per Multer backend
         } else {
           data.append(key, formData[key]);
         }
-
       });
 
-      data.append("role", formData.designation);
+      // Role mapping for backend auth
+      data.append("role", formData.designation.toUpperCase());
 
-      const res = await fetch(`${API_URL}/api/employees`, {
-        method: "POST",
-        body: data
-      });
+      // 🚀 Using the API service
+      const response = await addStaff(data);
 
-      const result = await res.json();
+      showMsg(`✅ Staff Registered! ID: ${response.data?.employeeId || 'Generated'}`);
 
-      if (!res.ok) {
-        throw new Error(result.message || "Registration failed");
-      }
-
-      showMsg(`Employee Registered! ID: ${result.data.employeeId}`);
-
+      // Reset Form
       setFormData({
-        name: "",
-        fatherName: "",
-        phone: "",
-        emergencyPhone: "",
-        aadhar: "",
-        address: "",
-        designation: "Worker",
+        name: "", fatherName: "", phone: "", emergencyPhone: "",
+        aadhar: "", address: "", designation: "Worker",
         joiningDate: new Date().toISOString().split("T")[0],
-        salary: "",
-        bankName: "",
-        accountNo: "",
-        ifscCode: "",
-        photo: null,
-        password: ""
+        salary: "", bankName: "", accountNo: "", ifscCode: "",
+        photo: null, password: ""
       });
-
       setPreview(null);
-
+      
       if (onEntrySaved) onEntrySaved();
-
     } catch (error) {
-
-      showMsg(error.message, "error");
-
+      showMsg(error.response?.data?.message || "Registration failed. Check server logs.", "error");
     } finally {
-
       setLoading(false);
-
     }
-
   };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
       {loading && <Loader />}
@@ -205,7 +153,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
               </div>
               
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CreditCard size={12}/> Aadhar Number *</label>
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CreditCard size={12}/> Aadhaar Number *</label>
                 <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required className="form-input-zinc font-bold tracking-widest" placeholder="12 Digits" />
               </div>
 
@@ -248,9 +196,12 @@ const EmployeeAdd = ({ onEntrySaved }) => {
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Designation</label>
                 <select name="designation" value={formData.designation} onChange={handleChange} className="form-input-zinc appearance-none cursor-pointer">
-                  <option value="Manager">Manager</option><option value="Operator">Operator</option>
-                  <option value="Worker">Worker</option><option value="Driver">Driver</option>
-                  <option value="Helper">Helper</option><option value="Admin">Admin</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Operator">Operator</option>
+                  <option value="Worker">Worker</option>
+                  <option value="Driver">Driver</option>
+                  <option value="Helper">Helper</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -263,12 +214,12 @@ const EmployeeAdd = ({ onEntrySaved }) => {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-amber-600 uppercase ml-1 flex items-center gap-1.5"><Lock size={12}/> Access Password *</label>
-                <input type="text" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 dark:border-amber-900/50 focus:border-amber-500 font-bold" placeholder="PIN" />
+                <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 dark:border-amber-900/50 focus:border-amber-500 font-bold" placeholder="PIN" />
               </div>
             </div>
           </div>
 
-          {/* Section 3: Financials */}
+          {/* Section 3: Financials & Residency */}
           <div className="space-y-6">
             <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
               <Landmark size={18} className="text-emerald-500" /> Bank & Residency

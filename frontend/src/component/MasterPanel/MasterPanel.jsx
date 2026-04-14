@@ -239,7 +239,7 @@ const MasterPanel = ({ user }) => {
       {showBulkModal && (
         <BulkSaleUploader 
           jsonData={bulkData}
-          isAuthorized={user?.role === 'Admin'}
+          isAuthorized={user?.role === 'ADMIN'}
           API_URL={API_URL}
           onClose={() => setShowBulkModal(false)}
           showMsg={showMsg}
@@ -324,7 +324,7 @@ const MasterPanel = ({ user }) => {
                     </div>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                    userItem.role === 'Admin' ? 'bg-red-50 text-red-600 border border-red-100' :
+                    userItem.role === 'ADMIN' ? 'bg-red-50 text-red-600 border border-red-100' :
                     userItem.role === 'Accountant' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                     'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                   }`}>
@@ -342,7 +342,7 @@ const MasterPanel = ({ user }) => {
                         disabled={actionLoading}
                         className="w-full pl-3 pr-10 py-2.5 bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500/20 appearance-none dark:text-white"
                       >
-                        <option value="Admin">Admin</option>
+                        <option value="ADMIN">Admin</option>
                         <option value="Manager">Manager</option>
                         <option value="Accountant">Accountant</option>
                         <option value="Staff">Staff</option>

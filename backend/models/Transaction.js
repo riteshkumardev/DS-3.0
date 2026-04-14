@@ -1,66 +1,72 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const transactionSchema = new mongoose.Schema({
-  // Party Name: String rakhenge taaki hum Supplier, Customer ya Employee kisi ko bhi handle kar sakein
-  // Agar aap sirf ID rakhna chahte hain toh 'refPath' use hota hai, par String zyada flexible hai
-  partyId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true,
-    refPath: 'partyModel' // Dynamic reference support
-  },
-  partyModel: {
-    type: String,
-    required: true,
-    enum: ['Supplier', 'Sale', 'Employee'] // In teeno mein se koi bhi ho sakta hai
-  },
-  partyName: { type: String, required: true }, // Display ke liye aasaan rahega
+    date: {
+        type: Date,
+        default: Date.now,
+        required: true
+    },
+    // --- Related Entity ---
+    partyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Party',
+        required: false 
+    },
+    staffId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Staff',
+        required: false
+    },
+    // --- Transaction Details ---
+    type: {
+        type: String,
+        enum: [
+            'SALE', 'PURCHASE', 'PAYMENT_IN', 'PAYMENT_OUT', 
+            'EXPENSE', 'SALARY', 'OPENING_BALANCE'
+        ],
+        required: true
+    },
+    description: {
+        type: String,
+        trim: true,
+        uppercase: true 
+    },
+    // --- Accounting Logic (Debit/Credit) ---
+    debit: {
+        type: Number,
+        default: 0
+    },
+    credit: {
+        type: Number,
+        default: 0
+    },
+    runningBalance: {
+        type: Number,
+        default: 0
+    },
+    // --- Meta Data ---
+    paymentMode: {
+        type: String,
+        enum: ['CASH', 'UPI', 'BANK', 'CREDIT'],
+        default: 'CREDIT'
+    },
+    referenceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: false
+    },
+    performedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true 
+    }
+}, {
+    timestamps: true
+});
 
-  // Consistent Date Format (YYYY-MM-DD) as per other models
-  date: { 
-    type: String, 
-    required: true 
-  },
+// Indexing for faster reporting
+transactionSchema.index({ date: -1, partyId: 1 });
+transactionSchema.index({ type: 1 });
 
-  // CREDIT = Paisa Aaya (Income), DEBIT = Paisa Gaya (Expense)
-  // 'IN'/'OUT' bhi sahi hai, par accounting terms use karna better hai
-  type: { 
-    type: String, 
-    enum: ['IN', 'OUT'], 
-    required: true 
-  },
+const Transaction = mongoose.model("Transaction", transactionSchema);
 
-  amount: { 
-    type: Number, 
-    required: true,
-    min: 0
-  },
-
-paymentMethod: {
-  type: String,
-  required: true,
-  // ✅ यहाँ 'Credit' को भी लिस्ट में जोड़ दें
- enum: ["Cash", "Online", "Cheque", "Credit", "UPI", "Cash/Bank"],
-  default: "Cash"
-},
-
-  description: { 
-    type: String, 
-    default: "Manual Ledger Entry" 
-  },
-
-  // Transaction ke baad us party ka kitna hisab bacha
-  remainingBalance: { 
-    type: Number,
-    required: true
-  },
-
-  // Reference ke liye: Bill No ya Invoice No jisse ye juda hai
-  refNo: { type: String } 
-
-}, { timestamps: true });
-
-// Indexing for speed
-transactionSchema.index({ partyId: 1, date: -1 });
-transactionSchema.index({ partyModel: 1 });
-
-export default mongoose.model('Transaction', transactionSchema);
+export default Transaction;

@@ -1,46 +1,95 @@
+// Purchase.js
 import mongoose from "mongoose";
 
-// Reuse the same goods structure for consistency
-const purchaseGoodsSchema = new mongoose.Schema({
-  product: { type: String, required: true },
-  quantity: { type: Number, default: 0 },
-  rate: { type: Number, default: 0 },
-  taxableAmount: { type: Number, default: 0 },
+const purchaseItemSchema = new mongoose.Schema({
+    productId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Product', 
+        required: true 
+    },
+    productName: { type: String, required: true }, // Snapshot for record
+    hsn: { type: String },
+    quantity: { type: Number, required: true, min: 0 },
+    unit: { type: String, default: "KG" },
+    rate: { type: Number, required: true, min: 0 }, // Cost Price
+    taxableAmount: { type: Number, default: 0 }
 }, { _id: false });
 
 const purchaseSchema = new mongoose.Schema({
-  billNo: { type: String, required: false }, // Supplier's Invoice No
-  date: { type: String, required: true },
-  supplierName: { type: String, required: true },
-  gstin: { type: String, default: "N/A" }, 
-  mobile: { type: String }, 
-  address: { type: String },
-  vehicleNo: { type: String }, 
+    // Business Identification
+    billNo: { 
+        type: String, 
+        required: true, 
+        uppercase: true,
+        comment: 'Supplier ka invoice number'
+    },
+    purchaseDate: { type: Date, default: Date.now },
+    
+    // Supplier Linking (Critical for Creditors Ledger)
+    supplierId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Party', // Party model mein partyType: 'SUPPLIER' filter hoga
+        required: true 
+    },
+    supplierName: { type: String, required: true },
 
-  // Multi-item Support
-  goods: [purchaseGoodsSchema],
+    // Items List
+    items: [purchaseItemSchema],
 
-  // Financials
-  travelingCost: { type: Number, default: 0 }, // Same as Freight
-  taxableValue: { type: Number, default: 0 },
-  cashDiscount: { type: Number, default: 0 },
-  totalAmount: { type: Number, required: true }, // Grand Total
-  paidAmount: { type: Number, default: 0 },    // Yeh hamara "DEBIT" transaction banega
-  balanceAmount: { type: Number, default: 0 },
-  
-  remarks: { type: String }
+    // --- Financials (Automated) ---
+    subTotal: { type: Number, default: 0 }, 
+    gstType: { type: String, enum: ['CGST/SGST', 'IGST'], required: true },
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    igst: { type: Number, default: 0 },
+    
+    otherCharges: { type: Number, default: 0, comment: 'Extra costs like unloading' },
+    discount: { type: Number, default: 0 },
+    roundOff: { type: Number, default: 0 },
+    
+    grandTotal: { type: Number, default: 0 },
+    amountPaid: { type: Number, default: 0 }, // Kitna cash/bank se diya
+    balanceDue: { type: Number, default: 0 }, // Supplier ko kitna dena baaki hai
+
+    paymentStatus: { 
+        type: String, 
+        enum: ['PAID', 'PARTIAL', 'UNPAID'], 
+        default: 'UNPAID' 
+    },
+
+    performedBy: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
+    },
+    remarks: { type: String, trim: true }
 }, { timestamps: true });
 
-// Auto-calculation for Purchase
+// --- Auto Calculations for Purchase ---
 purchaseSchema.pre("save", function (next) {
-  this.taxableValue = this.goods.reduce((sum, g) => {
-    g.taxableAmount = (Number(g.quantity) || 0) * (Number(g.rate) || 0);
-    return sum + g.taxableAmount;
-  }, 0);
+    // 1. Calculate Taxable amount for each item
+    this.subTotal = this.items.reduce((sum, item) => {
+        item.taxableAmount = item.quantity * item.rate;
+        return sum + item.taxableAmount;
+    }, 0);
 
-  this.totalAmount = (this.taxableValue + Number(this.travelingCost)) - (Number(this.cashDiscount) || 0);
-  this.balanceAmount = this.totalAmount - (Number(this.paidAmount) || 0);
-  next();
+    // 2. Total calculation
+    const totalTaxes = this.cgst + this.sgst + this.igst;
+    this.grandTotal = (this.subTotal + totalTaxes + this.otherCharges + this.roundOff) - this.discount;
+    
+    // 3. Balance Due (Liability)
+    this.balanceDue = this.grandTotal - this.amountPaid;
+
+    // 4. Update Status
+    if (this.balanceDue <= 0) {
+        this.paymentStatus = 'PAID';
+    } else if (this.balanceDue < this.grandTotal) {
+        this.paymentStatus = 'PARTIAL';
+    } else {
+        this.paymentStatus = 'UNPAID';
+    }
+
+    next();
 });
 
 export default mongoose.model("Purchase", purchaseSchema);

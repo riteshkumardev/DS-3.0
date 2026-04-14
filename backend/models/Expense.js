@@ -1,71 +1,68 @@
+// Expense.js
 import mongoose from "mongoose";
 
 const expenseSchema = new mongoose.Schema({
-  // Transaction date (YYYY-MM-DD format) - Consistent with Sale/Purchase/Salary
-  date: { 
-    type: String, 
-    required: true 
-  },
-  
-  // Kisko payment kiya ya kisse aaya (Supplier/Party/Employee Name)
-  partyName: { 
-    type: String, 
-    required: true,
-    trim: true 
-  },
-
-  // 'Payment In' = CREDIT (Paisa Aaya)
-  // 'Payment Out' = DEBIT (Paisa Gaya)
-  type: { 
-    type: String, 
-    required: true, 
-    enum: ['Payment In', 'Payment Out'],
-    default: 'Payment Out'
-  },
-
-  amount: { 
-    type: Number, 
-    required: true,
-    min: [0, "Amount cannot be negative"] 
-  },
-
-  // Category fix: 'Fuel', 'Salary', 'Maintenance' ko humne side rakha hai, 
-  // par yahan "General", "Office", "Food" etc. ho sakta hai.
-  category: { 
-    type: String, 
-    default: "General",
-    trim: true
-  },
-
-  // Payment Mode (Zaroori hai taaki pata chale Cash balance kam hua ya Bank)
-  paymentMode: {
-    type: String,
-    enum: ['Cash', 'Bank', 'UPI', 'Cheque'],
-    default: 'Cash'
-  },
-
-  // Transaction ID / UTR No / Reference No
-  txnId: { 
-    type: String, 
-    trim: true,
-    default: "N/A"
-  },
-
-  remark: { 
-    type: String, 
-    trim: true 
-  },
-
-  // Entry time (Automated via timestamps, but manual override if needed)
-  time: { 
-    type: String 
-  }
+    date: { 
+        type: Date, 
+        required: [true, "Date is mandatory"],
+        default: Date.now 
+    },
+    // Category specific details (Loading, Unloading, Rasan, etc.)
+    category: {
+        type: String,
+        required: [true, "Expense category is required"],
+        enum: [
+            'LOADING', 'UNLOADING', 'RASAN', 'WATER', 'MEDICAL', 
+            'CA', 'ELECTRICAL', 'HARDWARE', 'STATIONARY', 
+            'CONSTRUCTION', 'FUEL', 'SALARY', 'OTHER'
+        ],
+        uppercase: true
+    },
+    // Agar 'OTHER' category hai to yahan detail aayegi
+    otherDetail: {
+        type: String,
+        trim: true,
+        uppercase: true
+    },
+    // Accounting Logic
+    type: { 
+        type: String, 
+        required: true, 
+        enum: ['PAYMENT_IN', 'PAYMENT_OUT'],
+        default: 'PAYMENT_OUT'
+    },
+    amount: { 
+        type: Number, 
+        required: [true, "Amount is required"],
+        min: [0, "Amount cannot be negative"] 
+    },
+    // Financial Tracking
+    paymentMode: {
+        type: String,
+        enum: ['CASH', 'BANK', 'UPI', 'CHEQUE'],
+        default: 'CASH',
+        uppercase: true
+    },
+    txnId: { 
+        type: String, 
+        trim: true,
+        uppercase: true,
+        comment: 'Transaction ID / UTR No'
+    },
+    remark: { 
+        type: String, 
+        trim: true 
+    },
+    performedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    }
 }, { 
-  timestamps: true 
+    timestamps: true 
 });
 
-// Indexing for performance
-expenseSchema.index({ partyName: 1, date: -1 });
-expenseSchema.index({ type: 1 }); // Quick filtering for Total In vs Total Out
+// Search performance index
+expenseSchema.index({ category: 1, date: -1 });
 
 export default mongoose.model("Expense", expenseSchema);

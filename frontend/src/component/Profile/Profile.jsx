@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { 
@@ -13,10 +13,13 @@ export default function Profile({ user, setUser }) {
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [newPassword, setNewPassword] = useState("");
-  
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  const navigate = useNavigate();
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
   
-  // 🖼️ URL Formatter Helper - Fixes path issues once and for all
+  // 🖼️ URL Formatter Helper
   const getImageUrl = (path) => {
     if (!path) return "https://i.imgur.com/6VBx3io.png";
     if (path.startsWith('http')) return path;
@@ -25,10 +28,11 @@ export default function Profile({ user, setUser }) {
   };
 
   const [photoURL, setPhotoURL] = useState(getImageUrl(user?.photo));
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const navigate = useNavigate();
+  // 🛠️ Helper to get Token for Requests
+  const getAuthHeader = () => ({
+    headers: { Authorization: `Bearer ${user?.token}` }
+  });
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
@@ -44,104 +48,91 @@ export default function Profile({ user, setUser }) {
         employeeId: user.employeeId, 
         name, 
         phone,
-      });
+      }, getAuthHeader());
       
       if (res.data.success) {
-        const updatedData = res.data.data;
-        localStorage.setItem("user", JSON.stringify(updatedData));
+        const updatedData = { ...user, ...res.data.data };
+        localStorage.setItem("userInfo", JSON.stringify(updatedData)); // Sync with Login key
         setUser(updatedData);
-        setLoading(false); 
-        setTimeout(() => showMsg("✅ प्रोफाइल सफलतापूर्वक अपडेट हो गई", "success"), 100);
+        showMsg("✅ प्रोफाइल सफलतापूर्वक अपडेट हो गई");
       }
     } catch (err) {
-      setLoading(false);
       showMsg(err.response?.data?.message || "❌ प्रोफाइल अपडेट विफल", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   // 🔐 Change Password
   const changePassword = async () => {
-    if (newPassword.length < 4) return showMsg("Password minimum 4 digits long hona chahiye", "warning");
+    if (newPassword.length < 4) return showMsg("Password minimum 4 digits hona chahiye", "warning");
     try {
       setLoading(true);
       const res = await axios.post(`${API_URL}/api/profile/change-password`, {
         employeeId: user.employeeId, 
         password: newPassword,
-      });
+      }, getAuthHeader());
       
       if (res.data.success) {
-        setLoading(false);
         setNewPassword("");
-        setTimeout(() => showMsg("🔐 पासवर्ड सफलतापूर्वक बदल दिया गया है", "success"), 100);
+        showMsg("🔐 पासवर्ड सफलतापूर्वक बदल दिया गया है");
       }
     } catch (err) {
-      setLoading(false);
       showMsg(err.response?.data?.message || "❌ पासवर्ड अपडेट विफल", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   // 🖼️ Handle Image Upload
-// 🖼️ Handle Image Upload
-const handleImageChange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  // Validation
-  if (file.size > 2 * 1024 * 1024) {
-    return showMsg("File size too large (Max 2MB)", "warning");
-  }
+    if (file.size > 2 * 1024 * 1024) return showMsg("File size too large (Max 2MB)", "warning");
 
-  const formData = new FormData();
-  
-  // 🔴 FIX: Yahan "image" ki jagah "photo" hona chahiye 
-  // kyunki backend upload.single("photo") ka intezar kar raha hai
-  formData.append("photo", file); 
-  formData.append("employeeId", user.employeeId);
+    const formData = new FormData();
+    formData.append("photo", file); 
+    formData.append("employeeId", user.employeeId);
 
-  try {
-    setLoading(true);
-    const res = await axios.post(
-      `${API_URL}/api/profile/upload`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data"
-        }
-      }
-    );
-
-    if (res.data.success) {
-      const newPhotoPath = res.data.photo; // Cloudinary URL milega
-      const updatedUser = { ...user, photo: newPhotoPath };
-
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setPhotoURL(newPhotoPath); // Direct Cloudinary URL set karein
-
-      showMsg("✅ Profile photo updated successfully");
-    }
-  } catch (err) {
-    console.error("Upload Error Details:", err.response?.data);
-    showMsg(err.response?.data?.message || "Upload failed", "error");
-  } finally {
-    setLoading(false);
-    e.target.value = null; // Taaki same file dobara select ho sake
-  }
-};
-  // 🚪 Logout logic cleaned up
-  const logout = async () => {
     try {
       setLoading(true);
-      // Backend ko notify karein (Optional)
-      await axios.post(`${API_URL}/api/profile/logout`, { employeeId: user.employeeId });
+      const res = await axios.post(`${API_URL}/api/profile/upload`, formData, {
+        headers: {
+          ...getAuthHeader().headers,
+          "Content-Type": "multipart/form-data"
+        }
+      });
+
+      if (res.data.success) {
+        const newPhotoPath = res.data.photo;
+        const updatedUser = { ...user, photo: newPhotoPath };
+
+        localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setPhotoURL(getImageUrl(newPhotoPath));
+        showMsg("✅ Profile photo updated successfully");
+      }
     } catch (err) {
-      console.warn("Logout notification failed, clearing local data anyway.");
+      showMsg(err.response?.data?.message || "Upload failed", "error");
     } finally {
-      localStorage.removeItem("user");
-      setUser(null);
+      setLoading(false);
+      e.target.value = null;
+    }
+  };
+
+  // 🚪 Professional Logout
+  const logout = () => {
+    setLoading(true);
+    // Token aur session clear karna
+    localStorage.removeItem("userInfo");
+    localStorage.clear(); // Safety clear
+    setUser(null);
+    
+    setTimeout(() => {
       setLoading(false);
       navigate("/login", { replace: true });
-    }
+    }, 500);
   };
 
   if (loading) return <Loader />;
@@ -150,11 +141,11 @@ const handleImageChange = async (e) => {
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] p-4 md:p-12 font-sans transition-colors duration-500">
       <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* --- LEFT COLUMN: Profile Card --- */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-[2rem] p-8 shadow-xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center text-center">
             <div className="relative group">
-              <div className="w-32 h-32 rounded-3xl overflow-hidden ring-4 ring-emerald-500/20 group-hover:ring-emerald-500/40 transition-all duration-500 shadow-2xl">
+              <div className="w-32 h-32 rounded-3xl overflow-hidden ring-4 ring-emerald-500/20 group-hover:ring-emerald-500/40 transition-all duration-500 shadow-2xl bg-zinc-100 dark:bg-zinc-800">
                 <img src={photoURL} alt="profile" className="w-full h-full object-cover" />
               </div>
               <label className="absolute -bottom-2 -right-2 p-2.5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-xl cursor-pointer hover:scale-110 transition-transform shadow-lg">
@@ -164,7 +155,10 @@ const handleImageChange = async (e) => {
             </div>
             
             <h2 className="mt-6 text-xl font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{user?.name}</h2>
-            <p className="text-zinc-400 text-xs font-bold tracking-widest uppercase mt-1">ID: {user?.employeeId}</p>
+            <div className="flex flex-col gap-1 mt-1">
+                <span className="text-zinc-400 text-[10px] font-black tracking-widest uppercase">ID: {user?.employeeId}</span>
+                <span className="text-emerald-500 text-[9px] font-black tracking-widest uppercase">{user?.email}</span>
+            </div>
             
             <div className="mt-6 w-full pt-6 border-t border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center justify-between text-left p-3 bg-emerald-50 dark:bg-emerald-500/5 rounded-2xl">
@@ -183,7 +177,7 @@ const handleImageChange = async (e) => {
           </button>
         </div>
 
-        {/* --- RIGHT COLUMN: Settings --- */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 md:p-10 shadow-xl border border-zinc-200 dark:border-zinc-800">
             <h3 className="text-lg font-black text-zinc-800 dark:text-zinc-100 mb-8 flex items-center gap-3">
@@ -246,7 +240,7 @@ const handleImageChange = async (e) => {
       <style>{`
         .label-style { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; margin-left: 4px; }
         .input-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #d4d4d8; transition: color 0.3s; }
-        .form-input-zinc { width: 100%; background: #fdfdfd; border: 1px solid #e4e4e7; border-radius: 1.25rem; padding: 1rem 1rem 1rem 3rem; font-size: 0.875rem; outline: none; font-weight: 700; color: #18181b; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .form-input-zinc { width: 100%; background: #fdfdfd; border: 1px solid #e4e4e7; border-radius: 1.25rem; padding: 1rem 1rem 1rem 3rem; font-size: 0.875rem; outline: none; font-weight: 700; color: #18181b; transition: all 0.3s ease; }
         .dark .form-input-zinc { background: #18181b; border-color: #27272a; color: #f4f4f5; }
         .form-input-zinc:focus { border-color: #10b981; background: white; }
         .dark .form-input-zinc:focus { background: #09090b; border-color: #10b981; }

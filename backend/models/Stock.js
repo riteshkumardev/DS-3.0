@@ -1,38 +1,52 @@
+// Stock.js
 import mongoose from "mongoose";
 
+/**
+ * Stock Master Schema - Dharashakti Agro Products
+ * Yeh file current stock levels aur product details track karti hai.
+ */
 const stockSchema = new mongoose.Schema({
-  // Unique Product Name (e.g., 'Diesel', 'Tyre', 'Cement')
-  productName: { 
-    type: String, 
-    required: true, 
-    unique: true, 
-    trim: true,
-    uppercase: true // Consistency ke liye hamesha CAPS mein save hoga
-  },
-
-  // Stock Calculation Fields
-  openingStock: { type: Number, default: 0 }, // Saal ya Mahine ke shuru ka stock
-  totalIn: { type: Number, default: 0 },      // Total Purchase kitni hui
-  totalOut: { type: Number, default: 0 },     // Total Sale kitni hui
-  
-  // Current Available Stock (Logic: opening + totalIn - totalOut)
-  totalQuantity: { 
-    type: Number, 
-    default: 0 
-  }, 
-
-  unit: { 
-    type: String, 
-    enum: ['Ltrs', 'Nos', 'Kg', 'Bags', 'Units'], 
-    default: 'Units' 
-  },
-
-  remarks: { type: String }
+    productName: {
+        type: String,
+        required: [true, "Product name is required"],
+        unique: true,
+        trim: true,
+        uppercase: true
+    },
+    category: {
+        type: String,
+        required: [true, "Category is required"], // e.g., Fertilizer, Seeds, Pesticides
+        index: true
+    },
+    currentStock: {
+        type: Number,
+        default: 0,
+        min: [0, "Stock cannot be negative"]
+    },
+    unit: {
+        type: String,
+        default: "KG", // e.g., KG, BAG, QUINTAL
+        uppercase: true
+    },
+    minStockLevel: {
+        type: Number,
+        default: 10, // Dashboard par alert dikhane ke liye
+    },
+    pricePerUnit: {
+        type: Number,
+        required: [true, "Base price is required"]
+    },
+    lastUpdatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }
 }, { 
-  timestamps: true 
+    timestamps: true 
 });
 
-// Indexing for faster search
-stockSchema.index({ productName: 1 });
+// Search ko fast karne ke liye indexing
+stockSchema.index({ productName: 'text' });
 
-export default mongoose.model("Stock", stockSchema);
+const Stock = mongoose.model("Stock", stockSchema);
+
+export default Stock;

@@ -1,65 +1,111 @@
+// Sale.js
 import mongoose from "mongoose";
 
 const goodsSchema = new mongoose.Schema({
-  product: { type: String, required: true },
-  hsn: { type: String },
-  quantity: { type: Number, default: 0 },
-  rate: { type: Number, default: 0 },
-  taxableAmount: { type: Number, default: 0 },
+    // Ab String ki jagah Product Model ka reference use karein
+    productId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Product', 
+        required: true 
+    },
+    productName: { type: String, required: true }, // Snaphot for Invoice printing
+    hsn: { type: String },
+    quantity: { type: Number, required: true, min: 0 },
+    unit: { type: String, default: "KG" },
+    rate: { type: Number, required: true, min: 0 },
+    taxableAmount: { type: Number, default: 0 }
 }, { _id: false });
 
 const saleSchema = new mongoose.Schema({
-  billNo: { type: String, required: true, unique: true },
-  date: { type: String, required: true },
-  customerName: { type: String, required: true },
-  gstin: { type: String, default: "N/A" },
-  mobile: { type: String },
-  address: { type: String },
-  vehicleNo: { type: String },
-  
-  // Professional Logistics Fields
-  deliveryNote: { type: String },
-  paymentMode: { type: String, default: "BY BANK" },
-  buyerOrderNo: { type: String },
-  buyerOrderDate: { type: String, default: "-" },
-  dispatchDocNo: { type: String },
-  dispatchDate: { type: String, default: "-" },
-  dispatchedThrough: { type: String },
-  destination: { type: String },
-  lrRrNo: { type: String },
-  termsOfDelivery: { type: String },
+    // Business Identification
+    billNo: { 
+        type: String, 
+        required: true, 
+        unique: true,
+        uppercase: true 
+    },
+    date: { type: Date, default: Date.now },
+    
+    // Customer Linking (Critical for Ledger)
+    partyId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Party', 
+        required: true 
+    },
+    customerName: { type: String, required: true }, // Redundancy for fast display
+    
+    // Grouped Logistics (Truck/Dispatch details)
+    logistics: {
+        vehicleNo: { type: String, uppercase: true },
+        dispatchedThrough: { type: String, uppercase: true },
+        destination: { type: String, uppercase: true },
+        lrRrNo: { type: String },
+        freight: { type: Number, default: 0 },
+        isFreightPaid: { type: Boolean, default: false }
+    },
 
-  // Items
-  goods: [goodsSchema],
+    // Optional Fields (Cleaned up)
+    buyerOrderNo: { type: String },
+    termsOfDelivery: { type: String },
 
-  // Financials (Fixed Logic)
-  freight: { type: Number, default: 0 },
-  taxableValue: { type: Number, default: 0 },
-  cashDiscount: { type: Number, default: 0 }, // Percentage or Flat (Hum yahan Flat treat kar rahe hain)
-  cgst: { type: Number, default: 0 },
-  sgst: { type: Number, default: 0 },
-  igst: { type: Number, default: 0 },
-  totalAmount: { type: Number, default: 0 }, // Grand Total
-  amountReceived: { type: Number, default: 0 }, // Yeh hamara "CREDIT" transaction banega
-  paymentDue: { type: Number, default: 0 },
+    // Items List
+    goods: [goodsSchema],
 
-  remarks: { type: String },
-  si: { type: Number }
+    // --- Financials (Automated) ---
+    subTotal: { type: Number, default: 0 }, // Total of all items before Tax & Freight
+    gstType: { type: String, enum: ['CGST/SGST', 'IGST'], required: true },
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    igst: { type: Number, default: 0 },
+    
+    discount: { type: Number, default: 0 }, // Cash Discount (Flat)
+    roundOff: { type: Number, default: 0 },
+    
+    grandTotal: { type: Number, default: 0 },
+    amountPaid: { type: Number, default: 0 }, // Real-time payment entry
+    balanceDue: { type: Number, default: 0 },
+
+    status: { 
+        type: String, 
+        enum: ['PAID', 'PARTIAL', 'UNPAID', 'CANCELLED'], 
+        default: 'UNPAID' 
+    },
+    
+    performedBy: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
+    },
+    remarks: { type: String, trim: true }
 }, { timestamps: true });
 
-// Auto-calculation before saving
+// --- High-Level Auto Calculations ---
 saleSchema.pre("save", function (next) {
-  this.taxableValue = this.goods.reduce((sum, g) => {
-    g.taxableAmount = (Number(g.quantity) || 0) * (Number(g.rate) || 0);
-    return sum + g.taxableAmount;
-  }, 0);
+    // 1. Calculate Taxable amount for each item
+    this.subTotal = this.goods.reduce((sum, item) => {
+        item.taxableAmount = item.quantity * item.rate;
+        return sum + item.taxableAmount;
+    }, 0);
 
-  // Formula: (Taxable + Freight + Taxes) - Discount
-  const totalTaxes = (Number(this.cgst) || 0) + (Number(this.sgst) || 0) + (Number(this.igst) || 0);
-  this.totalAmount = (this.taxableValue + Number(this.freight) + totalTaxes) - (Number(this.cashDiscount) || 0);
-  
-  this.paymentDue = this.totalAmount - (Number(this.amountReceived) || 0);
-  next();
+    // 2. Tax Calculation Logic
+    const totalTaxes = this.cgst + this.sgst + this.igst;
+    
+    // 3. Grand Total = SubTotal + Taxes + Freight - Discount + RoundOff
+    this.grandTotal = (this.subTotal + totalTaxes + this.logistics.freight + this.roundOff) - this.discount;
+    
+    // 4. Calculate Balance Due
+    this.balanceDue = this.grandTotal - this.amountPaid;
+
+    // 5. Update Payment Status
+    if (this.balanceDue <= 0) {
+        this.status = 'PAID';
+    } else if (this.balanceDue < this.grandTotal) {
+        this.status = 'PARTIAL';
+    } else {
+        this.status = 'UNPAID';
+    }
+
+    next();
 });
 
 export default mongoose.model("Sale", saleSchema);

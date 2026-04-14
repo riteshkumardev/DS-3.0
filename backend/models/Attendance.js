@@ -1,19 +1,50 @@
+// Attendance.js
 import mongoose from "mongoose";
 
 const attendanceSchema = new mongoose.Schema({
-  employeeId: { type: String, required: true },
-  name: { type: String, required: true },
-  date: { type: String, required: true }, // Format: YYYY-MM-DD
-  status: { 
-    type: String, 
-    enum: ["Present", "Absent", "Half-Day", "Leave"], 
-    required: true 
-  },
-  timeIn: { type: String }, // Optional: Shift start
-  timeOut: { type: String }, // Optional: Shift end
-}, { timestamps: true });
+    staffId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Staff',
+        required: [true, "Staff reference is required"]
+    },
+    date: {
+        type: Date,
+        required: [true, "Date is required"],
+        // Ek employee ki ek din mein ek hi attendance entry honi chahiye
+    },
+    status: {
+        type: String,
+        enum: ['PRESENT', 'ABSENT', 'HALF_DAY', 'PAID_LEAVE', 'HOLIDAY'],
+        default: 'PRESENT',
+        required: true
+    },
+    // Logistics/Agro business mein overtime bohot common hai
+    overtimeHours: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    checkIn: {
+        type: String, // e.g., "09:00 AM"
+    },
+    checkOut: {
+        type: String, // e.g., "06:00 PM"
+    },
+    remark: {
+        type: String,
+        trim: true,
+        uppercase: true // e.g., "LATE ENTRY", "FIELD WORK"
+    },
+    performedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    }
+}, { 
+    timestamps: true 
+});
 
-// Ek employee ki ek din mein ek hi entry ho sakti hai
-attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+// Compound Index: Ek hi staff ki same date par do entry na ho paye
+attendanceSchema.index({ staffId: 1, date: 1 }, { unique: true });
 
-export default mongoose.model("Attendance", attendanceSchema);
+export default mongoose.model('Attendance', attendanceSchema);
