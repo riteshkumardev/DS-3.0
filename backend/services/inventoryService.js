@@ -12,7 +12,21 @@ class InventoryService {
      * @desc    Update Stock and Record Log (Handles HSN or ObjectId)
      */
     async updateStock(data, session = null) {
-        const { productId, productName, quantity, type, referenceId, performedBy, remarks, rate, hsn, unit, category } = data;
+        // Frontend se aane wale extra fields (totalQuantity, hsn, unit, category) ko extract kiya
+        const { 
+            productId, 
+            productName, 
+            totalQuantity, 
+            quantity, 
+            type, 
+            referenceId, 
+            performedBy, 
+            remarks, 
+            rate, 
+            hsn, 
+            unit, 
+            category 
+        } = data;
 
         try {
             // 1. Find Product in Master (Flexible Search: ID or HSN)
@@ -23,14 +37,14 @@ class InventoryService {
                 product = await Product.findOne({ hsnCode: productId }).session(session);
             }
 
-            // 🚀 AUTO-CREATE PRODUCT: Agar DB khali hai toh crash hone ke bajaye product create karein
+            // 🚀 AUTO-CREATE PRODUCT: Agar DB khali hai toh details ke sath create karein
             if (!product) {
-                console.log(`Creating missing product master for: ${productName || productId}`);
+                console.log(`📦 Creating missing product master for: ${productName || productId}`);
                 product = new Product({
                     name: (productName || productId).toUpperCase(),
                     hsnCode: hsn || productId,
                     unit: unit || "KG",
-                    category: category || "OTHERS",
+                    category: category || "GRAINS",
                     currentStock: 0,
                     purchasePrice: rate || 0,
                     salesPrice: rate || 0
@@ -38,40 +52,47 @@ class InventoryService {
                 await product.save({ session });
             }
 
-            // 2. Fetch or Create Stock Record for this product
+            // 2. Fetch or Create Stock Record (Stock.js validation fix)
             let stock = await Stock.findOne({ productId: product._id }).session(session);
             
             if (!stock) {
                 stock = new Stock({
                     productId: product._id,
                     productName: product.name,
-                    unit: product.unit || "KG",
+                    category: product.category || category || "GRAINS", // Fixed: category requirement
+                    unit: product.unit || unit || "KG",
                     currentQuantity: 0,
-                    avgPurchasePrice: rate || 0
+                    pricePerUnit: rate || product.purchasePrice || 1, // Fixed: pricePerUnit requirement
+                    avgPurchasePrice: rate || product.purchasePrice || 0,
+                    lastUpdatedBy: performedBy
                 });
             }
 
             const previousStock = stock.currentQuantity || 0;
             let newStock = previousStock;
 
-            // 3. Logic for Inward/Outward
+            // 3. Logic for Inward/Outward (Industrial Weight logic)
+            // Use totalQuantity (Weight) if available, else fallback to quantity (Bags)
+            const stockDelta = Number(totalQuantity) || Number(quantity) || 0;
+
             const inwardTypes = ['INWARD', 'RETURN_IN'];
             const outwardTypes = ['OUTWARD', 'WASTAGE', 'RETURN_OUT', 'SALE'];
 
             if (inwardTypes.includes(type)) {
-                newStock += Number(quantity);
+                newStock += stockDelta;
                 
-                // Valuation logic
+                // Valuation logic (Moving Average)
                 if (rate && rate > 0) {
                     const oldVal = previousStock * (stock.avgPurchasePrice || 0);
-                    const newVal = Number(quantity) * Number(rate);
+                    const newVal = stockDelta * Number(rate);
                     stock.avgPurchasePrice = (oldVal + newVal) / newStock;
+                    stock.pricePerUnit = rate; // Current transaction rate as base price
                 }
             } else if (outwardTypes.includes(type)) {
-                newStock -= Number(quantity);
+                newStock -= stockDelta;
             }
 
-            // 4. Master Sync: Update Stock & Product currentStock
+            // 4. Master Sync: Update Stock & Product Master
             stock.currentQuantity = newStock;
             stock.lastUpdatedBy = performedBy;
             await stock.save({ session });
@@ -79,15 +100,15 @@ class InventoryService {
             product.currentStock = newStock;
             await product.save({ session });
 
-            // 5. Audit Log
+            // 5. Audit Log Entry
             const log = new StockLog({
                 productId: product._id,
                 transactionType: type,
-                quantity: Number(quantity),
+                quantity: stockDelta,
                 previousStock,
                 newStock,
                 referenceId,
-                remarks: remarks?.toUpperCase() || `AUTO-SYNC: ${type}`,
+                remarks: remarks?.toUpperCase() || `SYNC: ${type}`,
                 performedBy
             });
 
@@ -105,7 +126,7 @@ class InventoryService {
      */
     async checkAvailability(productId, requestedQty) {
         let product;
-        if (productId.length === 24) {
+        if (productId && productId.length === 24) {
             product = await Product.findById(productId);
         } else {
             product = await Product.findOne({ hsnCode: productId });
