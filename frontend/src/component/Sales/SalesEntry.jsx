@@ -20,8 +20,8 @@ const SalesEntry = ({ user }) => {
     mobile: "",
     street: "",
     city: "Samastipur",
-    items: [{ productName: "", quantity: "", rate: "", productId: "", hsn: "" }], // Added productId here
-    billNo: "", 
+    items: [{ productName: "", quantity: "", rate: "", productId: "", hsn: "" }],
+    billNo: "",
     vehicleNo: "",
     travelingCost: 0,
     cashDiscount: 0,
@@ -30,13 +30,13 @@ const SalesEntry = ({ user }) => {
     paymentDue: 0,
     remarks: "",
     deliveryNote: "",
-    deliveryNoteDate: "", 
+    deliveryNoteDate: "",
     paymentMode: "BY BANK",
     buyerOrderNo: "",
     buyerOrderDate: "",
     dispatchDocNo: "",
     dispatchDate: "",
-    dispatchedThrough: "", 
+    dispatchedThrough: "",
     destination: "",
     lrRrNo: "",
     termsOfDelivery: "",
@@ -44,7 +44,7 @@ const SalesEntry = ({ user }) => {
 
   const [formData, setFormData] = useState(initialState);
   const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]); // 👈 Real Products from DB
+  const [products, setProducts] = useState([]);
   const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -65,7 +65,7 @@ const SalesEntry = ({ user }) => {
     const currentMonth = months[now.getMonth()];
     const currentYear = now.getFullYear();
     const finYear = now.getMonth() >= 3 ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}` : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
-    
+
     let nextSerial = 1;
     if (lastBillNo && lastBillNo.includes('/')) {
       const parts = lastBillNo.split('/');
@@ -75,22 +75,19 @@ const SalesEntry = ({ user }) => {
     return `DS/${finYear}/${currentMonth}/${String(nextSerial).padStart(3, '0')}`;
   };
 
-  // 🔄 Fetch All Data (Parties, Products, Last Bill)
   const fetchData = useCallback(async () => {
     if (!user?.token) return;
     try {
       setLoading(true);
-      
-      // 1. Fetch Customers
-      const supRes = await fetchPartiesList('SUPPLIER'); 
-      if (supRes.data?.success) setSuppliers(supRes.data.data);
+      const [supRes, prodRes, salesRes] = await Promise.all([
+        fetchPartiesList('SUPPLIER'),
+        axios.get(`${API_URL}/stocks`, getAuthHeader()),
+        axios.get(`${API_URL}/sales`, getAuthHeader())
+      ]);
 
-      // 2. Fetch Real Products from Inventory 👈 (CRITICAL FIX)
-      const prodRes = await axios.get(`${API_URL}/stocks`, getAuthHeader());
+      if (supRes.data?.success) setSuppliers(supRes.data.data);
       if (prodRes.data?.success) setProducts(prodRes.data.data);
 
-      // 3. Fetch Sales for Bill No
-      const salesRes = await axios.get(`${API_URL}/sales`, getAuthHeader());
       if (salesRes.data?.success && salesRes.data.data.length > 0) {
         const salesData = salesRes.data.data;
         const lastSi = Math.max(...salesData.map((s) => s.si || 0));
@@ -100,7 +97,7 @@ const SalesEntry = ({ user }) => {
       } else {
         setFormData(prev => ({ ...prev, billNo: generateBillID("") }));
       }
-    } catch (err) { 
+    } catch (err) {
       showMsg("Data loading failed.", "error");
     } finally { setLoading(false); }
   }, [user, API_URL, getAuthHeader]);
@@ -122,27 +119,28 @@ const SalesEntry = ({ user }) => {
     }
   };
 
-  // 🛒 Handle Item Change with Real ID Mapping
   const handleItemChange = (index, e) => {
     const { name, value } = e.target;
     const newItems = [...formData.items];
-    
+
     if (name === "productName") {
-      // Find real product from fetched list
       const selectedProd = products.find(p => (p.name || p.productName) === value);
       if (selectedProd) {
-        newItems[index].productId = selectedProd._id; // ✅ Real MongoDB ID
-        newItems[index].hsn = selectedProd.hsnCode;   // ✅ Real HSN
+        newItems[index].productId = selectedProd._id;
+        newItems[index].hsn = selectedProd.hsnCode || "";
+      } else {
+        // Clear ID if the name doesn't match an existing product
+        newItems[index].productId = "";
       }
     }
-    
+
     newItems[index][name] = value;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
   const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { productName: "", quantity: "", rate: "", productId: "", hsn: "" }] }));
   const removeItem = (index) => setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
-  
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -154,7 +152,7 @@ const SalesEntry = ({ user }) => {
     const disc = toSafeNumber(formData.cashDiscount);
     const freight = toSafeNumber(formData.travelingCost);
     const received = toSafeNumber(formData.amountReceived);
-    
+
     const grand = (sub + freight) - disc;
     setFormData(prev => ({ ...prev, totalPrice: grand, paymentDue: grand - received }));
   }, [formData.items, formData.travelingCost, formData.cashDiscount, formData.amountReceived]);
@@ -162,13 +160,19 @@ const SalesEntry = ({ user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) return showMsg("Access Denied!", "error");
-    
+
+    // --- CRITICAL FIX: VALIDATE PRODUCT IDS ---
+    const hasInvalidItem = formData.items.some(item => !item.productId || item.productId === "");
+    if (hasInvalidItem) {
+        return showMsg("One or more items do not have a valid Product ID. Please select products from the list.", "error");
+    }
+
     const selectedParty = suppliers.find(s => s.name === formData.customerName);
-    
+
     setLoading(true);
     try {
       const goods = formData.items.map(item => ({
-        productId: item.productId, // ✅ Passed Real ID
+        productId: item.productId,
         productName: item.productName,
         hsn: item.hsn,
         quantity: toSafeNumber(item.quantity),
@@ -183,7 +187,7 @@ const SalesEntry = ({ user }) => {
       const payload = {
         billNo: formData.billNo,
         date: formData.date,
-        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", 
+        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f",
         customerName: formData.customerName,
         logistics: {
           vehicleNo: formData.vehicleNo.toUpperCase(),
@@ -193,17 +197,17 @@ const SalesEntry = ({ user }) => {
           freight: toSafeNumber(formData.travelingCost)
         },
         goods: goods,
-        gstType: gstTypeValue, 
+        gstType: gstTypeValue,
         discount: toSafeNumber(formData.cashDiscount),
         amountPaid: toSafeNumber(formData.amountReceived),
-        performedBy: user?._id, 
+        performedBy: user?._id,
         remarks: formData.remarks
       };
 
       const res = await axios.post(`${API_URL}/sales`, payload, getAuthHeader());
       if (res.data.success) {
         showMsg("✅ Bill Saved & Inventory Synced!");
-        fetchData(); // Refresh data
+        fetchData();
         setFormData({ ...initialState, billNo: generateBillID(formData.billNo) });
       }
     } catch (error) {
@@ -215,7 +219,7 @@ const SalesEntry = ({ user }) => {
     <>
       <SalesEntryForm 
         formData={formData} nextSi={nextSi} loading={loading}
-        suppliers={suppliers} products={products} // 👈 Passed real products to form
+        suppliers={suppliers} products={products}
         handleChange={handleChange}
         handleCustomerSelect={handleCustomerSelect}
         handleItemChange={handleItemChange}
