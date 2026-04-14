@@ -21,6 +21,7 @@ import staffRoutes from "./routes/staffRoutes.js";
 import stockRoutes from "./routes/stockRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+import attendanceRoutes from "./routes/attendanceRoutes.js";
 // Initialize Config
 dotenv.config();
 
@@ -68,6 +69,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/stocks", stockRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/attendance", attendanceRoutes);
 // Static Files Folder
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

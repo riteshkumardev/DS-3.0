@@ -1,42 +1,58 @@
-// Attendance.js
 import mongoose from "mongoose";
 
 const attendanceSchema = new mongoose.Schema({
+    // --- Link to Staff Master ---
     staffId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Staff',
         required: [true, "Staff reference is required"]
     },
-    date: {
-        type: Date,
-        required: [true, "Date is required"],
-        // Ek employee ki ek din mein ek hi attendance entry honi chahiye
+    // Frontend compatibility ke liye hum employeeId (DS-2026-001) bhi store kar sakte hain
+    employeeId: { 
+        type: String, 
+        required: true,
+        uppercase: true 
     },
+
+    // --- Date & Time ---
+    // String format (YYYY-MM-DD) is safer for daily reports in India timezone
+    date: {
+        type: String, 
+        required: [true, "Attendance date is required"]
+    },
+    checkIn: { type: String },  // "09:00 AM"
+    checkOut: { type: String }, // "06:30 PM"
+
+    // --- Status & Payroll Triggers ---
     status: {
         type: String,
-        enum: ['PRESENT', 'ABSENT', 'HALF_DAY', 'PAID_LEAVE', 'HOLIDAY'],
+        enum: ['PRESENT', 'ABSENT', 'HALF_DAY', 'PAID_LEAVE', 'HOLIDAY', 'SUNDAY'],
         default: 'PRESENT',
         required: true
     },
-    // Logistics/Agro business mein overtime bohot common hai
+    
+    // Dharashakti Agro mein Overtime management
     overtimeHours: {
         type: Number,
         default: 0,
         min: 0
     },
-    checkIn: {
-        type: String, // e.g., "09:00 AM"
+
+    // --- Logistics Specific ---
+    workLocation: {
+        type: String,
+        enum: ['OFFICE', 'WAREHOUSE', 'FIELD_STATION', 'ON_TRIP'],
+        default: 'WAREHOUSE'
     },
-    checkOut: {
-        type: String, // e.g., "06:00 PM"
-    },
+
+    // --- Audit & Notes ---
     remark: {
         type: String,
         trim: true,
-        uppercase: true // e.g., "LATE ENTRY", "FIELD WORK"
+        uppercase: true // "FIELD WORK", "LATE DUE TO RAIN"
     },
     performedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId, // Admin ya Manager ki ID
         ref: 'User',
         required: true
     }
@@ -44,7 +60,8 @@ const attendanceSchema = new mongoose.Schema({
     timestamps: true 
 });
 
-// Compound Index: Ek hi staff ki same date par do entry na ho paye
+// CRITICAL: Prevent duplicate entries for the same person on the same day
 attendanceSchema.index({ staffId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ date: 1, status: 1 }); // For fast daily reports
 
 export default mongoose.model('Attendance', attendanceSchema);

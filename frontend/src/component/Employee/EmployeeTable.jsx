@@ -4,10 +4,11 @@ import {
   Search, Edit3, Camera, Check, X, Eye, FileDown 
 } from "lucide-react";
 
-// Aapki provided API services ka import
+// API Services
 import { getAllStaff, updateStaff } from "../../api/staffApi"; 
 import { getAttendanceByDate } from "../../api/attendanceApi"; 
 
+// Components & Utils
 import Loader from '../Core_Component/Loader/Loader';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,25 +16,26 @@ import autoTable from 'jspdf-autotable';
 const EmployeeTable = ({ user }) => { 
   const role = user?.role;
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
+  const navigate = useNavigate();
 
+  // States
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState(null); 
   const [editData, setEditData] = useState({});
   const [selectedIds, setSelectedIds] = useState([]); 
-  const navigate = useNavigate();
 
-  // 1. Fetch Employees using your service
+  // 1. Fetch Staff Data
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await getAllStaff(); // Service call
+      const res = await getAllStaff(); 
       if (res.data.success) {
         setEmployees(res.data.data);
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
+      console.error("Staff Fetch Error:", err);
     } finally {
       setLoading(false);
     }
@@ -43,6 +45,7 @@ const EmployeeTable = ({ user }) => {
     fetchEmployees();
   }, []);
 
+  // Selection Handlers
   const handleSelectOne = (id) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -50,55 +53,80 @@ const EmployeeTable = ({ user }) => {
   };
 
   const handleSelectAll = (filteredList) => {
-    if (selectedIds.length === filteredList.length) {
+    if (selectedIds.length === filteredList.length && filteredList.length > 0) {
       setSelectedIds([]);
     } else {
       setSelectedIds(filteredList.map(emp => emp._id));
     }
   };
 
-  // 2. Optimized PDF Generation with Attendance API
+  // 2. Generate Professional PDF Report
   const downloadReport = async () => {
-    if (selectedIds.length === 0) return alert("Select staff members first!");
+    if (selectedIds.length === 0) return alert("Please select staff members first!");
 
     try {
       const doc = new jsPDF('landscape');
-      const tableColumn = ["Sr.", "Emp ID", "Name", "Role", "Base Salary", "Work Days", "Earned", "Due"];
+      const tableColumn = ["Sr.", "Emp ID", "Name", "Designation", "Base Salary", "Days worked", "Earned Amount", "Status"];
       const tableRows = [];
 
-      let totals = { earned: 0, due: 0 };
+      let grandTotalEarned = 0;
       const employeesToExport = employees.filter(emp => selectedIds.includes(emp._id));
 
-      // Attendance fetch (Monthly report ke liye logic refine ki ja sakti hai)
-      const attRes = await getAttendanceByDate(""); // Fetch all or specific date
+      // Fetch Attendance for logic (current month)
+      const attRes = await getAttendanceByDate(""); 
       const allAttendance = attRes.data.data || [];
       const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
       employeesToExport.forEach((emp, i) => {
         const empAtt = allAttendance.filter(a => String(a.employeeId) === String(emp.employeeId));
-        const totalWorkDays = empAtt.filter(a => a.status === 'Present').length + (empAtt.filter(a => a.status === 'Half Day').length * 0.5);
-        const earned = Math.round((Number(emp.baseSalary) / daysInMonth) * totalWorkDays);
+        const presentDays = empAtt.filter(a => a.status === 'PRESENT').length;
+        const halfDays = empAtt.filter(a => a.status === 'HALF_DAY').length;
+        const totalWorkDays = presentDays + (halfDays * 0.5);
         
-        totals.earned += earned;
+        const earned = Math.round((Number(emp.baseSalary || 0) / daysInMonth) * totalWorkDays);
+        grandTotalEarned += earned;
 
         tableRows.push([
-          i + 1, emp.employeeId, emp.name, emp.role,
-          `Rs.${emp.baseSalary}`, totalWorkDays, `Rs.${earned}`, `Rs.${earned}`
+          i + 1, 
+          emp.employeeId, 
+          emp.name, 
+          emp.role || "STAFF",
+          `Rs.${emp.baseSalary}`, 
+          totalWorkDays, 
+          `Rs.${earned.toLocaleString()}`,
+          emp.status || "ACTIVE"
         ]);
       });
 
+      // Grand Total Row
       tableRows.push([
         { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fillColor: [240, 240, 240], fontStyle: 'bold' } },
-        { content: `Rs.${totals.earned}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } },
-        { content: `Rs.${totals.earned}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [200, 0, 0] } }
+        { content: `Rs.${grandTotalEarned.toLocaleString()}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [16, 185, 129] } },
+        { content: '', styles: { fillColor: [240, 240, 240] } }
       ]);
 
-      doc.text("DHARA SHAKTI AGRO - STAFF CONSOLIDATED REPORT", 14, 15);
-      autoTable(doc, { head: [tableColumn], body: tableRows, startY: 25, theme: 'grid', headStyles: { fillColor: [16, 185, 129] } });
-      doc.save(`Staff_Report_${new Date().toLocaleDateString()}.pdf`);
-    } catch (err) { alert("PDF Generation Failed"); }
+      // Title & PDF Design
+      doc.setFontSize(18);
+      doc.setTextColor(16, 185, 129);
+      doc.text("DHARASHAKTI AGRO - CONSOLIDATED STAFF REPORT", 14, 15);
+      
+      autoTable(doc, { 
+        head: [tableColumn], 
+        body: tableRows, 
+        startY: 25, 
+        theme: 'grid', 
+        headStyles: { fillColor: [16, 185, 129], fontSize: 10 },
+        styles: { fontSize: 9 }
+      });
+
+      doc.save(`Dharashakti_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) { 
+      console.error(err);
+      alert("Failed to generate PDF"); 
+    }
   };
 
+  // 3. Edit & Update Logic
   const startEdit = (emp) => {
     if (!isAuthorized) return;
     setEditId(emp._id); 
@@ -115,32 +143,29 @@ const EmployeeTable = ({ user }) => {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 3. Update Staff using your Service
   const handleSave = async () => {
     try {
       const payload = {
-        name: editData.name,
+        name: editData.name.toUpperCase(),
         phone: editData.phone,
-        salary: editData.salary,
+        salary: Number(editData.salary),
         accountNo: editData.accountNo,
         bankName: editData.bankName,
         role: editData.role
       };
       
-      const res = await updateStaff(editData.employeeId, payload); // Using service call
+      const res = await updateStaff(editData.employeeId, payload); 
       if (res.data.success) {
-        alert("✅ Details Updated!");
+        alert("✅ Staff Details Updated Successfully!");
         setEditId(null);
         fetchEmployees(); 
       }
-    } catch (err) { alert("Update Error"); }
+    } catch (err) { 
+        alert(err.response?.data?.message || "Update Failed"); 
+    }
   };
 
-  const filtered = employees.filter(emp => 
-    emp.name?.toLowerCase().includes(search.toLowerCase()) || 
-    emp.employeeId?.toString().includes(search)
-  );
-
+  // Utility: Image URL Builder
   const getImageUrl = (path) => {
     const API_BASE = "https://dharashakti30backend.vercel.app";
     if (!path || path === "null") return "https://i.imgur.com/6VBx3io.png";
@@ -148,18 +173,24 @@ const EmployeeTable = ({ user }) => {
     return `${API_BASE}/${path.replace(/\\/g, '/')}`;
   };
 
+  // Filter Logic
+  const filtered = employees.filter(emp => 
+    emp.name?.toLowerCase().includes(search.toLowerCase()) || 
+    emp.employeeId?.toLowerCase().includes(search.toLowerCase())
+  );
+
   if (loading) return <Loader />;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6 font-sans">
       <div className="max-w-screen-2xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         
-        {/* Header Section */}
+        {/* Table Header / Toolbar */}
         <div className="p-6 border-b dark:border-zinc-800 flex flex-wrap justify-between items-center gap-4 bg-zinc-50/50 dark:bg-zinc-800/20">
           <div className="flex items-center gap-4">
             <input 
                type="checkbox" 
-               className="w-5 h-5 cursor-pointer rounded accent-emerald-600 outline-none"
+               className="w-5 h-5 cursor-pointer rounded accent-emerald-600"
                onChange={() => handleSelectAll(filtered)}
                checked={selectedIds.length === filtered.length && filtered.length > 0}
             />
@@ -173,7 +204,7 @@ const EmployeeTable = ({ user }) => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search staff..." 
+                placeholder="Search by name or Employee ID..." 
                 className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -182,7 +213,7 @@ const EmployeeTable = ({ user }) => {
             
             <button 
               onClick={downloadReport}
-              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all shadow-md active:scale-95 ${selectedIds.length > 0 ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'}`}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all shadow-md active:scale-95 ${selectedIds.length > 0 ? 'bg-emerald-600 text-white' : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'}`}
               disabled={selectedIds.length === 0}
             >
               <FileDown size={18} /> Export PDF
@@ -190,17 +221,17 @@ const EmployeeTable = ({ user }) => {
           </div>
         </div>
 
-        {/* Responsive Table */}
+        {/* Staff Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1200px]">
+          <table className="w-full text-left border-collapse min-w-[1100px]">
             <thead>
               <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-[10px] font-black uppercase tracking-[0.2em] border-b dark:border-zinc-800">
-                <th className="px-6 py-5">Select</th>
-                <th className="px-6 py-5">Emp ID</th>
-                <th className="px-6 py-5">Profile</th>
-                <th className="px-6 py-5">Name & Contact</th>
-                <th className="px-6 py-5">Bank Details</th>
-                <th className="px-6 py-5">Salary & Role</th>
+                <th className="px-6 py-5 text-center">Select</th>
+                <th className="px-6 py-5">Employee ID</th>
+                <th className="px-6 py-5">Photo</th>
+                <th className="px-6 py-5">Full Name</th>
+                <th className="px-6 py-5">Bank Account</th>
+                <th className="px-6 py-5">Monthly Salary</th>
                 <th className="px-6 py-5 text-center">Actions</th>
               </tr>
             </thead>
@@ -215,44 +246,44 @@ const EmployeeTable = ({ user }) => {
                       onChange={() => handleSelectOne(emp._id)}
                     />
                   </td>
-                  <td className="px-6 py-4 font-black text-sm text-zinc-500">#{emp.employeeId}</td>
+                  <td className="px-6 py-4 font-black text-sm text-zinc-500 tracking-wider">
+                    {emp.employeeId}
+                  </td>
                   <td className="px-6 py-4">
-                    <img src={getImageUrl(emp.photo)} className="w-12 h-12 rounded-2xl object-cover border dark:border-zinc-700 shadow-sm" alt="profile" />
+                    <img 
+                        src={getImageUrl(emp.photo)} 
+                        className="w-12 h-12 rounded-2xl object-cover border dark:border-zinc-700 shadow-sm" 
+                        alt="emp" 
+                        onError={(e) => e.target.src = "https://i.imgur.com/6VBx3io.png"}
+                    />
                   </td>
                   <td className="px-6 py-4">
                     {editId === emp._id ? (
-                      <div className="space-y-1">
-                        <input name="name" value={editData.name} onChange={handleEditChange} className="edit-input-zinc" />
-                        <input name="phone" value={editData.phone} onChange={handleEditChange} className="edit-input-zinc" />
-                      </div>
+                      <input name="name" value={editData.name} onChange={handleEditChange} className="edit-input-zinc" />
                     ) : (
                       <div className="flex flex-col">
                         <span className="text-sm font-black text-zinc-700 dark:text-zinc-200 uppercase">{emp.name}</span>
-                        <span className="text-[10px] text-zinc-400 font-bold">{emp.phone}</span>
+                        <span className="text-[10px] text-zinc-400 font-bold tracking-widest">{emp.phone}</span>
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">{emp.bankDetails?.accountNumber || 'NO A/C'}</span>
-                      <span className="text-[9px] uppercase font-bold text-zinc-400">{emp.bankDetails?.bankName || 'N/A'}</span>
+                      <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">
+                        {emp.bankDetails?.accountNumber || 'NOT PROVIDED'}
+                      </span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400">
+                        {emp.bankDetails?.bankName || 'N/A'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     {editId === emp._id ? (
-                      <div className="space-y-1">
-                        <input name="salary" type="number" value={editData.salary} onChange={handleEditChange} className="edit-input-zinc" />
-                        <select name="role" value={editData.role} onChange={handleEditChange} className="edit-input-zinc">
-                            <option value="DRIVER">DRIVER</option>
-                            <option value="MANAGER">MANAGER</option>
-                            <option value="WORKER">WORKER</option>
-                            <option value="OPERATOR">OPERATOR</option>
-                        </select>
-                      </div>
+                      <input name="salary" type="number" value={editData.salary} onChange={handleEditChange} className="edit-input-zinc" />
                     ) : (
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-emerald-600">₹{Number(emp.baseSalary).toLocaleString()}</span>
-                        <span className="text-[9px] uppercase font-black text-zinc-400 tracking-wider">{emp.role}</span>
+                        <span className="text-sm font-black text-emerald-600">₹{Number(emp.baseSalary || 0).toLocaleString()}</span>
+                        <span className="text-[9px] uppercase font-black text-zinc-400 tracking-tighter">{emp.role}</span>
                       </div>
                     )}
                   </td>
@@ -260,7 +291,7 @@ const EmployeeTable = ({ user }) => {
                     <div className="flex justify-center gap-2">
                       {editId === emp._id ? (
                         <>
-                          <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl"><Check size={18}/></button>
+                          <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg"><Check size={18}/></button>
                           <button onClick={() => setEditId(null)} className="p-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 rounded-xl"><X size={18}/></button>
                         </>
                       ) : (
@@ -279,8 +310,18 @@ const EmployeeTable = ({ user }) => {
       </div>
 
       <style>{`
-        .edit-input-zinc { width: 100%; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 0.75rem; padding: 0.4rem 0.6rem; font-size: 0.75rem; outline: none; font-weight: 700; color: #1e293b; }
-        .dark .edit-input-zinc { background: #09090b; border-color: #27272a; color: #f4f4f5; }
+        .edit-input-zinc { 
+            width: 100%; 
+            background: #ffffff; 
+            border: 1px solid #e4e4e7; 
+            border-radius: 0.75rem; 
+            padding: 0.4rem 0.6rem; 
+            font-size: 0.75rem; 
+            outline: none; 
+            font-weight: 800; 
+            color: #10b981; 
+        }
+        .dark .edit-input-zinc { background: #09090b; border-color: #27272a; color: #10b981; }
       `}</style>
     </div>
   );
