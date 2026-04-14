@@ -1,23 +1,23 @@
 // purchaseController.js
 import Purchase from "../models/Purchase.js";
-import inventoryService from "../services/inventoryService.js";
-import ledgerService from "../services/ledgerService.js";
-import { ACCOUNT_TYPES, STOCK_TRANSACTION_TYPES } from "../utils/constants.js";
+import ledgerService from "../services/ledgerService.js"; // Sirf Ledger manage hoga
+import { ACCOUNT_TYPES } from "../utils/constants.js";
 import mongoose from "mongoose";
 
 /**
  * Professional Purchase Controller - Dharashakti Agro Products ERP
+ * (Inventory-Free Version: Manual Inventory Management)
  */
 
-// 1. CREATE PURCHASE (Atomic Transaction)
+// 1. CREATE PURCHASE
 export const createPurchase = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const { supplierId, goods, billNo, grandTotal, paymentMode } = req.body;
+        const { supplierId, billNo, grandTotal, paymentMode } = req.body;
 
-        // A. Save Purchase Record
+        // A. Save Purchase Record (Strictly Billing)
         const purchase = new Purchase({
             ...req.body,
             performedBy: req.user._id
@@ -25,21 +25,8 @@ export const createPurchase = async (req, res, next) => {
         
         const savedPurchase = await purchase.save({ session });
 
-        // B. Update Inventory (INWARD)
-        for (const item of goods) {
-            await inventoryService.updateStock({
-                productId: item.productId,
-                productName: item.productName,
-                quantity: item.quantity,
-                rate: item.rate, 
-                type: STOCK_TRANSACTION_TYPES.INWARD,
-                referenceId: savedPurchase._id,
-                performedBy: req.user._id,
-                remarks: `PURCHASE BILL: ${billNo}`
-            }, session);
-        }
-
-        // C. Update Ledger (Credit the Supplier)
+        // B. Update Ledger (Credit the Supplier)
+        // Purchase matlab udhari badh rahi hai -> Supplier Ledger Credit
         await ledgerService.postTransaction({
             partyId: supplierId,
             type: ACCOUNT_TYPES.PURCHASE,
@@ -51,7 +38,11 @@ export const createPurchase = async (req, res, next) => {
         }, session);
 
         await session.commitTransaction();
-        res.status(201).json({ success: true, message: "Purchase recorded successfully!", data: savedPurchase });
+        res.status(201).json({ 
+            success: true, 
+            message: "Purchase recorded and Ledger updated!", 
+            data: savedPurchase 
+        });
 
     } catch (error) {
         await session.abortTransaction();
@@ -94,14 +85,14 @@ export const getPurchaseById = async (req, res, next) => {
             .populate('supplierId')
             .populate('performedBy', 'name');
             
-        if (!purchase) return res.status(404).json({ success: false, message: "Purchase not found" });
+        if (!purchase) return res.status(404).json({ success: false, message: "Purchase record not found" });
         res.status(200).json({ success: true, data: purchase });
     } catch (error) {
         next(error);
     }
 };
 
-// 4. UPDATE PURCHASE (Reversal + Re-apply Logic)
+// 4. UPDATE PURCHASE (Ledger Reversal + Re-apply)
 export const updatePurchase = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -114,23 +105,10 @@ export const updatePurchase = async (req, res, next) => {
             return res.status(404).json({ success: false, message: "Purchase record not found" });
         }
 
-        const { supplierId, goods, billNo, grandTotal, paymentMode } = req.body;
+        const { supplierId, billNo, grandTotal, paymentMode } = req.body;
 
-        // --- STEP A: REVERSE OLD DATA ---
-        
-        // 1. Purana Stock reverse karein (Stock kam karein - OUTWARD)
-        for (const item of oldPurchase.goods) {
-            await inventoryService.updateStock({
-                productId: item.productId,
-                quantity: item.quantity,
-                type: STOCK_TRANSACTION_TYPES.OUTWARD,
-                remarks: `STOCK REVERSAL (EDITING PURCHASE: ${oldPurchase.billNo})`,
-                performedBy: req.user._id,
-                referenceId: oldPurchase._id
-            }, session);
-        }
-
-        // 2. Purana Ledger Entry reverse karein (Debit the supplier to nullify old Credit)
+        // --- STEP A: REVERSE OLD LEDGER ENTRY ---
+        // Pehle purani amount ko Debit karke Supplier ka balance neutral karein
         await ledgerService.postTransaction({
             partyId: oldPurchase.supplierId,
             type: ACCOUNT_TYPES.REVERSAL,
@@ -143,28 +121,14 @@ export const updatePurchase = async (req, res, next) => {
 
         // --- STEP B: APPLY NEW DATA ---
 
-        // 3. Purchase Document Update Karein
+        // 1. Purchase Document Update
         const updatedPurchase = await Purchase.findByIdAndUpdate(
             purchaseId,
             { ...req.body, performedBy: req.user._id },
             { new: true, session, runValidators: true }
         );
 
-        // 4. Naya Stock add karein (INWARD)
-        for (const item of goods) {
-            await inventoryService.updateStock({
-                productId: item.productId,
-                productName: item.productName,
-                quantity: item.quantity,
-                rate: item.rate,
-                type: STOCK_TRANSACTION_TYPES.INWARD,
-                remarks: `UPDATED PURCHASE BILL: ${billNo}`,
-                performedBy: req.user._id,
-                referenceId: updatedPurchase._id
-            }, session);
-        }
-
-        // 5. Naya Ledger Entry (Credit the supplier)
+        // 2. Naya Ledger Entry (New Credit)
         await ledgerService.postTransaction({
             partyId: supplierId,
             type: ACCOUNT_TYPES.PURCHASE,
@@ -176,7 +140,7 @@ export const updatePurchase = async (req, res, next) => {
         }, session);
 
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Purchase updated successfully!", data: updatedPurchase });
+        res.status(200).json({ success: true, message: "Purchase updated and Ledger synced!", data: updatedPurchase });
 
     } catch (error) {
         await session.abortTransaction();
@@ -186,7 +150,7 @@ export const updatePurchase = async (req, res, next) => {
     }
 };
 
-// 5. DELETE PURCHASE (With Stock & Ledger Reversal)
+// 5. DELETE PURCHASE (With Ledger Reversal Only)
 export const deletePurchase = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -195,18 +159,7 @@ export const deletePurchase = async (req, res, next) => {
         const purchase = await Purchase.findById(req.params.id);
         if (!purchase) throw new Error("Purchase record not found");
 
-        // Reverse Stock (OUTWARD)
-        for (const item of purchase.goods) {
-            await inventoryService.updateStock({
-                productId: item.productId,
-                quantity: item.quantity,
-                type: STOCK_TRANSACTION_TYPES.OUTWARD,
-                remarks: `REVERSED FROM DELETED PURCHASE BILL: ${purchase.billNo}`,
-                performedBy: req.user._id
-            }, session);
-        }
-
-        // Reverse Ledger (Debit Supplier)
+        // Reverse Ledger (Debit the supplier to clear the credit)
         await ledgerService.postTransaction({
             partyId: purchase.supplierId,
             type: ACCOUNT_TYPES.REVERSAL,
@@ -218,7 +171,7 @@ export const deletePurchase = async (req, res, next) => {
         await Purchase.findByIdAndDelete(req.params.id).session(session);
 
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Purchase deleted successfully" });
+        res.status(200).json({ success: true, message: "Purchase deleted and Ledger adjusted" });
 
     } catch (error) {
         await session.abortTransaction();
