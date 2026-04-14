@@ -19,8 +19,9 @@ const toSafeNumber = (v) => {
 };
 
 const SalesTable = ({ user }) => {
-  const role = user?.role;
-  const isAuthorized = role === "Admin" || role === "Accountant";
+  // ✅ FIX: Normalize role to UpperCase for reliable comparison
+  const userRole = user?.role?.toUpperCase(); 
+  const isAuthorized = userRole === "ADMIN" || userRole === "ACCOUNTANT" || userRole === "MANAGER";
 
   const [salesList, setSalesList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +40,7 @@ const SalesTable = ({ user }) => {
   const fetchSales = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getAllSales();
+      const res = await getAllSales(); 
       if (res.data.success) {
         setSalesList(res.data.data);
       }
@@ -75,7 +76,6 @@ const SalesTable = ({ user }) => {
   useEffect(() => {
     if (!editId || !editData.goods) return;
 
-    // Subtotal based on items
     const totalTaxable = editData.goods.reduce((sum, item) => {
         return sum + (toSafeNumber(item.quantity) * toSafeNumber(item.rate));
     }, 0);
@@ -84,14 +84,12 @@ const SalesTable = ({ user }) => {
     const discAmount = toSafeNumber(editData.discount);
     const received = toSafeNumber(editData.amountPaid);
     
-    // Grand Total Logic
     const finalTotal = freightMode === "+" 
         ? (totalTaxable + freight - discAmount) 
         : (totalTaxable - freight - discAmount);
         
     const due = finalTotal - received;
 
-    // Avoid infinite loops by checking difference
     if (Math.abs(editData.grandTotal - finalTotal) > 0.01 || Math.abs(editData.balanceDue - due) > 0.01) {
         setEditData((prev) => ({
             ...prev,
@@ -129,7 +127,6 @@ const SalesTable = ({ user }) => {
       return matchesSearch && matchesProduct;
     });
 
-    // Default sorting by date newest
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
@@ -171,7 +168,10 @@ const SalesTable = ({ user }) => {
   };
 
   const startEdit = (sale) => {
-    if (!isAuthorized) return showMsg("Unauthorized access", "warning");
+    // Check if the current user has permission before opening the edit UI
+    if (!isAuthorized) {
+        return showMsg(`Access Denied! Your role: ${user?.role || 'Guest'}`, "warning");
+    }
     setEditId(sale._id);
     setFreightMode(toSafeNumber(sale.logistics?.freight) < 0 ? "-" : "+"); 
     setEditData({ ...sale });
