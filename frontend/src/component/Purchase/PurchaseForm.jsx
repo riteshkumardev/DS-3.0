@@ -22,18 +22,18 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
   const userRole = user?.role?.toUpperCase();
   const isAuthorized = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 
-  // ✅ INITIAL STATE - Backend naming convention ke saath sync kiya gaya hai
+  // ✅ INITIAL STATE - Backend naming convention synced with your data
   const initialState = {
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseBillNo: "",
-    billNo: "", // Dono rakh rahe hain safety ke liye
+    billNo: "", 
     supplierName: "",
     supplierId: "",
     gstin: "",      
     mobile: "",     
     address: "",    
-    productName: "",
-    productId: "69ddf828b2da0117460f8ebf", // Corn default ID as per previous logs
+    productName: "CORN GRIT", // Default as per your data
+    productId: "69ddf828b2da0117460f8ebf", // As per your response
     vehicleNo: "",
     quantity: "",
     rate: "",
@@ -67,7 +67,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     loadSuppliers();
   }, []);
 
-  // 🧮 LIVE CALCULATIONS (Using formData direct access)
+  // 🧮 LIVE CALCULATIONS
   useEffect(() => {
     const qty = toSafeNumber(formData.quantity);
     const rate = toSafeNumber(formData.rate);
@@ -82,7 +82,6 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     const total = Math.round(basePrice - discountAmount + travelEffect); 
     const balance = Math.round(total - paid);
 
-    // ✅ Prevents infinite loop by checking if values actually changed
     if (formData.grandTotal !== total || formData.balanceDue !== balance) {
       setFormData((prev) => ({
         ...prev,
@@ -108,18 +107,19 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
       const isBihar = selectedSupplier?.gstin?.startsWith("10");
       const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
 
-      // ✅ NO DESTRUCTURING - Direct keys assignment for backend payload
+      // ✅ PAYLOAD - Synced with your Backend Schema
       const payload = {
         purchaseDate: formData.purchaseDate,
         purchaseBillNo: formData.purchaseBillNo || `PUR-${Date.now()}`,
-        billNo: formData.purchaseBillNo || `PUR-${Date.now()}`, // Backend validation fix
+        billNo: formData.purchaseBillNo || `PUR-${Date.now()}`, // Required path fix
         
-        supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
+        supplierId: selectedSupplier?._id || formData.supplierId || "69ddddbdb0477c53bf79cd3e",
         supplierName: formData.supplierName,
-        gstin: formData.gstin || selectedSupplier?.gstin || "URD",
-        mobile: formData.mobile || selectedSupplier?.phone || "",
-        address: formData.address || selectedSupplier?.address?.street || "",
+        gstin: formData.gstin || "URD",
+        mobile: formData.mobile || "",
+        address: formData.address || "",
 
+        // Multiple items handle karne ke liye array format
         items: [{
           productId: formData.productId, 
           productName: formData.productName,
@@ -170,7 +170,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
         <div className="bg-emerald-600 p-4 flex justify-between items-center text-white">
           <div className="flex items-center gap-3">
             <Package size={24} />
-            <h2 className="text-lg font-black tracking-tight uppercase">Purchase Entry (Live Stock)</h2>
+            <h2 className="text-lg font-black tracking-tight uppercase">Purchase Entry (Dharashakti ERP)</h2>
           </div>
           {!isAuthorized && (
             <div className="flex items-center gap-2 bg-red-500/20 px-3 py-1 rounded-full text-xs font-bold border border-red-500/50">
@@ -192,6 +192,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
 
           <ProductSection 
             formData={formData} 
+            setFormData={setFormData}
             loading={loading} 
             isAuthorized={isAuthorized} 
             handleChange={handleChange}
@@ -215,10 +216,9 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
             />
           </div>
 
-          {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-6 border-t dark:border-zinc-800">
-            <button type="button" onClick={onCancel} className="px-8 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 font-black text-[10px] uppercase tracking-widest hover:bg-zinc-200 transition-all">Cancel</button>
-            <button type="submit" disabled={loading || !isAuthorized} className="px-12 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
+            <button type="button" onClick={onCancel} className="px-8 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 font-black text-[10px] uppercase tracking-widest hover:bg-zinc-200">Cancel</button>
+            <button type="submit" disabled={loading || !isAuthorized} className="px-12 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700">
               {loading ? "Saving..." : !isAuthorized ? "🔒 Locked" : <div className="flex items-center gap-2"><Save size={14}/> Save Purchase</div>}
             </button>
           </div>
@@ -226,15 +226,6 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
       </div>
 
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
-      
-      <style>{`
-        .form-input-zinc { width: 100%; background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 0.75rem; padding: 0.65rem 0.75rem; font-size: 0.875rem; outline: none; transition: all 0.2s; }
-        .dark .form-input-zinc { background: #18181b; border-color: #27272a; color: #f4f4f5; }
-        .form-input-zinc:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
-        .form-input-zinc-readonly { width: 100%; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.65rem 0.75rem; font-size: 0.875rem; color: #64748b; }
-        .dark .form-input-zinc-readonly { background: #09090b; border-color: #18181b; color: #71717a; }
-        .label-style { font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.1em; display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-      `}</style>
     </div>
   );
 };
