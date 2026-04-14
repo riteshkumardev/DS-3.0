@@ -94,34 +94,44 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
+  // 1. Supplier find karein taaki ID aur exact metadata mil sake
   const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
 
   setLoading(true);
   try {
+    // 2. GST Type calculation (Bihar code: 10)
     const isBihar = selectedSupplier?.gstin?.startsWith("10");
     const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
 
-    // 💡 FIX: Create the 'goods' array structure expected by backend
+    // 3. Goods Array: Backend validation ke liye product matching zaroori hai
     const goodsArray = [{
       productName: formData.productName,
       quantity: toSafeNumber(formData.quantity),
       rate: toSafeNumber(formData.rate),
       taxableAmount: toSafeNumber(formData.quantity) * toSafeNumber(formData.rate),
-      // Agar backend productId mangta hai toh yahan fallback ID ya mapping add karein
-      productId: formData.productName // Ya jo bhi aapka logic ho
+      unit: "KG",
+      // IMPORTANT: Agar aapke paas products ki list hai, toh yahan selectedProd._id bhejein
+      // Agar nahi hai, toh backend handle karega, lekin productName pass hona chahiye
+      productId: formData.productName 
     }];
 
+    // 4. Final Payload (Backend schema ke according)
     const payload = {
       date: formData.date,
       billNo: formData.billNo || `PUR-${Date.now()}`,
       supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
-      customerName: formData.supplierName, // Backend field name check karein (supplierName ya customerName)
+      supplierName: formData.supplierName, // ✅ FIXED: Puraane logic mein ye missing tha
+      gstin: formData.gstin || selectedSupplier?.gstin || "URD",
+      mobile: formData.mobile || selectedSupplier?.phone || "",
+      address: formData.address || selectedSupplier?.address?.street || "",
+      
       logistics: {
         vehicleNo: formData.vehicleNo.toUpperCase(),
         freight: toSafeNumber(formData.travelingCost),
         travelMode: travelMode
       },
-      goods: goodsArray, // ✅ Now it is iterable!
+      
+      goods: goodsArray, // ✅ Iterable Array
       gstType: calculatedGstType,
       discount: toSafeNumber(formData.cashDiscount),
       amountPaid: toSafeNumber(formData.paidAmount),
@@ -130,15 +140,19 @@ const handleSubmit = async (e) => {
       performedBy: user?._id
     };
 
+    // 5. API Call
     const res = await createPurchase(payload);
     
     if (res.data.success) {
-      showMsg("✅ Purchase Entry Saved!");
+      showMsg("✅ Purchase Entry Saved Successfully!");
       setFormData(initialState);
       if (onSuccess) onSuccess();
     }
   } catch (error) {
-    showMsg(error.response?.data?.message || "Iteration error or save failed", "error");
+    // Backend se aane wala specific error dikhayein (e.g. "Path supplierName is required")
+    const errorMsg = error.response?.data?.message || "Data processing error";
+    showMsg(errorMsg, "error");
+    console.error("Purchase Submit Error:", error);
   } finally {
     setLoading(false);
   }
