@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Save, Calendar, Package, Weight, Layers, ListChecks, Info } from "lucide-react";
 // ✅ Importing your Centralized API service
-import { adjustStockManual } from "../api/stockApi";
+import { adjustStockManual } from "../../api/stockApi";
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 

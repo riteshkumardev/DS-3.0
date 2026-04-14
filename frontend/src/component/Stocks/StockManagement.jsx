@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 
 // ✅ Importing your Centralized API services
-import { getInventory, updateStock } from "../api/stockApi";
-import API from "../api/apiConfig"; // Fallback for delete if not in stockApi
+import { getInventory, updateStock } from "../../api/stockApi";
+import API from "../../api/apiConfig"; // Fallback for delete if not in stockApi
 
 import Loader from '../Core_Component/Loader/Loader';
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
