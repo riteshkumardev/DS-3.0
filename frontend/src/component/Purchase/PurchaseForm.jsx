@@ -22,22 +22,26 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
   const userRole = user?.role?.toUpperCase();
   const isAuthorized = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 
+  // ✅ INITIAL STATE - Backend naming convention ke saath sync kiya gaya hai
   const initialState = {
-    date: new Date().toISOString().split("T")[0],
+    purchaseDate: new Date().toISOString().split("T")[0],
+    purchaseBillNo: "",
+    billNo: "", // Dono rakh rahe hain safety ke liye
     supplierName: "",
+    supplierId: "",
     gstin: "",      
     mobile: "",     
     address: "",    
     productName: "",
-    billNo: "",
+    productId: "69ddf828b2da0117460f8ebf", // Corn default ID as per previous logs
     vehicleNo: "",
     quantity: "",
     rate: "",
     travelingCost: "", 
     cashDiscount: "", 
-    totalAmount: 0,
-    paidAmount: "",
-    balanceAmount: 0,
+    grandTotal: 0,
+    amountPaid: "",
+    balanceDue: 0,
     remarks: "",
   };
 
@@ -63,110 +67,100 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     loadSuppliers();
   }, []);
 
-  // Live Calculations
+  // 🧮 LIVE CALCULATIONS (Using formData direct access)
   useEffect(() => {
     const qty = toSafeNumber(formData.quantity);
     const rate = toSafeNumber(formData.rate);
     const travel = toSafeNumber(formData.travelingCost);
     const cdPercent = toSafeNumber(formData.cashDiscount);
-    const paid = toSafeNumber(formData.paidAmount);
+    const paid = toSafeNumber(formData.amountPaid);
 
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
     const travelEffect = travelMode === "+" ? travel : -travel;
 
-    const total = basePrice - discountAmount + travelEffect; 
-    const balance = total - paid;
+    const total = Math.round(basePrice - discountAmount + travelEffect); 
+    const balance = Math.round(total - paid);
 
-    setFormData((prev) => ({
-      ...prev,
-      totalAmount: Math.round(total),
-      balanceAmount: Math.round(balance),
-    }));
-  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount, formData.travelingCost, travelMode]);
+    // ✅ Prevents infinite loop by checking if values actually changed
+    if (formData.grandTotal !== total || formData.balanceDue !== balance) {
+      setFormData((prev) => ({
+        ...prev,
+        grandTotal: total,
+        balanceDue: balance,
+      }));
+    }
+  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.amountPaid, formData.travelingCost, travelMode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
-  // 1. Find Supplier for ID
-  const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
-  setLoading(true);
-  try {
-    const isBihar = selectedSupplier?.gstin?.startsWith("10");
-    const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
+    const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
 
-    const qty = toSafeNumber(formData.quantity);
-    const rate = toSafeNumber(formData.rate);
-    const taxableAmount = qty * rate;
+    setLoading(true);
+    try {
+      const isBihar = selectedSupplier?.gstin?.startsWith("10");
+      const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
 
-    // 💡 Backend Payload Alignment
-    const payload = {
-      // Basic Info
-      purchaseDate: formData.date, 
-      // ✅ FIX 1: Backend 'billNo' required mang raha hai
-      billNo: formData.billNo || `PUR-${Date.now()}`,
-      purchaseBillNo: formData.billNo || `PUR-${Date.now()}`,
+      // ✅ NO DESTRUCTURING - Direct keys assignment for backend payload
+      const payload = {
+        purchaseDate: formData.purchaseDate,
+        purchaseBillNo: formData.purchaseBillNo || `PUR-${Date.now()}`,
+        billNo: formData.purchaseBillNo || `PUR-${Date.now()}`, // Backend validation fix
+        
+        supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
+        supplierName: formData.supplierName,
+        gstin: formData.gstin || selectedSupplier?.gstin || "URD",
+        mobile: formData.mobile || selectedSupplier?.phone || "",
+        address: formData.address || selectedSupplier?.address?.street || "",
+
+        items: [{
+          productId: formData.productId, 
+          productName: formData.productName,
+          quantity: toSafeNumber(formData.quantity),
+          rate: toSafeNumber(formData.rate),
+          taxableAmount: toSafeNumber(formData.quantity) * toSafeNumber(formData.rate),
+          unit: "KG"
+        }],
+
+        logistics: {
+          vehicleNo: (formData.vehicleNo || "").toUpperCase(),
+          freight: toSafeNumber(formData.travelingCost),
+          travelMode: travelMode
+        },
+
+        gstType: calculatedGstType,
+        subTotal: toSafeNumber(formData.quantity) * toSafeNumber(formData.rate),
+        discount: toSafeNumber(formData.cashDiscount),
+        grandTotal: toSafeNumber(formData.grandTotal),
+        amountPaid: toSafeNumber(formData.amountPaid),
+        balanceDue: toSafeNumber(formData.balanceDue),
+        
+        performedBy: user?._id,
+        remarks: formData.remarks
+      };
+
+      const res = await createPurchase(payload);
       
-      // Supplier Info
-      supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
-      supplierName: formData.supplierName,
-      gstin: formData.gstin || selectedSupplier?.gstin || "URD",
-      mobile: formData.mobile || selectedSupplier?.phone || "",
-      address: formData.address || selectedSupplier?.address?.street || "",
-
-      // Items Array
-      items: [{
-        // ✅ FIX 2: Items ke andar 'productId' required hai
-        // Agar aapke paas items dropdown nahi hai, toh filhal productName hi ID ki jagah bhej rahe hain
-        // Recommended: Product master se real _id fetch karein
-        productId: formData.productId || formData.productName || "DEFAULT_ID", 
-        productName: formData.productName,
-        quantity: qty,
-        rate: rate,
-        taxableAmount: taxableAmount,
-        unit: "KG"
-      }],
-
-      logistics: {
-        vehicleNo: (formData.vehicleNo || "").toUpperCase(),
-        freight: toSafeNumber(formData.travelingCost),
-        travelMode: travelMode
-      },
-
-      // Financials
-      gstType: calculatedGstType,
-      subTotal: taxableAmount,
-      discount: toSafeNumber(formData.cashDiscount),
-      grandTotal: toSafeNumber(formData.totalAmount),
-      amountPaid: toSafeNumber(formData.paidAmount),
-      balanceDue: toSafeNumber(formData.totalAmount) - toSafeNumber(formData.paidAmount),
-      
-      performedBy: user?._id,
-      remarks: formData.remarks
-    };
-
-    const res = await createPurchase(payload);
-    
-    if (res.data.success) {
-      showMsg("✅ Purchase Entry Saved Successfully!");
-      setFormData(initialState);
-      if (onSuccess) onSuccess();
+      if (res.data.success) {
+        showMsg("✅ Purchase Entry Saved Successfully!");
+        setFormData(initialState);
+        if (onSuccess) onSuccess();
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || "Data processing error";
+      showMsg(errorMsg, "error");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    // Agar validation fail hota hai toh specific message dikhayega
-    const errorMsg = error.response?.data?.message || "Data processing error";
-    showMsg(errorMsg, "error");
-    console.error("Purchase Submit Error:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 font-sans">
       {loading && <Loader />}
@@ -216,8 +210,8 @@ const handleSubmit = async (e) => {
             </div>
             
             <SummaryCard 
-                totalAmount={formData.totalAmount} 
-                balanceAmount={formData.balanceAmount} 
+                totalAmount={formData.grandTotal} 
+                balanceAmount={formData.balanceDue} 
             />
           </div>
 

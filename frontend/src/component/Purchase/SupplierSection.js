@@ -9,6 +9,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
 
     if (supplier) {
       let finalName = supplier.name;
+      // Local Customer handling logic
       if (supplier.name === "Local customer") {
         const customName = prompt("कृपया लोकल कस्टमर का नाम दर्ज करें:");
         if (customName) finalName = customName;
@@ -17,58 +18,122 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
       setFormData(prev => ({
         ...prev,
         supplierName: finalName,
-        gstin: supplier.gstin || "N/A",
+        supplierId: supplier._id, // Backend strictly ID mangta hai
+        gstin: supplier.gstin || "URD",
         mobile: supplier.phone || "N/A",
         address: supplier.address?.street || "N/A",
       }));
     } else {
-      setFormData(prev => ({ ...prev, supplierName: selectedName, gstin: "", mobile: "", address: "" }));
+      setFormData(prev => ({ 
+        ...prev, 
+        supplierName: selectedName, 
+        supplierId: "", 
+        gstin: "", 
+        mobile: "", 
+        address: "" 
+      }));
     }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 📅 Date Field - purchaseDate sync */}
       <div className="space-y-1">
         <label className="label-style"><Calendar size={12}/> Date</label>
-        <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} className="form-input-zinc" />
+        <input 
+          type="date" 
+          name="purchaseDate" 
+          value={formData.purchaseDate} 
+          onChange={handleChange} 
+          disabled={loading || !isAuthorized} 
+          className="form-input-zinc" 
+        />
       </div>
 
+      {/* 👤 Supplier Selection */}
       <div className="space-y-1">
         <label className="label-style"><User size={12}/> Select Supplier</label>
-        <select name="supplierName" value={formData.supplierName === "" ? "" : (suppliers.find(s => s.name === formData.supplierName) ? formData.supplierName : "Local customer")} onChange={handleSupplierSelect} required disabled={loading || !isAuthorized} className="form-input-zinc">
+        <select 
+          name="supplierName" 
+          value={formData.supplierName === "" ? "" : (suppliers.find(s => s.name === formData.supplierName) ? formData.supplierName : "Local customer")} 
+          onChange={handleSupplierSelect} 
+          required 
+          disabled={loading || !isAuthorized} 
+          className="form-input-zinc"
+        >
           <option value="">-- Choose Supplier --</option>
           {suppliers.map((s) => <option key={s._id} value={s.name}>{s.name}</option>)}
         </select>
       </div>
 
+      {/* Supplier Name (Read Only) */}
       <div className="space-y-1">
         <label className="label-style">Supplier Name (Saved)</label>
-        <input name="supplierName" value={formData.supplierName} readOnly className="form-input-zinc-readonly font-bold text-emerald-600" />
+        <input 
+          name="supplierName" 
+          value={formData.supplierName} 
+          readOnly 
+          className="form-input-zinc-readonly font-bold text-emerald-600" 
+        />
       </div>
 
+      {/* GSTIN (Read Only) */}
       <div className="space-y-1">
         <label className="label-style">GSTIN</label>
-        <input name="gstin" value={formData.gstin} readOnly className="form-input-zinc-readonly" />
+        <input 
+          name="gstin" 
+          value={formData.gstin} 
+          readOnly 
+          className="form-input-zinc-readonly" 
+        />
       </div>
 
+      {/* Mobile No (Read Only) */}
       <div className="space-y-1">
         <label className="label-style"><CreditCard size={12}/> Mobile No</label>
-        <input name="mobile" value={formData.mobile} readOnly className="form-input-zinc-readonly" />
+        <input 
+          name="mobile" 
+          value={formData.mobile} 
+          readOnly 
+          className="form-input-zinc-readonly" 
+        />
       </div>
 
+      {/* 🔢 Bill No - purchaseBillNo sync */}
       <div className="space-y-1">
         <label className="label-style"><Hash size={12}/> Bill No</label>
-        <input name="billNo" value={formData.billNo} onChange={handleChange} placeholder="Optional" disabled={loading || !isAuthorized} className="form-input-zinc" />
+        <input 
+          name="purchaseBillNo" 
+          value={formData.purchaseBillNo} 
+          onChange={handleChange} 
+          placeholder="Optional" 
+          disabled={loading || !isAuthorized} 
+          className="form-input-zinc" 
+        />
       </div>
 
+      {/* 🚛 Vehicle No */}
       <div className="space-y-1">
         <label className="label-style"><Truck size={12}/> Vehicle No</label>
-        <input name="vehicleNo" value={formData.vehicleNo} onChange={handleChange} placeholder="BR-01-XXXX" disabled={loading || !isAuthorized} className="form-input-zinc" />
+        <input 
+          name="vehicleNo" 
+          value={formData.vehicleNo} 
+          onChange={handleChange} 
+          placeholder="BR-01-XXXX" 
+          disabled={loading || !isAuthorized} 
+          className="form-input-zinc" 
+        />
       </div>
 
+      {/* 📍 Address (Read Only) */}
       <div className="space-y-1">
         <label className="label-style"><MapPin size={12}/> Address</label>
-        <input name="address" value={formData.address} readOnly className="form-input-zinc-readonly" />
+        <input 
+          name="address" 
+          value={formData.address} 
+          readOnly 
+          className="form-input-zinc-readonly" 
+        />
       </div>
     </div>
   );
