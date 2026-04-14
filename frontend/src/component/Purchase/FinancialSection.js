@@ -15,7 +15,7 @@ const FinancialSection = ({ formData, loading, isAuthorized, handleChange }) => 
             onChange={handleChange} 
             placeholder="0 %" 
             disabled={loading || !isAuthorized} 
-            className="form-input-zinc" 
+            className="w-full border rounded-lg p-2 text-xs" 
           />
         </div>
 
@@ -29,7 +29,7 @@ const FinancialSection = ({ formData, loading, isAuthorized, handleChange }) => 
             onChange={handleChange} 
             placeholder="0" 
             disabled={loading || !isAuthorized} 
-            className="form-input-zinc" 
+            className="w-full border rounded-lg p-2 text-xs" 
           />
         </div>
       </div>
@@ -46,7 +46,7 @@ const FinancialSection = ({ formData, loading, isAuthorized, handleChange }) => 
           placeholder="Yahan quality, payment details ya extra information likhein..." 
           disabled={loading || !isAuthorized} 
           rows="3"
-          className="form-input-zinc min-h-[100px] resize-none pt-3"
+          className="w-full border rounded-lg p-2 text-xs"
         />
       </div>
     </div>

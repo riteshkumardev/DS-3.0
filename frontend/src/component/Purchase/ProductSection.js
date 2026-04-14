@@ -57,7 +57,7 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
           onChange={handleProductSelect} 
           required 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc bg-white dark:bg-zinc-900 font-bold"
+          className="w-full border rounded-lg p-2 text-xs"
         >
           <option value="">-- Choose Product --</option>
           {masterProducts.map((p) => (
@@ -79,7 +79,7 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
           required 
           placeholder="0" 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc bg-white dark:bg-zinc-900" 
+        className="w-full border rounded-lg p-2 text-xs"
         />
       </div>
 
@@ -94,7 +94,7 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
           required 
           placeholder="0.00" 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc bg-white dark:bg-zinc-900 font-medium" 
+          className="w-full border rounded-lg p-2 text-xs" 
         />
       </div>
 
@@ -119,7 +119,7 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
             onChange={handleChange} 
             placeholder="0" 
             disabled={loading || !isAuthorized} 
-            className="flex-1 form-input-zinc bg-white dark:bg-zinc-900" 
+           className="w-full border rounded-lg p-2 text-xs" 
           />
         </div>
       </div>

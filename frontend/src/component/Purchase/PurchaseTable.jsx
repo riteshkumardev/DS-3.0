@@ -192,7 +192,7 @@ const PurchaseTable = ({ user }) => {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-emerald-600 uppercase">Details</label>
-                          <input className="edit-input-zinc font-bold" value={editData.supplierName} readOnly />
+                          <input className="w-full border rounded-lg p-2 text-xs" value={editData.supplierName} readOnly />
                           <input className="w-full border rounded-lg p-2 text-xs" value={editData.productName} onChange={e => setEditData({...editData, productName: e.target.value})} />
                         </div>
                         <div className="space-y-2">

@@ -46,7 +46,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           value={formData.purchaseDate} 
           onChange={handleChange} 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc" 
+          className="w-full border rounded-lg p-2 text-xs" 
         />
       </div>
 
@@ -59,7 +59,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           onChange={handleSupplierSelect} 
           required 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc"
+          className="w-full border rounded-lg p-2 text-xs"
         >
           <option value="">-- Choose Supplier --</option>
           {suppliers.map((s) => <option key={s._id} value={s.name}>{s.name}</option>)}
@@ -73,7 +73,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           name="supplierName" 
           value={formData.supplierName} 
           readOnly 
-          className="form-input-zinc-readonly font-bold text-emerald-600" 
+          className="w-full border rounded-lg p-2 text-xs"
         />
       </div>
 
@@ -84,7 +84,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           name="gstin" 
           value={formData.gstin} 
           readOnly 
-          className="form-input-zinc-readonly" 
+          className="w-full border rounded-lg p-2 text-xs" 
         />
       </div>
 
@@ -95,7 +95,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           name="mobile" 
           value={formData.mobile} 
           readOnly 
-          className="form-input-zinc-readonly" 
+          className="w-full border rounded-lg p-2 text-xs" 
         />
       </div>
 
@@ -108,7 +108,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           onChange={handleChange} 
           placeholder="Optional" 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc" 
+         className="w-full border rounded-lg p-2 text-xs"
         />
       </div>
 
@@ -121,7 +121,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           onChange={handleChange} 
           placeholder="BR-01-XXXX" 
           disabled={loading || !isAuthorized} 
-          className="form-input-zinc" 
+         className="w-full border rounded-lg p-2 text-xs"
         />
       </div>
 
@@ -132,7 +132,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
           name="address" 
           value={formData.address} 
           readOnly 
-          className="form-input-zinc-readonly" 
+          className="w-full border rounded-lg p-2 text-xs" 
         />
       </div>
     </div>
