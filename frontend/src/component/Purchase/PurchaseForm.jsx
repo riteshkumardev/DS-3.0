@@ -93,6 +93,7 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
+  // 1. Find Supplier for ID
   const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
 
   setLoading(true);
@@ -104,21 +105,27 @@ const handleSubmit = async (e) => {
     const rate = toSafeNumber(formData.rate);
     const taxableAmount = qty * rate;
 
-    // 💡 Backend payload alignment based on your response data
+    // 💡 Backend Payload Alignment
     const payload = {
-      // 1. Basic Info (Backend expects purchaseDate & purchaseBillNo)
+      // Basic Info
       purchaseDate: formData.date, 
+      // ✅ FIX 1: Backend 'billNo' required mang raha hai
+      billNo: formData.billNo || `PUR-${Date.now()}`,
       purchaseBillNo: formData.billNo || `PUR-${Date.now()}`,
       
-      // 2. Supplier Info
+      // Supplier Info
       supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
       supplierName: formData.supplierName,
       gstin: formData.gstin || selectedSupplier?.gstin || "URD",
       mobile: formData.mobile || selectedSupplier?.phone || "",
       address: formData.address || selectedSupplier?.address?.street || "",
 
-      // 3. Items Array (Backend response shows "items", not "goods")
+      // Items Array
       items: [{
+        // ✅ FIX 2: Items ke andar 'productId' required hai
+        // Agar aapke paas items dropdown nahi hai, toh filhal productName hi ID ki jagah bhej rahe hain
+        // Recommended: Product master se real _id fetch karein
+        productId: formData.productId || formData.productName || "DEFAULT_ID", 
         productName: formData.productName,
         quantity: qty,
         rate: rate,
@@ -126,20 +133,19 @@ const handleSubmit = async (e) => {
         unit: "KG"
       }],
 
-      // 4. Logistics (Keep as is if your schema supports it, else move to top level)
       logistics: {
-        vehicleNo: formData.vehicleNo.toUpperCase(),
+        vehicleNo: (formData.vehicleNo || "").toUpperCase(),
         freight: toSafeNumber(formData.travelingCost),
         travelMode: travelMode
       },
 
-      // 5. Financials (Backend response shows subTotal & balanceDue)
+      // Financials
       gstType: calculatedGstType,
-      subTotal: taxableAmount, // ✅ Added for backend
+      subTotal: taxableAmount,
       discount: toSafeNumber(formData.cashDiscount),
       grandTotal: toSafeNumber(formData.totalAmount),
       amountPaid: toSafeNumber(formData.paidAmount),
-      balanceDue: toSafeNumber(formData.totalAmount) - toSafeNumber(formData.paidAmount), // ✅ Added
+      balanceDue: toSafeNumber(formData.totalAmount) - toSafeNumber(formData.paidAmount),
       
       performedBy: user?._id,
       remarks: formData.remarks
@@ -153,6 +159,7 @@ const handleSubmit = async (e) => {
       if (onSuccess) onSuccess();
     }
   } catch (error) {
+    // Agar validation fail hota hai toh specific message dikhayega
     const errorMsg = error.response?.data?.message || "Data processing error";
     showMsg(errorMsg, "error");
     console.error("Purchase Submit Error:", error);
