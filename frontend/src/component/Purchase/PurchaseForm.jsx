@@ -179,50 +179,83 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-8">
-          
-          <SupplierSection 
-            formData={formData} 
-            suppliers={suppliers} 
-            loading={loading} 
-            isAuthorized={isAuthorized} 
-            setFormData={setFormData}
-            handleChange={handleChange}
-          />
+     // PurchaseForm.js ke andar form layout ko is tarah wrap karein
+<form onSubmit={handleSubmit} className="p-6 space-y-10">
+  
+  {/* 🏢 SUPPLIER & LOGISTICS SECTION */}
+  <div className="glass-section relative">
+    <div className="absolute -top-3 left-6 bg-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">
+      Supplier Info
+    </div>
+    <SupplierSection 
+      formData={formData} 
+      suppliers={suppliers} 
+      loading={loading} 
+      isAuthorized={isAuthorized} 
+      setFormData={setFormData}
+      handleChange={handleChange}
+    />
+  </div>
 
-          <ProductSection 
-            formData={formData} 
-            setFormData={setFormData}
-            loading={loading} 
-            isAuthorized={isAuthorized} 
-            handleChange={handleChange}
-            travelMode={travelMode}
-            setTravelMode={setTravelMode}
-          />
+  {/* 📦 PRODUCT DETAILS SECTION */}
+  <div className="glass-section relative border-emerald-500/20">
+    <div className="absolute -top-3 left-6 bg-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">
+      Product Details
+    </div>
+    <ProductSection 
+      formData={formData} 
+      setFormData={setFormData}
+      loading={loading} 
+      isAuthorized={isAuthorized} 
+      handleChange={handleChange}
+      travelMode={travelMode}
+      setTravelMode={setTravelMode}
+    />
+  </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <FinancialSection 
-                formData={formData} 
-                loading={loading} 
-                isAuthorized={isAuthorized} 
-                handleChange={handleChange}
-              />
-            </div>
-            
-            <SummaryCard 
-                totalAmount={formData.grandTotal} 
-                balanceAmount={formData.balanceDue} 
-            />
-          </div>
+  {/* 💰 FINANCIAL & SUMMARY SECTION */}
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <div className="lg:col-span-2 glass-section relative">
+       <div className="absolute -top-3 left-6 bg-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">
+        Payments & Remarks
+      </div>
+      <FinancialSection 
+        formData={formData} 
+        loading={loading} 
+        isAuthorized={isAuthorized} 
+        handleChange={handleChange}
+      />
+    </div>
+    
+    <div className="lg:col-span-1 h-full">
+      <SummaryCard 
+        totalAmount={formData.grandTotal} 
+        balanceAmount={formData.balanceDue} 
+      />
+    </div>
+  </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t dark:border-zinc-800">
-            <button type="button" onClick={onCancel} className="px-8 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 font-black text-[10px] uppercase tracking-widest hover:bg-zinc-200">Cancel</button>
-            <button type="submit" disabled={loading || !isAuthorized} className="px-12 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700">
-              {loading ? "Saving..." : !isAuthorized ? "🔒 Locked" : <div className="flex items-center gap-2"><Save size={14}/> Save Purchase</div>}
-            </button>
-          </div>
-        </form>
+  {/* 🚀 ACTION BUTTONS */}
+  <div className="flex justify-end items-center gap-4 pt-4">
+    <button 
+      type="button" 
+      onClick={onCancel} 
+      className="px-6 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all font-bold text-xs uppercase tracking-widest"
+    >
+      Cancel
+    </button>
+    <button 
+      type="submit" 
+      disabled={loading || !isAuthorized} 
+      className="group relative px-10 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-[0.15em] shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-95 disabled:opacity-50"
+    >
+      <div className="flex items-center gap-2">
+        {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={16}/>}
+        <span>Save Purchase Record</span>
+      </div>
+    </button>
+  </div>
+</form>
       </div>
 
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
