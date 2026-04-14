@@ -93,10 +93,31 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) return showMsg("Unauthorized!", "error");
+
+    // 🔍 Find Selected Supplier Details
+    const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
     
+    // VALIDATION: Backend needs supplierId
+    if (!selectedSupplier && formData.supplierName !== "Local customer") {
+        return showMsg("Please select a valid supplier from the list", "error");
+    }
+
     setLoading(true);
     try {
-      const payload = { ...formData, travelMode, performedBy: user?._id };
+      // 📝 1. Calculate GST Type (Bihar code is 10)
+      const isBihar = selectedSupplier?.gstin?.startsWith("10");
+      const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
+
+      // 📝 2. Prepare Payload with Backend Requirements
+      const payload = { 
+        ...formData, 
+        supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e", // Default or Selected ID
+        gstType: calculatedGstType,
+        billNo: formData.billNo || `PUR-${Date.now()}`, // Ensure billNo is never empty
+        travelMode, 
+        performedBy: user?._id 
+      };
+
       const res = await createPurchase(payload);
       if (res.data.success) {
         showMsg("✅ Purchase Entry Saved!");
@@ -104,7 +125,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
         if (onSuccess) onSuccess();
       }
     } catch (error) {
-      showMsg(error.response?.data?.message || "Save failed", "error");
+      showMsg(error.response?.data?.message || "Path validations failed", "error");
     } finally { setLoading(false); }
   };
 
@@ -117,7 +138,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
         <div className="bg-emerald-600 p-4 flex justify-between items-center text-white">
           <div className="flex items-center gap-3">
             <Package size={24} />
-            <h2 className="text-lg font-black tracking-tight uppercase">Purchase Entry</h2>
+            <h2 className="text-lg font-black tracking-tight uppercase">Purchase Entry (Live Stock)</h2>
           </div>
           {!isAuthorized && (
             <div className="flex items-center gap-2 bg-red-500/20 px-3 py-1 rounded-full text-xs font-bold border border-red-500/50">
@@ -174,7 +195,6 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
 
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
       
-      {/* Shared Styles */}
       <style>{`
         .form-input-zinc { width: 100%; background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 0.75rem; padding: 0.65rem 0.75rem; font-size: 0.875rem; outline: none; transition: all 0.2s; }
         .dark .form-input-zinc { background: #18181b; border-color: #27272a; color: #f4f4f5; }
