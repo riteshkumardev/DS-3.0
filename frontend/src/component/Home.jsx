@@ -24,9 +24,9 @@ const Home = ({ user }) => {
       try {
         setLoading(true);
         const [salesRes, purchaseRes, stockRes] = await Promise.all([
-          axios.get(`${API_URL}/api/sales`),
-          axios.get(`${API_URL}/api/purchases`),
-          axios.get(`${API_URL}/api/stocks`)
+          axios.get(`${API_URL}/sales`),
+          axios.get(`${API_URL}/purchases`),
+          axios.get(`${API_URL}/stocks`)
         ]);
 
         const salesData = salesRes.data.data || [];
