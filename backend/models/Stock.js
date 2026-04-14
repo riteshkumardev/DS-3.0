@@ -15,7 +15,7 @@ const stockSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        required: [true, "Category is required"], // e.g., Fertilizer, Seeds, Pesticides
+        required: [false, "Category is required"], // e.g., Fertilizer, Seeds, Pesticides
         index: true
     },
     currentStock: {
@@ -34,7 +34,7 @@ const stockSchema = new mongoose.Schema({
     },
     pricePerUnit: {
         type: Number,
-        required: [true, "Base price is required"]
+        required: [false, "Base price is required"]
     },
     lastUpdatedBy: {
         type: mongoose.Schema.Types.ObjectId,
