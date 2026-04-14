@@ -4,13 +4,9 @@ import {
   CalendarDays, Briefcase, MapPin, Lock, Camera, Rocket, X
 } from "lucide-react";
 
-// Professional API Service Import (Jo humne pehle banayi thi)
- 
-
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 import { addStaff } from "../../api/staffApi";
-
 
 const EmployeeAdd = ({ onEntrySaved }) => {
   const [loading, setLoading] = useState(false);
@@ -29,7 +25,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     emergencyPhone: "",
     aadhar: "",
     address: "",
-    designation: "WORKER",
+    designation: "WORKER", // Default match with Enum
     joiningDate: new Date().toISOString().split("T")[0],
     salary: "",
     bankName: "",
@@ -43,24 +39,22 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // Cleanup photo preview to prevent memory leaks
   useEffect(() => {
     return () => { if (preview) URL.revokeObjectURL(preview); };
   }, [preview]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Length Validations
+    // Input Constraints
     if ((name === "phone" || name === "emergencyPhone") && value.length > 10) return;
     if (name === "aadhar" && value.length > 12) return;
-
+    
     setFormData({ ...formData, [name]: value });
   };
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) return showMsg("Only image files allowed", "error");
     if (file.size > 2 * 1024 * 1024) return showMsg("Image must be less than 2MB", "error");
 
@@ -71,36 +65,46 @@ const EmployeeAdd = ({ onEntrySaved }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Field Validations
+    // Validations
     if (formData.phone.length !== 10) return showMsg("Mobile number must be 10 digits", "error");
-    if (formData.aadhar.length !== 12) return showMsg("Aadhar must be 12 digits", "error");
-    if (formData.password.length < 4) return showMsg("Password must be at least 4 digits", "error");
+    if (formData.aadhar.length !== 12) return showMsg("Aadhaar must be 12 digits", "error");
+    if (formData.password.length < 4) return showMsg("PIN must be at least 4 digits", "error");
 
     setLoading(true);
 
     try {
-      // 📦 Using FormData for multipart/form-data (Photo Upload support)
+      // 📦 Building Multipart Data for Backend Compatibility
       const data = new FormData();
-      Object.keys(formData).forEach((key) => {
-        if (key === "photo" && formData[key]) {
-          data.append("image", formData[key]); // 'image' key as per Multer backend
-        } else {
-          data.append(key, formData[key]);
-        }
-      });
+      
+      // Mapping to Backend Schema structure
+      data.append("name", formData.name);
+      data.append("fatherName", formData.fatherName);
+      data.append("phone", formData.phone);
+      data.append("emergencyPhone", formData.emergencyPhone);
+      data.append("address", formData.address);
+      data.append("role", formData.designation); // Match enum: 'DRIVER', 'WORKER', etc.
+      data.append("salary", formData.salary); // Backend will map this to baseSalary
+      data.append("aadhar", formData.aadhar); // Backend will map this to kycDetails
+      data.append("password", formData.password);
+      data.append("bankName", formData.bankName);
+      data.append("accountNo", formData.accountNo);
+      data.append("ifscCode", formData.ifscCode);
+      data.append("joiningDate", formData.joiningDate);
 
-      // Role mapping for backend auth
-      data.append("role", formData.designation.toUpperCase());
+      if (formData.photo) {
+        data.append("image", formData.photo); 
+      }
 
-      // 🚀 Using the API service
       const response = await addStaff(data);
 
-      showMsg(`✅ Staff Registered! ID: ${response.data?.employeeId || 'Generated'}`);
+      // Show Success with Generated ID
+      const empId = response.data?.data?.employeeId || "Generated";
+      showMsg(`✅ Staff Registered! ID: ${empId}`, "success");
 
-      // Reset Form
+      // Reset Form State
       setFormData({
         name: "", fatherName: "", phone: "", emergencyPhone: "",
-        aadhar: "", address: "", designation: "Worker",
+        aadhar: "", address: "", designation: "WORKER",
         joiningDate: new Date().toISOString().split("T")[0],
         salary: "", bankName: "", accountNo: "", ifscCode: "",
         photo: null, password: ""
@@ -109,7 +113,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       
       if (onEntrySaved) onEntrySaved();
     } catch (error) {
-      showMsg(error.response?.data?.message || "Registration failed. Check server logs.", "error");
+      showMsg(error.response?.data?.message || "Registration failed. Check server connection.", "error");
     } finally {
       setLoading(false);
     }
@@ -121,7 +125,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       
       <div className="max-w-5xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         
-        {/* Header */}
+        {/* Header Section */}
         <div className="bg-emerald-600 p-8 flex flex-col md:flex-row justify-between items-center text-white gap-4">
           <div className="flex items-center gap-4">
             {preview ? (
@@ -131,30 +135,30 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             )}
             <div>
               <h2 className="text-2xl font-black tracking-tight uppercase">Staff Enrollment</h2>
-              <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest opacity-80">Identity & Payroll Setup</p>
+              <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest opacity-80">Dharashakti Agro Products</p>
             </div>
           </div>
           <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest">
-            {formData.designation} Mode
+            {formData.designation || "SELECT"} MODE
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-12">
           
-          {/* Section 1: Personal Information */}
+          {/* Section 1: Personal Data */}
           <div className="space-y-6">
             <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <User size={18} className="text-emerald-500" /> Personal Information
+              <User size={18} className="text-emerald-500" /> Identity Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Full Name *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input-zinc" placeholder="Rahul Kumar" />
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input-zinc" placeholder="Ex: Rahul Kumar" />
               </div>
               
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CreditCard size={12}/> Aadhaar Number *</label>
-                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required className="form-input-zinc font-bold tracking-widest" placeholder="12 Digits" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CreditCard size={12}/> Aadhaar (12 Digits) *</label>
+                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required className="form-input-zinc font-bold tracking-widest" placeholder="0000 0000 0000" />
               </div>
 
               <div className="space-y-1">
@@ -163,7 +167,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
                   <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                   <div className={`form-input-zinc flex items-center justify-between ${formData.photo ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-zinc-50 dark:bg-zinc-800/50'}`}>
                     <span className="text-zinc-500 text-xs truncate font-bold">
-                      {formData.photo ? formData.photo.name : "Choose JPG/PNG..."}
+                      {formData.photo ? formData.photo.name : "Upload Photo..."}
                     </span>
                     {formData.photo ? <X size={14} className="text-red-500 cursor-pointer" onClick={(e) => { e.preventDefault(); setFormData({...formData, photo: null}); setPreview(null); }}/> : <Camera size={14} className="text-zinc-400" />}
                   </div>
@@ -171,8 +175,8 @@ const EmployeeAdd = ({ onEntrySaved }) => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Phone size={12}/> Contact Number *</label>
-                <input type="number" name="phone" value={formData.phone} onChange={handleChange} required className="form-input-zinc font-bold" placeholder="10 Digits" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Phone size={12}/> Mobile *</label>
+                <input type="number" name="phone" value={formData.phone} onChange={handleChange} required className="form-input-zinc font-bold" placeholder="9999900000" />
               </div>
 
               <div className="space-y-1">
@@ -181,90 +185,89 @@ const EmployeeAdd = ({ onEntrySaved }) => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Emergency Contact</label>
-                <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} className="form-input-zinc" placeholder="Family #" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Emergency Phone</label>
+                <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} className="form-input-zinc" placeholder="Family Number" />
               </div>
             </div>
           </div>
 
-          {/* Section 2: Employment & Security */}
+          {/* Section 2: Salary & Security */}
           <div className="space-y-6">
             <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <Briefcase size={18} className="text-emerald-500" /> Employment Details
+              <Briefcase size={18} className="text-emerald-500" /> Employment Config
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Designation</label>
-          <select 
-  name="designation" 
-  value={formData.designation} 
-  onChange={handleChange} 
-  className="form-input-zinc appearance-none cursor-pointer"
->
-  <option value="">Select Designation</option> {/* Ek default empty option achha rehta hai */}
-  <option value="MANAGER">Manager</option>
-  <option value="ACCOUNTANT">Accountant</option>
-  <option value="OPERATOR">Operator</option>
-  <option value="DRIVER">Driver</option>
-  <option value="LOADER">Loader</option>
-  <option value="SALES_MAN">Sales Man</option>
-  <option value="WORKER">Worker</option>
-  <option value="OTHER">Other</option>
-</select>
+                <select name="designation" value={formData.designation} onChange={handleChange} className="form-input-zinc appearance-none cursor-pointer">
+                  <option value="MANAGER">Manager</option>
+                  <option value="ACCOUNTANT">Accountant</option>
+                  <option value="OPERATOR">Operator</option>
+                  <option value="DRIVER">Driver</option>
+                  <option value="LOADER">Loader</option>
+                  <option value="SALES_MAN">Sales Man</option>
+                  <option value="WORKER">Worker</option>
+                  <option value="OTHER">Other</option>
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CalendarDays size={12}/> Joining Date</label>
                 <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} className="form-input-zinc" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Banknote size={12}/> Monthly Wage *</label>
-                <input type="number" name="salary" value={formData.salary} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600" placeholder="₹" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Banknote size={12}/> Monthly Salary *</label>
+                <input type="number" name="salary" value={formData.salary} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600" placeholder="₹ Amount" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-amber-600 uppercase ml-1 flex items-center gap-1.5"><Lock size={12}/> Access Password *</label>
-                <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 dark:border-amber-900/50 focus:border-amber-500 font-bold" placeholder="PIN" />
+                <label className="text-[10px] font-black text-amber-600 uppercase ml-1 flex items-center gap-1.5"><Lock size={12}/> Access PIN *</label>
+                <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 focus:border-amber-500 font-bold" placeholder="For Login" />
               </div>
             </div>
           </div>
 
-          {/* Section 3: Financials & Residency */}
+          {/* Section 3: Bank Details */}
           <div className="space-y-6">
             <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <Landmark size={18} className="text-emerald-500" /> Bank & Residency
+              <Landmark size={18} className="text-emerald-500" /> Payment & Address
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Bank Name</label>
-                <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} className="form-input-zinc" placeholder="SBI/PNB/HDFC" />
+                <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} className="form-input-zinc" placeholder="Ex: SBI / HDFC" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">A/C Number</label>
-                <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} className="form-input-zinc font-bold tracking-wider" placeholder="Digits only" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Account Number</label>
+                <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} className="form-input-zinc font-bold tracking-wider" placeholder="Digits Only" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">IFSC Code</label>
-                <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} className="form-input-zinc uppercase tracking-widest" placeholder="IFSC" />
+                <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} className="form-input-zinc uppercase tracking-widest" placeholder="SBIN000XXXX" />
               </div>
               <div className="space-y-1 lg:col-span-3">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><MapPin size={12}/> Address</label>
-                <input type="text" name="address" value={formData.address} onChange={handleChange} className="form-input-zinc" placeholder="Full Address" />
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><MapPin size={12}/> Current Address</label>
+                <input type="text" name="address" value={formData.address} onChange={handleChange} className="form-input-zinc" placeholder="Village, Block, District..." />
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center pt-8 gap-4">
+          <div className="flex flex-col items-center justify-center pt-8">
             <button 
               type="submit" 
               disabled={loading}
               className="group relative flex items-center gap-4 px-20 py-5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
             >
-              {loading ? "Processing..." : <><Rocket size={20} className="group-hover:animate-bounce" /> Submit Registration</>}
+              {loading ? "Registering..." : <><Rocket size={20} className="group-hover:animate-bounce" /> Complete Registration</>}
             </button>
           </div>
         </form>
       </div>
 
-      <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
 
       <style>{`
         .form-input-zinc {
