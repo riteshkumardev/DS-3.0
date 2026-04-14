@@ -13,18 +13,6 @@ const SalesEntry = ({ user }) => {
   const userRole = user?.role?.toUpperCase();
   const isAuthorized = ["ADMIN", "ACCOUNTANT", "MANAGER"].includes(userRole);
 
-  // 🆔 Product to ID Mapping (Mandatory for Backend ref: 'Product')
-  // Note: Ensure these IDs exist in your MongoDB Products collection
-  const productIdMap = {
-    "CORN GRIT": "60d000000000000000000001",
-    "CORN GRIT (3MM)": "60d000000000000000000002",
-    "CATTLE FEED": "60d000000000000000000003",
-    "RICE GRIT": "60d000000000000000000004",
-    "CORN FLOUR": "60d000000000000000000005",
-    "RICE FLOUR": "60d000000000000000000006",
-    "DEFAULT": "60d000000000000000000000"
-  };
-
   const initialState = {
     date: new Date().toISOString().split("T")[0],
     customerName: "",
@@ -32,14 +20,14 @@ const SalesEntry = ({ user }) => {
     mobile: "",
     street: "",
     city: "Samastipur",
-    items: [{ productName: "", quantity: "", rate: "" }],
+    items: [{ productName: "", quantity: "", rate: "", productId: "", hsn: "" }], // Added productId here
     billNo: "", 
     vehicleNo: "",
-    travelingCost: 0, // Maps to logistics.freight
-    cashDiscount: 0,  // Maps to discount
-    totalPrice: 0,    // Maps to grandTotal
-    amountReceived: 0, // Maps to amountPaid
-    paymentDue: 0,    // Maps to balanceDue
+    travelingCost: 0,
+    cashDiscount: 0,
+    totalPrice: 0,
+    amountReceived: 0,
+    paymentDue: 0,
     remarks: "",
     deliveryNote: "",
     deliveryNoteDate: "", 
@@ -56,23 +44,12 @@ const SalesEntry = ({ user }) => {
 
   const [formData, setFormData] = useState(initialState);
   const [suppliers, setSuppliers] = useState([]);
+  const [products, setProducts] = useState([]); // 👈 Real Products from DB
   const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
-  // 📦 HSN Logic Helper
-  const getHSNCode = (productName) => {
-    const name = productName?.toUpperCase().trim() || "";
-    if (name.includes("CATTLE FEED")) return "23099010";
-    if (name.includes("CORN GRIT")) return "11031300";
-    if (name.includes("CORN FLOUR")) return "11022000";
-    if (name.includes("RICE GRIT")) return "10064000";
-    if (name.includes("RICE FLOUR")) return "11022000";
-    if (name.includes("BAG")) return "63053300";
-    return "00000000";
-  };
 
   const getAuthHeader = useCallback(() => ({
     headers: { Authorization: `Bearer ${user?.token}` }
@@ -98,13 +75,21 @@ const SalesEntry = ({ user }) => {
     return `DS/${finYear}/${currentMonth}/${String(nextSerial).padStart(3, '0')}`;
   };
 
+  // 🔄 Fetch All Data (Parties, Products, Last Bill)
   const fetchData = useCallback(async () => {
     if (!user?.token) return;
     try {
       setLoading(true);
+      
+      // 1. Fetch Customers
       const supRes = await fetchPartiesList('SUPPLIER'); 
       if (supRes.data?.success) setSuppliers(supRes.data.data);
 
+      // 2. Fetch Real Products from Inventory 👈 (CRITICAL FIX)
+      const prodRes = await axios.get(`${API_URL}/stocks`, getAuthHeader());
+      if (prodRes.data?.success) setProducts(prodRes.data.data);
+
+      // 3. Fetch Sales for Bill No
       const salesRes = await axios.get(`${API_URL}/sales`, getAuthHeader());
       if (salesRes.data?.success && salesRes.data.data.length > 0) {
         const salesData = salesRes.data.data;
@@ -137,14 +122,25 @@ const SalesEntry = ({ user }) => {
     }
   };
 
+  // 🛒 Handle Item Change with Real ID Mapping
   const handleItemChange = (index, e) => {
     const { name, value } = e.target;
     const newItems = [...formData.items];
+    
+    if (name === "productName") {
+      // Find real product from fetched list
+      const selectedProd = products.find(p => (p.name || p.productName) === value);
+      if (selectedProd) {
+        newItems[index].productId = selectedProd._id; // ✅ Real MongoDB ID
+        newItems[index].hsn = selectedProd.hsnCode;   // ✅ Real HSN
+      }
+    }
+    
     newItems[index][name] = value;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { productName: "", quantity: "", rate: "" }] }));
+  const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { productName: "", quantity: "", rate: "", productId: "", hsn: "" }] }));
   const removeItem = (index) => setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   
   const handleChange = (e) => {
@@ -152,7 +148,6 @@ const SalesEntry = ({ user }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Logic to sync visuals with Schema's pre-save calculations
   useEffect(() => {
     let sub = 0;
     formData.items.forEach(item => { sub += toSafeNumber(item.quantity) * toSafeNumber(item.rate); });
@@ -169,30 +164,26 @@ const SalesEntry = ({ user }) => {
     if (!isAuthorized) return showMsg("Access Denied!", "error");
     
     const selectedParty = suppliers.find(s => s.name === formData.customerName);
-    if (!selectedParty && formData.customerName !== "Local customer") {
-        return showMsg("Please select a valid customer", "error");
-    }
-
+    
     setLoading(true);
     try {
       const goods = formData.items.map(item => ({
-        productId: productIdMap[item.productName.toUpperCase()] || productIdMap["DEFAULT"],
+        productId: item.productId, // ✅ Passed Real ID
         productName: item.productName,
-        hsn: getHSNCode(item.productName),
+        hsn: item.hsn,
         quantity: toSafeNumber(item.quantity),
         unit: "KG",
         rate: toSafeNumber(item.rate),
         taxableAmount: toSafeNumber(item.quantity) * toSafeNumber(item.rate)
       }));
 
-      // 🔥 ENUM FIX: Backend strictly needs 'IGST' or 'CGST/SGST'
       const isBihar = formData.gstin?.startsWith("10");
       const gstTypeValue = isBihar ? "CGST/SGST" : "IGST";
 
       const payload = {
         billNo: formData.billNo,
         date: formData.date,
-        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", // Actual Party Ref
+        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", 
         customerName: formData.customerName,
         logistics: {
           vehicleNo: formData.vehicleNo.toUpperCase(),
@@ -201,26 +192,22 @@ const SalesEntry = ({ user }) => {
           lrRrNo: formData.lrRrNo,
           freight: toSafeNumber(formData.travelingCost)
         },
-        buyerOrderNo: formData.buyerOrderNo,
-        termsOfDelivery: formData.termsOfDelivery,
         goods: goods,
         gstType: gstTypeValue, 
         discount: toSafeNumber(formData.cashDiscount),
         amountPaid: toSafeNumber(formData.amountReceived),
-        performedBy: user?._id || "60d00000000000000000000a", // Admin ID ref
+        performedBy: user?._id, 
         remarks: formData.remarks
       };
 
       const res = await axios.post(`${API_URL}/sales`, payload, getAuthHeader());
       if (res.data.success) {
-        showMsg("✅ Sale Saved & Inventory Synced!");
-        setNextSi(prev => prev + 1);
-        const nextBill = generateBillID(formData.billNo);
-        setFormData({ ...initialState, billNo: nextBill });
+        showMsg("✅ Bill Saved & Inventory Synced!");
+        fetchData(); // Refresh data
+        setFormData({ ...initialState, billNo: generateBillID(formData.billNo) });
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || "ValidationError: Check required fields";
-      showMsg(errorMsg, "error");
+      showMsg(error.response?.data?.message || "Submit Failed", "error");
     } finally { setLoading(false); }
   };
 
@@ -228,12 +215,13 @@ const SalesEntry = ({ user }) => {
     <>
       <SalesEntryForm 
         formData={formData} nextSi={nextSi} loading={loading}
-        suppliers={suppliers} handleChange={handleChange}
+        suppliers={suppliers} products={products} // 👈 Passed real products to form
+        handleChange={handleChange}
         handleCustomerSelect={handleCustomerSelect}
         handleItemChange={handleItemChange}
         addItem={addItem} removeItem={removeItem}
         handleSubmit={handleSubmit}
-        resetForm={() => setFormData({ ...initialState, billNo: generateBillID(formData.billNo) })}
+        resetForm={() => fetchData()}
         initialState={initialState}
       />
       <CustomSnackbar 
