@@ -8,19 +8,18 @@ const StockAddForm = ({ user }) => {
   const role = user?.role?.toUpperCase();
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT" || role === "MANAGER";
 
-  // 🆔 Product ID Mapping to satisfy Backend Requirements
-  const productIdMap = {
-    "CORN GRIT": "60d000000000000000000001",
-    "CORN GRIT (3MM)": "60d000000000000000000002",
-    "CATTLE FEED": "60d000000000000000000003",
-    "RICE GRIT": "60d000000000000000000004",
-    "CORN FLOUR": "60d000000000000000000005",
-    "RICE FLOUR": "60d000000000000000000006",
-    "RICE BROKEN": "60d000000000000000000007",
-    "CORN": "60d000000000000000000008",
-    "RICE": "60d000000000000000000009",
-    "PACKING BAG": "60d000000000000000000010",
-    "DEFAULT": "60d000000000000000000000"
+  // 📦 HSN Code Helper (Used as Product ID as per your requirement)
+  const getHSNCode = (productName) => {
+    const name = productName?.toUpperCase().trim() || "";
+    if (name.includes("CATTLE FEED")) return "23099010";
+    if (name.includes("CORN GRIT")) return "11031300";
+    if (name.includes("CORN FLOUR")) return "11022000";
+    if (name.includes("RICE GRIT")) return "10064000";
+    if (name.includes("RICE FLOUR")) return "11022000";
+    if (name.includes("RICE BROKEN")) return "10064010";
+    if (name.includes("CORN") || name === "MAIZE") return "10059000";
+    if (name.includes("BAG")) return "63053300";
+    return "00000000";
   };
 
   const initialState = {
@@ -69,17 +68,20 @@ const StockAddForm = ({ user }) => {
 
     setLoading(true);
     try {
-      // 🚀 Payload must match controller requirements (productId, quantity, type)
+      const hsn = getHSNCode(formData.productName);
+
+      // 🚀 Payload using HSN Code as productId
       const payload = {
-        productId: productIdMap[formData.productName] || productIdMap["DEFAULT"], // Mandatory Fix
+        productId: hsn, // 👈 Using HSN Code here as requested
         productName: formData.productName,
         totalQuantity: Number(formData.weight),
         quantity: Number(formData.quantity) || 0,
-        type: "INWARD", // Mandatory Fix: Tells backend if stock is coming in
+        type: "INWARD", 
         bagType: formData.bagType,
         bagCondition: formData.bagCondition,
         unit: formData.unit,
         category: formData.category,
+        hsn: hsn,
         remarks: formData.remarks || "MANUAL STOCK UPDATE",
         date: formData.date,
         performedBy: user?._id 
@@ -88,11 +90,11 @@ const StockAddForm = ({ user }) => {
       const res = await adjustStockManual(payload);
       
       if (res.data.success) {
-        triggerMsg("✅ Stock adjustment synced successfully!", "success");
+        triggerMsg(`✅ Stock Updated! (HSN: ${hsn})`, "success");
         setFormData(initialState);
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || "Sync Error: Product ID or Type missing";
+      const errorMsg = error.response?.data?.message || "Sync Error: Database mismatch";
       triggerMsg(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -103,7 +105,7 @@ const StockAddForm = ({ user }) => {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 font-sans text-left">
       {loading && <Loader />}
       
-      <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         
         <div className="bg-emerald-600 p-6 text-white flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-xl shadow-inner">
@@ -111,7 +113,7 @@ const StockAddForm = ({ user }) => {
           </div>
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight italic">Inventory Control Master</h2>
-            <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest opacity-80">Manual Stock Adjustment</p>
+            <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest opacity-80">HSN Based Stock Adjustment</p>
           </div>
         </div>
 
@@ -146,29 +148,9 @@ const StockAddForm = ({ user }) => {
             </div>
           </div>
 
-          {(formData.productName.includes("BAG")) && (
-            <div className="p-8 bg-zinc-50 dark:bg-zinc-800/30 rounded-[2rem] border-2 border-dashed border-emerald-500/20 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-500">
-               <div className="space-y-2">
-                  <label className="form-label font-black text-emerald-600">Bag Material</label>
-                  <select name="bagType" value={formData.bagType} onChange={handleChange} className="form-input-zinc bg-white dark:bg-zinc-900 border-emerald-200">
-                    <option value="PP BAG">PP Plastic</option>
-                    <option value="JUTE">Jute (पटुआ)</option>
-                    <option value="HDPE">HDPE</option>
-                  </select>
-               </div>
-               <div className="space-y-2">
-                  <label className="form-label font-black text-emerald-600">Bag Condition</label>
-                  <select name="bagCondition" value={formData.bagCondition} onChange={handleChange} className="form-input-zinc bg-white dark:bg-zinc-900 border-emerald-200">
-                    <option value="NEW">Fresh New (नया)</option>
-                    <option value="USED">Used (पुराना)</option>
-                  </select>
-               </div>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t dark:border-zinc-800 pt-8">
             <div className="space-y-2">
-              <label className="form-label"><ListChecks size={12}/> Quantity (Bags/Units)</label>
+              <label className="form-label"><ListChecks size={12}/> Unit Quantity (Bags/Units)</label>
               <input type="number" name="quantity" placeholder="No. of Bags" value={formData.quantity} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600 text-lg shadow-inner" />
             </div>
 
@@ -176,6 +158,13 @@ const StockAddForm = ({ user }) => {
               <label className="form-label"><Weight size={12}/> Total Net Weight (KG)</label>
               <input type="number" name="weight" placeholder="Total KG" value={formData.weight} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600 text-lg shadow-inner" />
             </div>
+          </div>
+
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 flex justify-between items-center">
+             <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">Target HSN (Auto-ID):</span>
+             <span className="text-sm font-mono font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 rounded-lg">
+                {formData.productName ? getHSNCode(formData.productName) : "NOT_SELECTED"}
+             </span>
           </div>
 
           <div className="space-y-2">
@@ -188,14 +177,7 @@ const StockAddForm = ({ user }) => {
             disabled={loading} 
             className="w-full py-5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-black dark:hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 cursor-pointer group"
           >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                SYNCING...
-              </span>
-            ) : (
-              <><Save size={20} className="group-hover:rotate-12 transition-transform"/> Update Inventory Now</>
-            )}
+            {loading ? "SYNCING..." : <><Save size={20} className="group-hover:rotate-12 transition-transform"/> Update Inventory Now</>}
           </button>
         </form>
       </div>

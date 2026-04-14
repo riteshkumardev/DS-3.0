@@ -14,6 +14,7 @@ const SalesEntry = ({ user }) => {
   const isAuthorized = ["ADMIN", "ACCOUNTANT", "MANAGER"].includes(userRole);
 
   // 🆔 Product to ID Mapping (Mandatory for Backend ref: 'Product')
+  // Note: Ensure these IDs exist in your MongoDB Products collection
   const productIdMap = {
     "CORN GRIT": "60d000000000000000000001",
     "CORN GRIT (3MM)": "60d000000000000000000002",
@@ -34,11 +35,11 @@ const SalesEntry = ({ user }) => {
     items: [{ productName: "", quantity: "", rate: "" }],
     billNo: "", 
     vehicleNo: "",
-    travelingCost: 0, // Logistics.freight
-    cashDiscount: 0,  // discount
-    totalPrice: 0,    // grandTotal
-    amountReceived: 0, // amountPaid
-    paymentDue: 0,    // balanceDue
+    travelingCost: 0, // Maps to logistics.freight
+    cashDiscount: 0,  // Maps to discount
+    totalPrice: 0,    // Maps to grandTotal
+    amountReceived: 0, // Maps to amountPaid
+    paymentDue: 0,    // Maps to balanceDue
     remarks: "",
     deliveryNote: "",
     deliveryNoteDate: "", 
@@ -61,7 +62,7 @@ const SalesEntry = ({ user }) => {
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  // 📦 HSN Logic
+  // 📦 HSN Logic Helper
   const getHSNCode = (productName) => {
     const name = productName?.toUpperCase().trim() || "";
     if (name.includes("CATTLE FEED")) return "23099010";
@@ -117,7 +118,7 @@ const SalesEntry = ({ user }) => {
     } catch (err) { 
       showMsg("Data loading failed.", "error");
     } finally { setLoading(false); }
-  }, [user, getAuthHeader]);
+  }, [user, API_URL, getAuthHeader]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -151,7 +152,7 @@ const SalesEntry = ({ user }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Calculations matching Schema.pre("save") logic
+  // Logic to sync visuals with Schema's pre-save calculations
   useEffect(() => {
     let sub = 0;
     formData.items.forEach(item => { sub += toSafeNumber(item.quantity) * toSafeNumber(item.rate); });
@@ -179,45 +180,47 @@ const SalesEntry = ({ user }) => {
         productName: item.productName,
         hsn: getHSNCode(item.productName),
         quantity: toSafeNumber(item.quantity),
+        unit: "KG",
         rate: toSafeNumber(item.rate),
         taxableAmount: toSafeNumber(item.quantity) * toSafeNumber(item.rate)
       }));
 
-      // 🔥 FINAL FIX: Backend Model strictly wants 'IGST' or 'CGST/SGST'
+      // 🔥 ENUM FIX: Backend strictly needs 'IGST' or 'CGST/SGST'
       const isBihar = formData.gstin?.startsWith("10");
       const gstTypeValue = isBihar ? "CGST/SGST" : "IGST";
 
       const payload = {
         billNo: formData.billNo,
         date: formData.date,
-        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f",
+        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", // Actual Party Ref
         customerName: formData.customerName,
         logistics: {
-          vehicleNo: formData.vehicleNo,
-          dispatchedThrough: formData.dispatchedThrough,
-          destination: formData.destination,
+          vehicleNo: formData.vehicleNo.toUpperCase(),
+          dispatchedThrough: formData.dispatchedThrough.toUpperCase(),
+          destination: formData.destination.toUpperCase(),
           lrRrNo: formData.lrRrNo,
           freight: toSafeNumber(formData.travelingCost)
         },
         buyerOrderNo: formData.buyerOrderNo,
         termsOfDelivery: formData.termsOfDelivery,
         goods: goods,
-        gstType: gstTypeValue, // Enum match: IGST or CGST/SGST
+        gstType: gstTypeValue, 
         discount: toSafeNumber(formData.cashDiscount),
         amountPaid: toSafeNumber(formData.amountReceived),
-        performedBy: user?._id || "60d00000000000000000000a", // Required ref: User
+        performedBy: user?._id || "60d00000000000000000000a", // Admin ID ref
         remarks: formData.remarks
       };
 
       const res = await axios.post(`${API_URL}/sales`, payload, getAuthHeader());
       if (res.data.success) {
-        showMsg("✅ Bill Saved Successfully!");
+        showMsg("✅ Sale Saved & Inventory Synced!");
         setNextSi(prev => prev + 1);
         const nextBill = generateBillID(formData.billNo);
         setFormData({ ...initialState, billNo: nextBill });
       }
     } catch (error) {
-      showMsg(error.response?.data?.message || "Submit Failed", "error");
+      const errorMsg = error.response?.data?.message || "ValidationError: Check required fields";
+      showMsg(errorMsg, "error");
     } finally { setLoading(false); }
   };
 
