@@ -104,7 +104,7 @@ const SalesEntry = ({ user }) => {
       const supRes = await fetchPartiesList('SUPPLIER'); 
       if (supRes.data?.success) setSuppliers(supRes.data.data);
 
-      const salesRes = await axios.get(`${API_URL}/api/sales`, getAuthHeader());
+      const salesRes = await axios.get(`${API_URL}/sales`, getAuthHeader());
       if (salesRes.data?.success && salesRes.data.data.length > 0) {
         const salesData = salesRes.data.data;
         const lastSi = Math.max(...salesData.map((s) => s.si || 0));
@@ -209,7 +209,7 @@ const SalesEntry = ({ user }) => {
         remarks: formData.remarks
       };
 
-      const res = await axios.post(`${API_URL}/api/sales`, payload, getAuthHeader());
+      const res = await axios.post(`${API_URL}/sales`, payload, getAuthHeader());
       if (res.data.success) {
         showMsg("✅ Bill Saved Successfully!");
         setNextSi(prev => prev + 1);
