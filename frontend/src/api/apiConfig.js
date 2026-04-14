@@ -1,14 +1,17 @@
 import axios from 'axios';
 
-// Backend URL (Aapke case mein localhost:5000)
+// 🌍 Vercal/Production vs Local Development environment check
+// .env file mein REACT_APP_API_URL define karna hoga
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const API = axios.create({
-    baseURL: 'http://localhost:5000/api',
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// Request Interceptor: Har call ke saath Token bhejne ke liye
+// Request Interceptor: Auth Token handle karne ke liye
 API.interceptors.request.use((req) => {
     const userInfo = localStorage.getItem('userInfo') 
         ? JSON.parse(localStorage.getItem('userInfo')) 
