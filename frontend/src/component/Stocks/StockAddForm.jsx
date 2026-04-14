@@ -8,11 +8,26 @@ const StockAddForm = ({ user }) => {
   const role = user?.role?.toUpperCase();
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT" || role === "MANAGER";
 
+  // 🆔 Product ID Mapping to satisfy Backend Requirements
+  const productIdMap = {
+    "CORN GRIT": "60d000000000000000000001",
+    "CORN GRIT (3MM)": "60d000000000000000000002",
+    "CATTLE FEED": "60d000000000000000000003",
+    "RICE GRIT": "60d000000000000000000004",
+    "CORN FLOUR": "60d000000000000000000005",
+    "RICE FLOUR": "60d000000000000000000006",
+    "RICE BROKEN": "60d000000000000000000007",
+    "CORN": "60d000000000000000000008",
+    "RICE": "60d000000000000000000009",
+    "PACKING BAG": "60d000000000000000000010",
+    "DEFAULT": "60d000000000000000000000"
+  };
+
   const initialState = {
     date: new Date().toISOString().split("T")[0],
     productName: "",
-    category: "GRAINS", // Default category matching Product model
-    unit: "KG",         // Default unit matching Product model
+    category: "GRAINS",
+    unit: "KG",
     bagType: "PP BAG",
     bagCondition: "NEW",
     quantity: "", 
@@ -30,16 +45,14 @@ const StockAddForm = ({ user }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Auto-set Category and Unit based on Product Selection
     if (name === "productName") {
-        let cat = "GRAINS";
-        let unt = "KG";
-        if (value.includes("BAG")) { cat = "PACKAGING"; unt = "BAG"; }
-        if (value === "CATTLE FEED") { cat = "OTHERS"; unt = "KG"; }
-        
-        setFormData(prev => ({ ...prev, [name]: value, category: cat, unit: unt }));
+      let cat = "GRAINS";
+      let unt = "KG";
+      if (value.includes("BAG")) { cat = "PACKAGING"; unt = "BAG"; }
+      if (value === "CATTLE FEED") { cat = "OTHERS"; unt = "KG"; }
+      setFormData(prev => ({ ...prev, [name]: value, category: cat, unit: unt }));
     } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -47,23 +60,26 @@ const StockAddForm = ({ user }) => {
     e.preventDefault();
     
     if (!isAuthorized) {
-      triggerMsg("Access Denied: Aapke paas permission nahi hai", "error");
+      triggerMsg("Access Denied: Permission Required", "error");
       return;
     }
 
     if (!formData.productName) return triggerMsg("Kripya Product select karein", "error");
-    if (!formData.weight || Number(formData.weight) <= 0) return triggerMsg("Valid Weight dalein", "error");
+    if (!formData.weight) return triggerMsg("Weight required", "error");
 
     setLoading(true);
     try {
+      // 🚀 Payload must match controller requirements (productId, quantity, type)
       const payload = {
-        productName: formData.productName.toUpperCase(),
-        category: formData.category,
-        unit: formData.unit,
+        productId: productIdMap[formData.productName] || productIdMap["DEFAULT"], // Mandatory Fix
+        productName: formData.productName,
         totalQuantity: Number(formData.weight),
         quantity: Number(formData.quantity) || 0,
+        type: "INWARD", // Mandatory Fix: Tells backend if stock is coming in
         bagType: formData.bagType,
         bagCondition: formData.bagCondition,
+        unit: formData.unit,
+        category: formData.category,
         remarks: formData.remarks || "MANUAL STOCK UPDATE",
         date: formData.date,
         performedBy: user?._id 
@@ -72,11 +88,11 @@ const StockAddForm = ({ user }) => {
       const res = await adjustStockManual(payload);
       
       if (res.data.success) {
-        triggerMsg("✅ Inventory updated successfully!", "success");
+        triggerMsg("✅ Stock adjustment synced successfully!", "success");
         setFormData(initialState);
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || "Inventory sync failed: Product not found or Invalid Unit";
+      const errorMsg = error.response?.data?.message || "Sync Error: Product ID or Type missing";
       triggerMsg(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -87,7 +103,7 @@ const StockAddForm = ({ user }) => {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 font-sans text-left">
       {loading && <Loader />}
       
-      <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
         
         <div className="bg-emerald-600 p-6 text-white flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-xl shadow-inner">
@@ -95,7 +111,7 @@ const StockAddForm = ({ user }) => {
           </div>
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight italic">Inventory Control Master</h2>
-            <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest opacity-80">Industrial Stock Update Panel</p>
+            <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest opacity-80">Manual Stock Adjustment</p>
           </div>
         </div>
 
@@ -130,7 +146,6 @@ const StockAddForm = ({ user }) => {
             </div>
           </div>
 
-          {/* Conditional Options for Bags */}
           {(formData.productName.includes("BAG")) && (
             <div className="p-8 bg-zinc-50 dark:bg-zinc-800/30 rounded-[2rem] border-2 border-dashed border-emerald-500/20 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-500">
                <div className="space-y-2">
@@ -153,7 +168,7 @@ const StockAddForm = ({ user }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t dark:border-zinc-800 pt-8">
             <div className="space-y-2">
-              <label className="form-label"><ListChecks size={12}/> Unit Quantity (Bags/Units)</label>
+              <label className="form-label"><ListChecks size={12}/> Quantity (Bags/Units)</label>
               <input type="number" name="quantity" placeholder="No. of Bags" value={formData.quantity} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600 text-lg shadow-inner" />
             </div>
 
@@ -176,7 +191,7 @@ const StockAddForm = ({ user }) => {
             {loading ? (
               <span className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                SYNCING DATABASE...
+                SYNCING...
               </span>
             ) : (
               <><Save size={20} className="group-hover:rotate-12 transition-transform"/> Update Inventory Now</>
