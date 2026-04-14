@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { Save, Calendar, Package, Weight, Layers, ListChecks, Info } from "lucide-react";
+// ✅ Importing your Centralized API service
+import { adjustStockManual } from "../api/stockApi";
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const StockAddForm = ({ user }) => {
-    const role=user.role
+  const role = user?.role;
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const initialState = {
@@ -21,8 +22,6 @@ const StockAddForm = ({ user }) => {
   const [formData, setFormData] = useState(initialState);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const triggerMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
@@ -40,27 +39,35 @@ const StockAddForm = ({ user }) => {
       return;
     }
 
+    if (!formData.productName) {
+      triggerMsg("कृपया उत्पाद का चयन करें", "error");
+      return;
+    }
+
     setLoading(true);
     try {
-      // ✅ मुख्य सुधार: 'weight' को 'totalQuantity' के नाम से भेज रहे हैं ताकि DB में सही जगह जाए
+      // ✅ Payload mapping consistent with Sale logic & Backend Schema
       const payload = {
         productName: formData.productName,
-        totalQuantity: Number(formData.weight), // DB Field Match Fix
+        totalQuantity: Number(formData.weight), // weight maps to totalQuantity in DB
         quantity: Number(formData.quantity),    // Bags count
-        bagType: formData.bagType,
-        bagCondition: formData.bagCondition,
+        bagType: formData.bagType || "PP BAG",
+        bagCondition: formData.bagCondition || "NEW",
         remarks: formData.remarks || "Manual Stock Update",
-        date: formData.date
+        date: formData.date,
+        performedBy: user?._id // Reference to user performing update
       };
 
-      const res = await axios.post(`${API_URL}/api/stocks`, payload);
+      // ✅ Using your central api service
+      const res = await adjustStockManual(payload);
       
       if (res.data.success) {
         triggerMsg("✅ स्टॉक सफलतापूर्वक अपडेट हो गया!", "success");
         setFormData(initialState);
       }
     } catch (error) {
-      triggerMsg(error.response?.data?.message || "❌ एरर: डेटा सेव नहीं हो पाया", "error");
+      const errorMsg = error.response?.data?.message || "❌ एरर: डेटा सेव नहीं हो पाया";
+      triggerMsg(errorMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -107,7 +114,6 @@ const StockAddForm = ({ user }) => {
                   <option value="RICE FLOUR">Rice Flour </option>
                 </optgroup>
                 <optgroup label="Industrial">
-                 
                   <option value="PACKING BAG">Packing Bag</option>
                   <option value="PACKING BAG JUTE">Packing Bag Jute</option>
                   <option value="PACKING BAG PLASTIC">Packing Bag Plastic</option>
@@ -117,8 +123,8 @@ const StockAddForm = ({ user }) => {
             </div>
           </div>
 
-          {/* Special Options for Packing Bags */}
-          {formData.productName === "PACKING BAG" && (
+          {/* Conditional Options for Bags */}
+          {(formData.productName.includes("BAG")) && (
             <div className="p-8 bg-zinc-50 dark:bg-zinc-800/30 rounded-[2rem] border-2 border-dashed border-emerald-500/20 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-500">
                <div className="space-y-2 text-left">
                   <label className="form-label font-black text-emerald-600">Bag Material</label>
@@ -126,10 +132,11 @@ const StockAddForm = ({ user }) => {
                     <option value="">Select Material...</option>
                     <option value="JUTE">Jute (पटुआ/जूट)</option>
                     <option value="PLASTIC">Plastic (प्लास्टिक)</option>
+                    <option value="PP BAG">PP Bag (पीपी बोरा)</option>
                   </select>
                </div>
                <div className="space-y-2 text-left">
-                  <label className="form-label font-black text-emerald-600">Bag Source</label>
+                  <label className="form-label font-black text-emerald-600">Bag Condition</label>
                   <select name="bagCondition" value={formData.bagCondition} onChange={handleChange} required className="form-input-zinc bg-white dark:bg-zinc-900 border-emerald-200">
                     <option value="">Select Condition...</option>
                     <option value="NEW">Fresh New (नया)</option>

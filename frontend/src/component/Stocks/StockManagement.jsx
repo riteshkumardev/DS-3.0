@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import axios from "axios";
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Trash2, Edit3, Check, X, 
-  Package, History, Database, 
-  Layers, Weight, ClipboardList, ShoppingBag, ArrowUpRight
+  Database, Weight, ClipboardList, ShoppingBag, ArrowUpRight, Layers
 } from "lucide-react";
+
+// ✅ Importing your Centralized API services
+import { getInventory, updateStock } from "../api/stockApi";
+import API from "../api/apiConfig"; // Fallback for delete if not in stockApi
+
 import Loader from '../Core_Component/Loader/Loader';
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const StockManagement = ({ user }) => {
-    const role=user.role
+  const role = user?.role;
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [stocks, setStocks] = useState([]); 
@@ -19,51 +22,60 @@ const StockManagement = ({ user }) => {
   const [editData, setEditData] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  const fetchStocks = async () => {
+  // 🔄 Fetch Inventory using Service
+  const fetchStocks = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/stocks`);
+      const res = await getInventory();
       if (res.data.success) {
         setStocks(res.data.data);
       }
     } catch (err) {
-      showMsg("स्टॉक लोड करने में असमर्थ", "error");
+      showMsg(err.response?.data?.message || "स्टॉक लोड करने में असमर्थ", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStocks();
-  }, [API_URL]);
+  }, [fetchStocks]);
 
+  // 💾 Handle Save (Update) using Service
   const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await axios.put(`${API_URL}/api/stocks/${editId}`, editData);
+      // Backend expects structured data (totalQuantity and quantity)
+      const payload = {
+        ...editData,
+        totalQuantity: Number(editData.totalQuantity),
+        quantity: Number(editData.quantity)
+      };
+
+      const res = await updateStock(editId, payload);
       if (res.data.success) {
         showMsg("Inventory updated successfully! ✅");
         setEditId(null);
         fetchStocks();
       }
     } catch (err) {
-      showMsg("Update failed.", "error");
+      showMsg(err.response?.data?.message || "Update failed.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // 🗑️ Handle Delete
   const handleDelete = async (id) => {
     if (!isAuthorized || !window.confirm("क्या आप इसे डिलीट करना चाहते हैं?")) return;
     try {
       setLoading(true);
-      const res = await axios.delete(`${API_URL}/api/stocks/${id}`);
+      // Using direct API call as delete wasn't in your snippet
+      const res = await API.delete(`/stocks/${id}`);
       if (res.data.success) {
         showMsg("Item removed from inventory");
         fetchStocks();
@@ -79,13 +91,13 @@ const StockManagement = ({ user }) => {
     s.productName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <Loader />;
+  if (loading && stocks.length === 0) return <Loader />;
 
   return (
     <div className="min-h-screen bg-[#f1f3f6] dark:bg-zinc-950 p-4 md:p-10 font-sans">
       
       {/* 📊 Summary Dashboard Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
         {[
           { label: "Active Items", val: stocks.length, sub: "In Inventory", icon: <Database />, color: "border-emerald-500", bg: "text-emerald-600" },
           { label: "Stock Units", val: stocks.reduce((acc, s) => acc + (Number(s.quantity) || 0), 0), sub: "Total Bags", icon: <ShoppingBag />, color: "border-indigo-500", bg: "text-indigo-600" },
@@ -137,7 +149,7 @@ const StockManagement = ({ user }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredStocks.map((stock) => {
+              {filteredStocks.length > 0 ? filteredStocks.map((stock) => {
                 const isEditing = editId === stock._id;
                 const weight = Number(stock.totalQuantity) || 0;
 
@@ -155,7 +167,7 @@ const StockManagement = ({ user }) => {
                            </div>
                            <div className="flex flex-col">
                               <span className="text-base font-black text-zinc-900 dark:text-zinc-100 uppercase italic tracking-tight leading-tight">{stock.productName}</span>
-                              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1 opacity-60">{stock.remarks || "Standard Batch"}</span>
+                              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1 opacity-60">ID: {stock._id?.slice(-6).toUpperCase()}</span>
                            </div>
                         </div>
                       )}
@@ -193,20 +205,18 @@ const StockManagement = ({ user }) => {
                       )}
                     </td>
 
-                    {/* Bag Attributes */}
+                    {/* Properties */}
                     <td className="px-10 py-6">
-                       {stock.bagType || stock.bagCondition ? (
                          <div className="flex flex-wrap gap-2 text-left">
                             <span className="px-3 py-1 bg-zinc-900 text-zinc-100 dark:bg-white dark:text-zinc-900 text-[9px] font-black rounded-lg uppercase tracking-widest">
-                               {stock.bagType}
+                               {stock.unit || "KG"}
                             </span>
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black rounded-lg uppercase tracking-widest">
-                               {stock.bagCondition}
-                            </span>
+                            {stock.category && (
+                              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black rounded-lg uppercase tracking-widest">
+                                 {stock.category}
+                              </span>
+                            )}
                          </div>
-                       ) : (
-                         <span className="text-[10px] font-black text-zinc-300 uppercase tracking-widest bg-zinc-50 dark:bg-zinc-800/50 px-3 py-1 rounded-lg">Raw Product</span>
-                       )}
                     </td>
 
                     {/* Actions */}
@@ -225,7 +235,11 @@ const StockManagement = ({ user }) => {
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan="5" className="px-10 py-20 text-center text-zinc-400 font-bold italic uppercase tracking-widest">No Inventory Records Found</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
