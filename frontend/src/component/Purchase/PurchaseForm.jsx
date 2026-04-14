@@ -90,45 +90,59 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!isAuthorized) return showMsg("Unauthorized!", "error");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
-    // 🔍 Find Selected Supplier Details
-    const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
+  const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
+
+  setLoading(true);
+  try {
+    const isBihar = selectedSupplier?.gstin?.startsWith("10");
+    const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
+
+    // 💡 FIX: Create the 'goods' array structure expected by backend
+    const goodsArray = [{
+      productName: formData.productName,
+      quantity: toSafeNumber(formData.quantity),
+      rate: toSafeNumber(formData.rate),
+      taxableAmount: toSafeNumber(formData.quantity) * toSafeNumber(formData.rate),
+      // Agar backend productId mangta hai toh yahan fallback ID ya mapping add karein
+      productId: formData.productName // Ya jo bhi aapka logic ho
+    }];
+
+    const payload = {
+      date: formData.date,
+      billNo: formData.billNo || `PUR-${Date.now()}`,
+      supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
+      customerName: formData.supplierName, // Backend field name check karein (supplierName ya customerName)
+      logistics: {
+        vehicleNo: formData.vehicleNo.toUpperCase(),
+        freight: toSafeNumber(formData.travelingCost),
+        travelMode: travelMode
+      },
+      goods: goodsArray, // ✅ Now it is iterable!
+      gstType: calculatedGstType,
+      discount: toSafeNumber(formData.cashDiscount),
+      amountPaid: toSafeNumber(formData.paidAmount),
+      grandTotal: toSafeNumber(formData.totalAmount),
+      remarks: formData.remarks,
+      performedBy: user?._id
+    };
+
+    const res = await createPurchase(payload);
     
-    // VALIDATION: Backend needs supplierId
-    if (!selectedSupplier && formData.supplierName !== "Local customer") {
-        return showMsg("Please select a valid supplier from the list", "error");
+    if (res.data.success) {
+      showMsg("✅ Purchase Entry Saved!");
+      setFormData(initialState);
+      if (onSuccess) onSuccess();
     }
-
-    setLoading(true);
-    try {
-      // 📝 1. Calculate GST Type (Bihar code is 10)
-      const isBihar = selectedSupplier?.gstin?.startsWith("10");
-      const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
-
-      // 📝 2. Prepare Payload with Backend Requirements
-      const payload = { 
-        ...formData, 
-        supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e", // Default or Selected ID
-        gstType: calculatedGstType,
-        billNo: formData.billNo || `PUR-${Date.now()}`, // Ensure billNo is never empty
-        travelMode, 
-        performedBy: user?._id 
-      };
-
-      const res = await createPurchase(payload);
-      if (res.data.success) {
-        showMsg("✅ Purchase Entry Saved!");
-        setFormData(initialState);
-        if (onSuccess) onSuccess();
-      }
-    } catch (error) {
-      showMsg(error.response?.data?.message || "Path validations failed", "error");
-    } finally { setLoading(false); }
-  };
-
+  } catch (error) {
+    showMsg(error.response?.data?.message || "Iteration error or save failed", "error");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 font-sans">
       {loading && <Loader />}
