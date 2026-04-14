@@ -70,6 +70,7 @@ const SalesEntry = ({ user }) => {
     if (lastBillNo && lastBillNo.includes('/')) {
       const parts = lastBillNo.split('/');
       const lastSerial = parseInt(parts[parts.length - 1]);
+      // Reset serial if month changed, else increment
       if (currentMonth === parts[2]) nextSerial = lastSerial + 1;
     }
     return `DS/${finYear}/${currentMonth}/${String(nextSerial).padStart(3, '0')}`;
@@ -124,13 +125,17 @@ const SalesEntry = ({ user }) => {
     const newItems = [...formData.items];
 
     if (name === "productName") {
-      const selectedProd = products.find(p => (p.name || p.productName) === value);
+      // Improved match: Case insensitive and checks both 'name' and 'productName' fields
+      const selectedProd = products.find(p => 
+        (p.name?.toLowerCase() === value.toLowerCase()) || 
+        (p.productName?.toLowerCase() === value.toLowerCase())
+      );
+
       if (selectedProd) {
         newItems[index].productId = selectedProd._id;
         newItems[index].hsn = selectedProd.hsnCode || "";
       } else {
-        // Clear ID if the name doesn't match an existing product
-        newItems[index].productId = "";
+        newItems[index].productId = ""; // Reset if user types something invalid
       }
     }
 
@@ -138,8 +143,15 @@ const SalesEntry = ({ user }) => {
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { productName: "", quantity: "", rate: "", productId: "", hsn: "" }] }));
-  const removeItem = (index) => setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  const addItem = () => setFormData(prev => ({ 
+    ...prev, 
+    items: [...prev.items, { productName: "", quantity: "", rate: "", productId: "", hsn: "" }] 
+  }));
+
+  const removeItem = (index) => setFormData(prev => ({ 
+    ...prev, 
+    items: prev.items.filter((_, i) => i !== index) 
+  }));
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -161,10 +173,10 @@ const SalesEntry = ({ user }) => {
     e.preventDefault();
     if (!isAuthorized) return showMsg("Access Denied!", "error");
 
-    // --- CRITICAL FIX: VALIDATE PRODUCT IDS ---
+    // VALIDATION: Ensure all rows have a product selected from the DB
     const hasInvalidItem = formData.items.some(item => !item.productId || item.productId === "");
     if (hasInvalidItem) {
-        return showMsg("One or more items do not have a valid Product ID. Please select products from the list.", "error");
+        return showMsg("Please select valid products from the suggestion list for all rows.", "error");
     }
 
     const selectedParty = suppliers.find(s => s.name === formData.customerName);
@@ -187,7 +199,7 @@ const SalesEntry = ({ user }) => {
       const payload = {
         billNo: formData.billNo,
         date: formData.date,
-        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f",
+        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", // Default fallback if needed
         customerName: formData.customerName,
         logistics: {
           vehicleNo: formData.vehicleNo.toUpperCase(),
@@ -205,31 +217,43 @@ const SalesEntry = ({ user }) => {
       };
 
       const res = await axios.post(`${API_URL}/sales`, payload, getAuthHeader());
+      
       if (res.data.success) {
         showMsg("✅ Bill Saved & Inventory Synced!");
-        fetchData();
-        setFormData({ ...initialState, billNo: generateBillID(formData.billNo) });
+        // Refresh serial numbers and products for the next bill
+        await fetchData();
+        // Reset form to initial state but keep the new Bill No
+        setFormData(prev => ({ 
+            ...initialState, 
+            billNo: generateBillID(formData.billNo) 
+        }));
       }
     } catch (error) {
-      showMsg(error.response?.data?.message || "Submit Failed", "error");
+      showMsg(error.response?.data?.message || "Submission failed. Please check network.", "error");
     } finally { setLoading(false); }
   };
 
   return (
     <>
       <SalesEntryForm 
-        formData={formData} nextSi={nextSi} loading={loading}
-        suppliers={suppliers} products={products}
+        formData={formData} 
+        nextSi={nextSi} 
+        loading={loading}
+        suppliers={suppliers} 
+        products={products}
         handleChange={handleChange}
         handleCustomerSelect={handleCustomerSelect}
         handleItemChange={handleItemChange}
-        addItem={addItem} removeItem={removeItem}
+        addItem={addItem} 
+        removeItem={removeItem}
         handleSubmit={handleSubmit}
         resetForm={() => fetchData()}
         initialState={initialState}
       />
       <CustomSnackbar 
-        open={snackbar.open} message={snackbar.message} severity={snackbar.severity} 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
       />
     </>
