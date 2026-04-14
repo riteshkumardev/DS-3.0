@@ -7,7 +7,7 @@ import {
 import Loader from '../Core_Component/Loader/Loader';
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const SupplierManager = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
@@ -43,7 +43,7 @@ const SupplierManager = ({ user }) => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/parties?type=SUPPLIER`, getAuthHeader());
+      const response = await axios.get(`${API_BASE_URL}/parties?type=SUPPLIER`, getAuthHeader());
       const result = response.data.data || response.data;
       setSuppliers(Array.isArray(result) ? result : []);
     } catch (error) {
@@ -71,10 +71,10 @@ const SupplierManager = ({ user }) => {
 
     try {
       if (editId) {
-        await axios.put(`${API_BASE_URL}/api/parties/${editId}`, submissionData, getAuthHeader());
+        await axios.put(`${API_BASE_URL}/parties/${editId}`, submissionData, getAuthHeader());
         showMsg("Supplier updated successfully!");
       } else {
-        await axios.post(`${API_BASE_URL}/api/parties`, submissionData, getAuthHeader());
+        await axios.post(`${API_BASE_URL}/parties`, submissionData, getAuthHeader());
         showMsg("Supplier saved successfully!");
       }
       resetForm();
@@ -88,7 +88,7 @@ const SupplierManager = ({ user }) => {
     if (window.confirm("क्या आप वाकई इस सप्लायर को हटाना चाहते हैं?")) {
       setLoading(true);
       try {
-        await axios.delete(`${API_BASE_URL}/api/parties/${id}`, getAuthHeader());
+        await axios.delete(`${API_BASE_URL}/parties/${id}`, getAuthHeader());
         setSuppliers(prev => prev.filter(s => s._id !== id));
         showMsg("सप्लायर हटा दिया गया", "info");
       } catch (error) { 
