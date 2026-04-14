@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./Sales.css";
 // Modular API functions
-import { getAllSales, deleteSale, getInvoicePDF } from "../../api/saleApi"; 
+import { getAllSales, deleteSale, getInvoicePDF, updateSale } from "../../api/saleApi"; 
 import { 
   Search, Trash2, Edit3, Check, X, 
   ChevronLeft, ChevronRight, Receipt, Calendar, Truck, MessageSquare, Printer 
@@ -151,19 +151,44 @@ const SalesTable = ({ user }) => {
     }
   };
 
-  const handleSave = async () => {
+const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await axios.put(`${process.env.REACT_APP_API_URL}/sales/${editId}`, editData);
-      if (res.data.success) { 
-        showMsg("Bill Updated Successfully!"); 
-        setEditId(null); 
-        fetchSales(); 
+
+      // 1. Data Sanitization: Ensure numbers are safe before sending
+      const payload = {
+        ...editData,
+        logistics: {
+          ...editData.logistics,
+          freight: toSafeNumber(editData.logistics?.freight)
+        },
+        goods: editData.goods.map(g => ({
+          ...g,
+          quantity: toSafeNumber(g.quantity),
+          rate: toSafeNumber(g.rate),
+          taxableAmount: toSafeNumber(g.quantity) * toSafeNumber(g.rate)
+        })),
+        discount: toSafeNumber(editData.discount),
+        amountPaid: toSafeNumber(editData.amountPaid),
+        grandTotal: toSafeNumber(editData.grandTotal),
+        balanceDue: toSafeNumber(editData.balanceDue)
+      };
+
+      // 2. Use the modular API function (saleApi.js se imported)
+      // Note: Make sure updateSale is imported at the top of your file
+      const res = await updateSale(editId, payload);
+
+      if (res.data.success) {
+        showMsg("✅ Bill & Ledger Updated Successfully!");
+        setEditId(null); // Edit mode exit karein
+        await fetchSales(); // Refresh the table with new data
       }
-    } catch { 
-      showMsg("Update failed.", "error"); 
-    } finally { 
-      setLoading(false); 
+    } catch (err) {
+      // Backend se aane wala specific error message dikhayein
+      const errorMsg = err.response?.data?.message || "Update failed. Check connection.";
+      showMsg(errorMsg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
