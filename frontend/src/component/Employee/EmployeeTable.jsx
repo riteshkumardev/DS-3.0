@@ -6,12 +6,13 @@ import {
 
 // API Services
 import { getAllStaff, updateStaff } from "../../api/staffApi"; 
-import { getAttendanceByDate } from "../../api/attendanceApi"; 
+
 
 // Components & Utils
 import Loader from '../Core_Component/Loader/Loader';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getAttendanceByDate } from '../../api/attendanceApi';
 
 const EmployeeTable = ({ user }) => { 
   const role = user?.role;
