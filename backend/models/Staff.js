@@ -18,7 +18,7 @@ const staffSchema = new mongoose.Schema({
     fatherName: { type: String, trim: true, uppercase: true }, // Added from your JSON
     role: { 
         type: String, 
-        enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR', 'OTHER'],
+        enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR',"WORKER" ,'OTHER'],
         default: 'OPERATOR'
     },
     
