@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; 
 import { useNavigate } from "react-router-dom";
 import { 
   Search, Edit3, Camera, Check, X, Eye, FileDown 
 } from "lucide-react";
+
+// Aapki provided API services ka import
+import { getAllStaff, updateStaff } from "../../api/staffApi"; 
+import { getAttendanceByDate } from "../../api/attendanceApi"; 
+
 import Loader from '../Core_Component/Loader/Loader';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const EmployeeTable = ({ user }) => { 
   const role = user?.role;
-  const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT"; // Match uppercase roles
+  const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
@@ -20,12 +24,11 @@ const EmployeeTable = ({ user }) => {
   const [selectedIds, setSelectedIds] = useState([]); 
   const navigate = useNavigate();
 
-  const API_URL = process.env.REACT_APP_API_URL || "https://dharashakti30backend.vercel.app";
-
+  // 1. Fetch Employees using your service
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/employees`);
+      const res = await getAllStaff(); // Service call
       if (res.data.success) {
         setEmployees(res.data.data);
       }
@@ -38,7 +41,7 @@ const EmployeeTable = ({ user }) => {
 
   useEffect(() => {
     fetchEmployees();
-  }, [API_URL]);
+  }, []);
 
   const handleSelectOne = (id) => {
     setSelectedIds(prev => 
@@ -54,48 +57,40 @@ const EmployeeTable = ({ user }) => {
     }
   };
 
-  // --- PDF GENERATION ---
+  // 2. Optimized PDF Generation with Attendance API
   const downloadReport = async () => {
     if (selectedIds.length === 0) return alert("Select staff members first!");
 
     try {
       const doc = new jsPDF('landscape');
-      const tableColumn = ["Sr.", "Emp ID", "Name", "Role", "Base Salary", "Work Days", "Earned", "Paid", "Due"];
+      const tableColumn = ["Sr.", "Emp ID", "Name", "Role", "Base Salary", "Work Days", "Earned", "Due"];
       const tableRows = [];
 
-      let totals = { earned: 0, paid: 0, due: 0 };
+      let totals = { earned: 0, due: 0 };
       const employeesToExport = employees.filter(emp => selectedIds.includes(emp._id));
 
-      const attRes = await axios.get(`${API_URL}/api/attendance`);
+      // Attendance fetch (Monthly report ke liye logic refine ki ja sakti hai)
+      const attRes = await getAttendanceByDate(""); // Fetch all or specific date
       const allAttendance = attRes.data.data || [];
       const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
 
-      for (let i = 0; i < employeesToExport.length; i++) {
-        const emp = employeesToExport[i];
-        
-        // Calculation logic
+      employeesToExport.forEach((emp, i) => {
         const empAtt = allAttendance.filter(a => String(a.employeeId) === String(emp.employeeId));
         const totalWorkDays = empAtt.filter(a => a.status === 'Present').length + (empAtt.filter(a => a.status === 'Half Day').length * 0.5);
         const earned = Math.round((Number(emp.baseSalary) / daysInMonth) * totalWorkDays);
         
-        // Placeholder for payments (replace with actual API if available)
-        const paid = 0; 
-        const due = earned - paid;
-
-        totals.earned += earned; totals.paid += paid; totals.due += due;
+        totals.earned += earned;
 
         tableRows.push([
           i + 1, emp.employeeId, emp.name, emp.role,
-          `Rs.${emp.baseSalary}`, totalWorkDays, `Rs.${earned}`, `Rs.${paid}`, `Rs.${due}`
+          `Rs.${emp.baseSalary}`, totalWorkDays, `Rs.${earned}`, `Rs.${earned}`
         ]);
-      }
+      });
 
-      // Add Grand Total
       tableRows.push([
         { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fillColor: [240, 240, 240], fontStyle: 'bold' } },
         { content: `Rs.${totals.earned}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } },
-        { content: `Rs.${totals.paid}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } },
-        { content: `Rs.${totals.due}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [200, 0, 0] } }
+        { content: `Rs.${totals.earned}`, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [200, 0, 0] } }
       ]);
 
       doc.text("DHARA SHAKTI AGRO - STAFF CONSOLIDATED REPORT", 14, 15);
@@ -109,7 +104,7 @@ const EmployeeTable = ({ user }) => {
     setEditId(emp._id); 
     setEditData({ 
         ...emp, 
-        salary: emp.baseSalary, // Flattening for the form
+        salary: emp.baseSalary, 
         accountNo: emp.bankDetails?.accountNumber,
         bankName: emp.bankDetails?.bankName
     });
@@ -120,18 +115,19 @@ const EmployeeTable = ({ user }) => {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 3. Update Staff using your Service
   const handleSave = async () => {
     try {
       const payload = {
         name: editData.name,
         phone: editData.phone,
-        salary: editData.salary, // Controller handles mapping to baseSalary
+        salary: editData.salary,
         accountNo: editData.accountNo,
         bankName: editData.bankName,
         role: editData.role
       };
       
-      const res = await axios.put(`${API_URL}/api/employees/${editData.employeeId}`, payload);
+      const res = await updateStaff(editData.employeeId, payload); // Using service call
       if (res.data.success) {
         alert("✅ Details Updated!");
         setEditId(null);
@@ -140,29 +136,16 @@ const EmployeeTable = ({ user }) => {
     } catch (err) { alert("Update Error"); }
   };
 
-  const handlePhotoChange = async (e, empId) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("image", file); 
-    try {
-      await axios.put(`${API_URL}/api/employees/${empId}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      alert("✅ Photo Updated!");
-      fetchEmployees(); 
-    } catch (err) { alert("Photo update failed"); }
-  };
-
   const filtered = employees.filter(emp => 
     emp.name?.toLowerCase().includes(search.toLowerCase()) || 
     emp.employeeId?.toString().includes(search)
   );
 
   const getImageUrl = (path) => {
+    const API_BASE = "https://dharashakti30backend.vercel.app";
     if (!path || path === "null") return "https://i.imgur.com/6VBx3io.png";
     if (path.startsWith('http')) return path;
-    return `${API_URL}/${path.replace(/\\/g, '/')}`;
+    return `${API_BASE}/${path.replace(/\\/g, '/')}`;
   };
 
   if (loading) return <Loader />;
@@ -190,7 +173,7 @@ const EmployeeTable = ({ user }) => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search staff by name or ID..." 
+                placeholder="Search staff..." 
                 className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -234,15 +217,7 @@ const EmployeeTable = ({ user }) => {
                   </td>
                   <td className="px-6 py-4 font-black text-sm text-zinc-500">#{emp.employeeId}</td>
                   <td className="px-6 py-4">
-                    <div className="relative group w-12 h-12">
-                      <img src={getImageUrl(emp.photo)} className="w-full h-full rounded-2xl object-cover border dark:border-zinc-700" alt="profile" />
-                      {isAuthorized && (
-                        <label className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                            <Camera size={16} className="text-white" />
-                            <input type="file" hidden accept="image/*" onChange={(e) => handlePhotoChange(e, emp.employeeId)} />
-                        </label>
-                      )}
-                    </div>
+                    <img src={getImageUrl(emp.photo)} className="w-12 h-12 rounded-2xl object-cover border dark:border-zinc-700 shadow-sm" alt="profile" />
                   </td>
                   <td className="px-6 py-4">
                     {editId === emp._id ? (
@@ -258,17 +233,10 @@ const EmployeeTable = ({ user }) => {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    {editId === emp._id ? (
-                      <div className="space-y-1">
-                        <input name="bankName" value={editData.bankName} onChange={handleEditChange} className="edit-input-zinc" placeholder="Bank" />
-                        <input name="accountNo" value={editData.accountNo} onChange={handleEditChange} className="edit-input-zinc" placeholder="A/C No" />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">{emp.bankDetails?.accountNumber || 'NO A/C'}</span>
-                        <span className="text-[9px] uppercase font-bold text-zinc-400">{emp.bankDetails?.bankName || 'N/A'}</span>
-                      </div>
-                    )}
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">{emp.bankDetails?.accountNumber || 'NO A/C'}</span>
+                      <span className="text-[9px] uppercase font-bold text-zinc-400">{emp.bankDetails?.bankName || 'N/A'}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {editId === emp._id ? (
@@ -292,7 +260,7 @@ const EmployeeTable = ({ user }) => {
                     <div className="flex justify-center gap-2">
                       {editId === emp._id ? (
                         <>
-                          <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-500/20"><Check size={18}/></button>
+                          <button onClick={handleSave} className="p-2 bg-emerald-600 text-white rounded-xl"><Check size={18}/></button>
                           <button onClick={() => setEditId(null)} className="p-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 rounded-xl"><X size={18}/></button>
                         </>
                       ) : (
@@ -313,7 +281,6 @@ const EmployeeTable = ({ user }) => {
       <style>{`
         .edit-input-zinc { width: 100%; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 0.75rem; padding: 0.4rem 0.6rem; font-size: 0.75rem; outline: none; font-weight: 700; color: #1e293b; }
         .dark .edit-input-zinc { background: #09090b; border-color: #27272a; color: #f4f4f5; }
-        .edit-input-zinc:focus { border-color: #10b981; ring: 2px solid rgba(16, 185, 129, 0.2); }
       `}</style>
     </div>
   );
