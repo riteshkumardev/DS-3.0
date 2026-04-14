@@ -89,58 +89,62 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
 const handleSubmit = async (e) => {
   e.preventDefault();
   if (!isAuthorized) return showMsg("Unauthorized!", "error");
 
-  // 1. Supplier find karein taaki ID aur exact metadata mil sake
   const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
 
   setLoading(true);
   try {
-    // 2. GST Type calculation (Bihar code: 10)
     const isBihar = selectedSupplier?.gstin?.startsWith("10");
     const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
 
-    // 3. Goods Array: Backend validation ke liye product matching zaroori hai
-    const goodsArray = [{
-      productName: formData.productName,
-      quantity: toSafeNumber(formData.quantity),
-      rate: toSafeNumber(formData.rate),
-      taxableAmount: toSafeNumber(formData.quantity) * toSafeNumber(formData.rate),
-      unit: "KG",
-      // IMPORTANT: Agar aapke paas products ki list hai, toh yahan selectedProd._id bhejein
-      // Agar nahi hai, toh backend handle karega, lekin productName pass hona chahiye
-      productId: formData.productName 
-    }];
+    const qty = toSafeNumber(formData.quantity);
+    const rate = toSafeNumber(formData.rate);
+    const taxableAmount = qty * rate;
 
-    // 4. Final Payload (Backend schema ke according)
+    // 💡 Backend payload alignment based on your response data
     const payload = {
-      date: formData.date,
-      billNo: formData.billNo || `PUR-${Date.now()}`,
+      // 1. Basic Info (Backend expects purchaseDate & purchaseBillNo)
+      purchaseDate: formData.date, 
+      purchaseBillNo: formData.billNo || `PUR-${Date.now()}`,
+      
+      // 2. Supplier Info
       supplierId: selectedSupplier?._id || "69ddddbdb0477c53bf79cd3e",
-      supplierName: formData.supplierName, // ✅ FIXED: Puraane logic mein ye missing tha
+      supplierName: formData.supplierName,
       gstin: formData.gstin || selectedSupplier?.gstin || "URD",
       mobile: formData.mobile || selectedSupplier?.phone || "",
       address: formData.address || selectedSupplier?.address?.street || "",
-      
+
+      // 3. Items Array (Backend response shows "items", not "goods")
+      items: [{
+        productName: formData.productName,
+        quantity: qty,
+        rate: rate,
+        taxableAmount: taxableAmount,
+        unit: "KG"
+      }],
+
+      // 4. Logistics (Keep as is if your schema supports it, else move to top level)
       logistics: {
         vehicleNo: formData.vehicleNo.toUpperCase(),
         freight: toSafeNumber(formData.travelingCost),
         travelMode: travelMode
       },
-      
-      goods: goodsArray, // ✅ Iterable Array
+
+      // 5. Financials (Backend response shows subTotal & balanceDue)
       gstType: calculatedGstType,
+      subTotal: taxableAmount, // ✅ Added for backend
       discount: toSafeNumber(formData.cashDiscount),
-      amountPaid: toSafeNumber(formData.paidAmount),
       grandTotal: toSafeNumber(formData.totalAmount),
-      remarks: formData.remarks,
-      performedBy: user?._id
+      amountPaid: toSafeNumber(formData.paidAmount),
+      balanceDue: toSafeNumber(formData.totalAmount) - toSafeNumber(formData.paidAmount), // ✅ Added
+      
+      performedBy: user?._id,
+      remarks: formData.remarks
     };
 
-    // 5. API Call
     const res = await createPurchase(payload);
     
     if (res.data.success) {
@@ -149,7 +153,6 @@ const handleSubmit = async (e) => {
       if (onSuccess) onSuccess();
     }
   } catch (error) {
-    // Backend se aane wala specific error dikhayein (e.g. "Path supplierName is required")
     const errorMsg = error.response?.data?.message || "Data processing error";
     showMsg(errorMsg, "error");
     console.error("Purchase Submit Error:", error);
