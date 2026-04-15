@@ -8,6 +8,7 @@ import {
 // API Imports
 import { postTransaction } from '../../api/ledgerApi';
 import axios from 'axios';
+import { fetchParties } from '../../api/partyApi'; 
 
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
@@ -32,12 +33,12 @@ const AddTransaction = () => {
 
   const [formData, setFormData] = useState(initialForm);
 
-  // 1. Fetch all Parties (Customers/Suppliers)
-  const fetchParties = useCallback(async () => {
+// 1. Fetch all Parties (Customers/Suppliers) using partyApi
+  const loadParties = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetching from your parties master endpoint
-      const res = await axios.get(`${API_BASE_URL}/parties`); 
+      // fetchParties import ka use karke call
+      const res = await fetchParties(); 
       if (res.data?.success) {
         setParties(res.data.data);
       }
@@ -47,11 +48,11 @@ const AddTransaction = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
-    fetchParties();
-  }, [fetchParties]);
+    loadParties();
+  }, [loadParties]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
