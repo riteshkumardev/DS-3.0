@@ -31,7 +31,7 @@ const ExpenseManager = ({ user }) => {
     
     const initialForm = {
         date: new Date().toISOString().split('T')[0],
-        partyName: '',
+        category: '',
         otherDetail: '',
         type: 'Payment Out',
         amount: '',
@@ -65,12 +65,12 @@ const ExpenseManager = ({ user }) => {
     // Filtering logic (same as before)
     useEffect(() => {
         let temp = [...transactions];
-        if (filterParty !== 'All') temp = temp.filter(t => t.partyName === filterParty);
+        if (filterParty !== 'All') temp = temp.filter(t => t.category === filterParty);
         if (startDate && endDate) temp = temp.filter(t => t.date >= startDate && t.date <= endDate);
         if (searchQuery.trim() !== "") {
             const query = searchQuery.toLowerCase();
             temp = temp.filter(t => 
-                t.partyName?.toLowerCase().includes(query) || 
+                t.category?.toLowerCase().includes(query) || 
                 t.remark?.toLowerCase().includes(query) || 
                 t.txnId?.toLowerCase().includes(query)
             );
@@ -93,12 +93,12 @@ const ExpenseManager = ({ user }) => {
         setIsEditing(true);
         setEditId(txn._id);
         const categories = ['Loading', 'Unloading', 'Rasan', 'Water', 'Medical', 'CA', 'Electrical', 'Hardware', 'Stationary', 'Construction'];
-        const isStandardCategory = categories.includes(txn.partyName);
+        const isStandardCategory = categories.includes(txn.category);
 
         setFormData({
             date: txn.date.split('T')[0],
-            partyName: isStandardCategory ? txn.partyName : 'Other',
-            otherDetail: !isStandardCategory ? txn.partyName : '',
+            category: isStandardCategory ? txn.category : 'Other',
+            otherDetail: !isStandardCategory ? txn.category : '',
             type: txn.type,
             amount: txn.amount,
             txnId: txn.txnId || '',
@@ -134,7 +134,7 @@ const ExpenseManager = ({ user }) => {
         try {
             const payload = {
                 ...formData,
-                partyName: formData.partyName === 'Other' ? formData.otherDetail : formData.partyName
+                category: formData.category === 'Other' ? formData.otherDetail : formData.category
             };
 
             let res;
@@ -242,22 +242,24 @@ const ExpenseManager = ({ user }) => {
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex gap-1"><User size={12}/> Category</label>
-                                <select value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} required className="form-input-zinc">
+                                <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} required className="form-input-zinc">
                                     <option value="">-- Select --</option>
-                                    <option value="Loading">Loading</option>
-                                    <option value="Unloading">Unloading</option>
-                                    <option value="Rasan">Rasan</option>
-                                    <option value="Water">Water</option>
-                                    <option value="Medical">Medical</option>
+                                    <option value="LOADING">Loading</option>
+                                    <option value="UNLOADING">Unloading</option>
+                                    <option value="RASAN">Rasan</option>
+                                    <option value="WATER">Water</option>
+                                    <option value="MEDICAL">Medical</option>
                                     <option value="CA">CA</option>
-                                    <option value="Electrical">Electrical/Electronics</option>
-                                    <option value="Hardware">Hardware</option>
-                                    <option value="Stationary">Stationary</option>
-                                    <option value="Construction">Construction</option>
-                                    <option value="Other">Other</option>
+                                    <option value="ELECTRICAL">Electrical/Electronics</option>
+                                    <option value="HARDWARE">Hardware</option>
+                                    <option value="STATIONARY">Stationary</option>
+                                    <option value="CONSTRUCTION">Construction</option>
+                                    <option value="FUEL">Construction</option>
+                                    <option value="SALARY">Construction</option>
+                                    <option value="OTHER">Other</option>
                                 </select>
                             </div>
-                            {formData.partyName === 'Other' && (
+                            {formData.category === 'Other' && (
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex gap-1"><MoreHorizontal size={12}/> Detail</label>
                                     <input type="text" value={formData.otherDetail} onChange={e => setFormData({...formData, otherDetail: e.target.value})} placeholder="Specify..." required className="form-input-zinc border-emerald-200" />
@@ -342,7 +344,7 @@ const ExpenseManager = ({ user }) => {
                                     <td className="px-4 py-3 text-center font-bold text-zinc-400">{i + 1}</td>
                                     <td className="px-4 py-3 font-bold">{new Date(txn.date).toLocaleDateString('en-GB')}</td>
                                     <td className="px-4 py-3">
-                                        <div className="font-black uppercase text-zinc-900 dark:text-white">{txn.partyName}</div>
+                                        <div className="font-black uppercase text-zinc-900 dark:text-white">{txn.category}</div>
                                         <div className="text-[9px] opacity-60">{txn.remark} {txn.txnId && `| ${txn.txnId}`}</div>
                                     </td>
                                     <td className="px-4 py-3 text-right font-bold text-emerald-600">
