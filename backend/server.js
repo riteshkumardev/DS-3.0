@@ -66,6 +66,7 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/employees", staffRoutes);
 app.use("/api/stocks", stockRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/products", productRoutes);
