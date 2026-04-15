@@ -33,6 +33,7 @@ const ExpenseManager = ({ user }) => {
         date: new Date().toISOString().split('T')[0],
         category: '',
         otherDetail: '',
+        title: '',
         type: 'Payment Out',
         amount: '',
         txnId: '',
@@ -254,8 +255,8 @@ const ExpenseManager = ({ user }) => {
                                     <option value="HARDWARE">Hardware</option>
                                     <option value="STATIONARY">Stationary</option>
                                     <option value="CONSTRUCTION">Construction</option>
-                                    <option value="FUEL">Construction</option>
-                                    <option value="SALARY">Construction</option>
+                                    <option value="FUEL">Fuel</option>
+                                    <option value="SALARY">Salary</option>
                                     <option value="OTHER">Other</option>
                                 </select>
                             </div>
