@@ -9,7 +9,7 @@ export const getProfitLossReport = (startDate, endDate) =>
     API.get(`/reports/profit-loss?startDate=${startDate}&endDate=${endDate}`);
 
 // Business Overview Stats (Dashboard ke liye)
-export const getDashboardStats = () => API.get('/reports/dashboard-summary');
+export const getDashboardStats = () => API.get('/reports/dashboard-stats');
 
 // GSTR-1 (Sales Report for Tax)
 export const getGSTR1Report = (month, year) => 
