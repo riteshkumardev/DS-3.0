@@ -175,6 +175,9 @@ const SalesEntry = ({ user }) => {
 
     // VALIDATION: Ensure all rows have a product selected from the DB
     const hasInvalidItem = formData.items.some(item => !item.productId || item.productId === "");
+    console.log(hasInvalidItem, "--- hasInvalidItem");
+    console.log(formData.items,"--- formData.items");
+    
     if (hasInvalidItem) {
         return showMsg("Please select valid products from the suggestion list for all rows.", "error");
     }
