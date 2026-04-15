@@ -136,6 +136,6 @@ class LedgerService {
             throw error;
         }
     }
-}
+}   
 
 export default new LedgerService();
