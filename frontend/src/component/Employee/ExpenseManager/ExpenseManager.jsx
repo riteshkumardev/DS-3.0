@@ -5,15 +5,17 @@ import {
     createExpense, 
     updateExpense, 
     deleteExpense 
-} from './api/expenseApi'; 
+} from '../../../api/expenseApi'; 
 
 import { 
     Landmark, Filter, Printer, Save, Wallet, User, 
     Calendar, Hash, Info, RotateCcw, MoreHorizontal,
-    Pencil, Trash2, X, Search
-} from "lucide-center";
-import Loader from "../../Core_Component/Loader/Loader";
+    Pencil, Trash2, X, Search 
+} from "lucide-react";
+
+
 import CustomSnackbar from "../../Core_Component/Snackbar/CustomSnackbar";
+import Loader from '../../Core_Component/Loader/Loader';
 
 const ExpenseManager = ({ user }) => {
     // Role handling based on backend routes
