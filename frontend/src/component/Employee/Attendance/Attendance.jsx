@@ -10,10 +10,12 @@ import { getAllStaff } from "../../../api/staffApi";
 import { markAttendance, getAttendanceByDate } from '../../../api/attendanceApi';
 import Loader from '../../Core_Component/Loader/Loader';
 
-const Attendance = ({ role }) => {
+const Attendance = ({user}) => {
   // 💡 User Data & Auth
   const userData = JSON.parse(localStorage.getItem("user") || "{}");
-  const userRole = role || userData.role;
+  const userRole = user?.role || userData.role;
+  console.log(user,"<--- User Role in Attendance.jsx");
+  
   const isAuthorized = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 
   const [employees, setEmployees] = useState([]);

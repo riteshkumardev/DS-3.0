@@ -146,7 +146,7 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger user={user} /></ProtectedRoute>} />
-            <Route path="/invoice" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
+            <Route path="/invoice" element={<ProtectedRoute><InvoicePage user={user} /></ProtectedRoute>} />
 
             {/* 💼 MANAGEMENT LEVEL (Manager & Admin Only) */}
             <Route path="/profit-loss" element={<ProtectedRoute managerAllowed><ProfitLoss /></ProtectedRoute>} />
@@ -158,17 +158,17 @@ function App() {
             <Route path="/stock-management" element={<ProtectedRoute managerAllowed><StockManagement user={user} /></ProtectedRoute>} />
             <Route path="/stock-add" element={<ProtectedRoute managerAllowed><StockAddForm user={user} /></ProtectedRoute>} />
             <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable user={user} /></ProtectedRoute>} />
-            <Route path="/Reports_Printing" element={<ProtectedRoute managerAllowed><ReportsPrinting/></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute managerAllowed><SupplierManager /></ProtectedRoute>} />
-            <Route path="/attendance" element={<ProtectedRoute managerAllowed><Attendance /></ProtectedRoute>} />
+            <Route path="/Reports_Printing" element={<ProtectedRoute managerAllowed><ReportsPrinting user={user}/></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute managerAllowed><SupplierManager user={user}/></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute managerAllowed><Attendance user={user} /></ProtectedRoute>} />
 
             {/* 🛡️ SYSTEM ADMIN LEVEL (Strict Security) */}
             <Route path="/master-panel" element={<ProtectedRoute adminOnly><MasterPanel user={user} /></ProtectedRoute>} />
             <Route path="/audit-trail" element={<ProtectedRoute adminOnly><AuditPage /></ProtectedRoute>} />
             <Route path="/employee-add" element={<ProtectedRoute adminOnly><EmployeeAdd user={user} /></ProtectedRoute>} />
-            <Route path="/add-transaction" element={<ProtectedRoute adminOnly><AddTransaction /></ProtectedRoute>} />
-            <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory/></ProtectedRoute>} />
-            <Route path="/analysis-page" element={<ProtectedRoute adminOnly><AnalysisPage /></ProtectedRoute>} />
+            <Route path="/add-transaction" element={<ProtectedRoute adminOnly><AddTransaction user={user}/></ProtectedRoute>} />
+            <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory user={user}/></ProtectedRoute>} />
+            <Route path="/analysis-page" element={<ProtectedRoute adminOnly><AnalysisPage  user={user} /></ProtectedRoute>} />
             <Route path="/service" element={<ProtectedRoute adminOnly><Service/></ProtectedRoute>} />
 
             {/* Fallback Redirect */}
