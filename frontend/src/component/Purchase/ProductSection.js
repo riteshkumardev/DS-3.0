@@ -1,76 +1,75 @@
-import React, { useState, useEffect } from "react";
-import { Layers, Plus, Minus } from "lucide-react";
-// ✅ Modular API import
-import { getAllProducts } from "../../api/productApi";
+import React from "react";
+import { Layers, Plus, Minus, Tag } from "lucide-react";
 
-const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleChange, travelMode, setTravelMode }) => {
-  const [masterProducts, setMasterProducts] = useState([]);
+/**
+ * ProductSection Component (Optimized)
+ * Ab ye internal network call nahi karega, balki props se products lega.
+ */
+const ProductSection = ({ 
+  formData, 
+  products, // 👈 Parent se aane wali master product list
+  loading, 
+  isAuthorized, 
+  setFormData, 
+  handleChange, 
+  travelMode, 
+  setTravelMode 
+}) => {
 
-  // 1. Fetch Products using modular API
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        // Sirf wahi products mangaiye jo active hain dropdown ke liye
-        const res = await getAllProducts({ isActive: true }); 
-        if (res.data?.success) {
-          setMasterProducts(res.data.data);
-        }
-      } catch (err) {
-        console.error("Master products load karne mein fail:", err);
-      }
-    };
-    loadProducts();
-  }, []);
-
-  // 2. Custom Change Handler: Name aur ID dono ko sync karega
+  // 1. Custom Change Handler: Dropdown se ID select hogi
   const handleProductSelect = (e) => {
-    const selectedName = e.target.value;
-    const product = masterProducts.find((p) => p.name === selectedName);
+    const selectedId = e.target.value;
+    const product = products.find((p) => p._id === selectedId);
 
     if (product) {
       setFormData((prev) => ({
         ...prev,
+        productId: product._id,
         productName: product.name,
-        productId: product._id, // ✅ Backend validation ke liye MongoDB ID
-        // HSN Code aur Unit auto-fill logic (optional layout ke liye)
+        hsn: product.hsnCode || "",
+        unit: product.unit || "KG",
+        rate: product.purchasePrice || prev.rate // Auto-fill purchase price from master
       }));
     } else {
       setFormData((prev) => ({ 
         ...prev, 
-        productName: selectedName, 
-        productId: "" 
+        productId: "", 
+        productName: "",
+        hsn: ""
       }));
     }
   };
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       
-      {/* 📦 Product Name Dropdown */}
-      <div className="space-y-1">
-        <label className="label-style">
-          <Layers size={14} className="text-emerald-500" /> Product Name
+      {/* 📦 Product Name Dropdown (Dynamic from Props) */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <Layers size={12} className="text-emerald-500" /> Select Product
         </label>
         <select 
-          name="productName" 
-          value={formData.productName} 
+          name="productId" // 👈 name change to productId for DB consistency
+          value={formData.productId} 
           onChange={handleProductSelect} 
           required 
           disabled={loading || !isAuthorized} 
-          className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all appearance-none"
         >
-          <option value="">-- Choose Product --</option>
-          {masterProducts.map((p) => (
-            <option key={p._id} value={p.name}>
-              {p.name} {p.hsnCode ? `(${p.hsnCode})` : ""}
+          <option value="">-- Choose From Master --</option>
+          {products && products.map((p) => (
+            <option key={p._id} value={p._id}>
+              {p.name} {p.hsnCode ? `[${p.hsnCode}]` : ""}
             </option>
           ))}
         </select>
       </div>
 
       {/* 🔢 Quantity Field */}
-      <div className="space-y-1">
-        <label className="label-style">Quantity (Unit)</label>
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
+          Quantity ({formData.unit || 'Units'})
+        </label>
         <input 
           type="number" 
           name="quantity" 
@@ -79,13 +78,15 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
           required 
           placeholder="0" 
           disabled={loading || !isAuthorized} 
-        className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all"
         />
       </div>
 
       {/* 💰 Rate Field */}
-      <div className="space-y-1">
-        <label className="label-style">Rate (Price/Unit)</label>
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
+          Rate (₹ / {formData.unit || 'Unit'})
+        </label>
         <input 
           type="number" 
           name="rate" 
@@ -94,23 +95,25 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
           required 
           placeholder="0.00" 
           disabled={loading || !isAuthorized} 
-          className="w-full border rounded-lg p-2 text-xs" 
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black outline-none focus:border-emerald-500 dark:text-white transition-all" 
         />
       </div>
 
-      {/* 🚚 Traveling Cost Section */}
-      <div className="space-y-1">
-        <label className="label-style">Traveling Cost (₹)</label>
-        <div className="flex gap-1">
+      {/* 🚚 Traveling / Freight Section */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
+          Freight / Traveling (₹)
+        </label>
+        <div className="flex gap-2">
           <button 
             type="button" 
             onClick={() => setTravelMode(prev => prev === "+" ? "-" : "+")} 
             disabled={loading || !isAuthorized} 
-            className={`w-10 rounded-lg flex items-center justify-center font-bold text-white transition-all shadow-sm ${
-              travelMode === "+" ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'
+            className={`w-12 rounded-xl flex items-center justify-center font-bold text-white transition-all shadow-md ${
+              travelMode === "+" ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'
             }`}
           >
-            {travelMode === "+" ? <Plus size={14}/> : <Minus size={14}/>}
+            {travelMode === "+" ? <Plus size={16}/> : <Minus size={16}/>}
           </button>
           <input 
             type="number" 
@@ -119,10 +122,27 @@ const ProductSection = ({ formData, loading, isAuthorized, setFormData, handleCh
             onChange={handleChange} 
             placeholder="0" 
             disabled={loading || !isAuthorized} 
-           className="w-full border rounded-lg p-2 text-xs" 
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all" 
           />
         </div>
       </div>
+
+      {/* ℹ️ Smart Preview (Auto-filled from master) */}
+      {formData.productId && (
+        <div className="md:col-span-4 mt-2 flex gap-4 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2">
+                <Tag size={12} className="text-zinc-400"/>
+                <span className="text-[10px] font-black text-zinc-500 uppercase">HSN:</span>
+                <span className="text-[10px] font-mono font-bold dark:text-emerald-400">{formData.hsn}</span>
+            </div>
+            <div className="flex items-center gap-2 border-l border-zinc-200 dark:border-zinc-700 pl-4">
+                <span className="text-[10px] font-black text-zinc-500 uppercase">Total:</span>
+                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                    ₹{(Number(formData.quantity) * Number(formData.rate)).toLocaleString()}
+                </span>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
