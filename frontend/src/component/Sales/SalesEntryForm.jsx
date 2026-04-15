@@ -17,7 +17,8 @@ const SalesEntryForm = ({
   removeItem, 
   handleSubmit, 
   resetForm, 
-  initialState 
+  initialState,
+  products
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 p-4 font-sans">
@@ -142,15 +143,19 @@ const SalesEntryForm = ({
                 <div key={index} className="flex flex-wrap md:flex-nowrap gap-3 items-end border-b border-zinc-50 dark:border-zinc-800 pb-3 animate-in fade-in slide-in-from-left-2">
                   <div className="flex-1 min-w-[200px] space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400">Product {index+1}</label>
-                    <select name="productName" value={item.productName} onChange={(e) => handleItemChange(index, e)} required className="form-input text-xs">
-                      <option value="">-- Choose Product --</option>
-                      <option value="Corn Grit">Corn Grit</option>
-                      <option value="Corn Grit (3mm)">Corn Grit (3mm)</option>
-                      <option value="Cattle Feed">Cattle Feed</option>
-                      <option value="Rice Grit">Rice Grit</option>
-                      <option value="Corn Flour">Corn Flour</option>
-                      <option value="Rice Flour">Rice Flour</option>
-                    </select>
+                  <select
+  name="productId" // 👈 productName ki jagah productId
+  value={item.productId}
+  onChange={(e) => handleItemChange(index, e)}
+  className="..."
+>
+  <option value="">-- Choose Product --</option>
+  {products.map((p) => (
+    <option key={p._id} value={p._id}>
+      {p.name} (HSN: {p.hsnCode})
+    </option>
+  ))}
+</select>
                   </div>
                   <div className="w-32 space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400">Qty (KG)</label>

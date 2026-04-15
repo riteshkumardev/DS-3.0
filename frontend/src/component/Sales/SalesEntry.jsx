@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { fetchPartiesList } from "../../api/partyApi";
+import { getAllProducts } from "../../api/productApi"; // 👈 API import
 import SalesEntryForm from "./SalesEntryForm";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
@@ -20,6 +21,7 @@ const SalesEntry = ({ user }) => {
     mobile: "",
     street: "",
     city: "Samastipur",
+    // items mein ab hum ID aur HSN ko priority denge
     items: [{ productName: "", quantity: "", rate: "", productId: "", hsn: "" }],
     billNo: "",
     vehicleNo: "",
@@ -29,22 +31,15 @@ const SalesEntry = ({ user }) => {
     amountReceived: 0,
     paymentDue: 0,
     remarks: "",
-    deliveryNote: "",
-    deliveryNoteDate: "",
     paymentMode: "BY BANK",
-    buyerOrderNo: "",
-    buyerOrderDate: "",
-    dispatchDocNo: "",
-    dispatchDate: "",
     dispatchedThrough: "",
     destination: "",
     lrRrNo: "",
-    termsOfDelivery: "",
   };
 
   const [formData, setFormData] = useState(initialState);
   const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState([]); // 👈 Master Product List
   const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -59,30 +54,14 @@ const SalesEntry = ({ user }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  const generateBillID = (lastBillNo) => {
-    const now = new Date();
-    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-    const currentMonth = months[now.getMonth()];
-    const currentYear = now.getFullYear();
-    const finYear = now.getMonth() >= 3 ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}` : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
-
-    let nextSerial = 1;
-    if (lastBillNo && lastBillNo.includes('/')) {
-      const parts = lastBillNo.split('/');
-      const lastSerial = parseInt(parts[parts.length - 1]);
-      // Reset serial if month changed, else increment
-      if (currentMonth === parts[2]) nextSerial = lastSerial + 1;
-    }
-    return `DS/${finYear}/${currentMonth}/${String(nextSerial).padStart(3, '0')}`;
-  };
-
+  // --- SMART DATA FETCHING ---
   const fetchData = useCallback(async () => {
     if (!user?.token) return;
     try {
       setLoading(true);
       const [supRes, prodRes, salesRes] = await Promise.all([
         fetchPartiesList('SUPPLIER'),
-        axios.get(`${API_URL}/stocks`, getAuthHeader()),
+        getAllProducts({ isActive: true }), // 👈 Seedhe Product Master se data
         axios.get(`${API_URL}/sales`, getAuthHeader())
       ]);
 
@@ -105,6 +84,24 @@ const SalesEntry = ({ user }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // --- AUTO GENERATE BILL ID ---
+  const generateBillID = (lastBillNo) => {
+    const now = new Date();
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const currentMonth = months[now.getMonth()];
+    const currentYear = now.getFullYear();
+    const finYear = now.getMonth() >= 3 ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}` : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
+
+    let nextSerial = 1;
+    if (lastBillNo && lastBillNo.includes('/')) {
+      const parts = lastBillNo.split('/');
+      const lastSerial = parseInt(parts[parts.length - 1]);
+      if (currentMonth === parts[2]) nextSerial = lastSerial + 1;
+    }
+    return `DS/${finYear}/${currentMonth}/${String(nextSerial).padStart(3, '0')}`;
+  };
+
+  // --- CUSTOMER SELECTION ---
   const handleCustomerSelect = (e) => {
     const selectedName = e.target.value;
     const customer = suppliers.find((s) => s.name === selectedName);
@@ -120,26 +117,23 @@ const SalesEntry = ({ user }) => {
     }
   };
 
+  // --- SMART ITEM SELECTION (NO HARDCODING) ---
   const handleItemChange = (index, e) => {
     const { name, value } = e.target;
     const newItems = [...formData.items];
 
-    if (name === "productName") {
-      // Improved match: Case insensitive and checks both 'name' and 'productName' fields
-      const selectedProd = products.find(p => 
-        (p.name?.toLowerCase() === value.toLowerCase()) || 
-        (p.productName?.toLowerCase() === value.toLowerCase())
-      );
-
+    if (name === "productId") { // 👈 Select dropdown ab productId bhejega
+      const selectedProd = products.find(p => p._id === value);
       if (selectedProd) {
         newItems[index].productId = selectedProd._id;
-        newItems[index].hsn = selectedProd.hsnCode || "";
-      } else {
-        newItems[index].productId = ""; // Reset if user types something invalid
+        newItems[index].productName = selectedProd.name;
+        newItems[index].hsn = selectedProd.hsnCode || "000000";
+        newItems[index].rate = selectedProd.salesPrice || ""; // Auto-fill sales price
       }
+    } else {
+      newItems[index][name] = value;
     }
 
-    newItems[index][name] = value;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
@@ -158,6 +152,7 @@ const SalesEntry = ({ user }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- TOTAL CALCULATION ---
   useEffect(() => {
     let sub = 0;
     formData.items.forEach(item => { sub += toSafeNumber(item.quantity) * toSafeNumber(item.rate); });
@@ -169,18 +164,13 @@ const SalesEntry = ({ user }) => {
     setFormData(prev => ({ ...prev, totalPrice: grand, paymentDue: grand - received }));
   }, [formData.items, formData.travelingCost, formData.cashDiscount, formData.amountReceived]);
 
+  // --- SUBMIT SALE ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) return showMsg("Access Denied!", "error");
 
-    // VALIDATION: Ensure all rows have a product selected from the DB
-    const hasInvalidItem = formData.items.some(item => !item.productId || item.productId === "");
-    console.log(hasInvalidItem, "--- hasInvalidItem");
-    console.log(formData.items,"--- formData.items");
-    
-    if (hasInvalidItem) {
-        return showMsg("Please select valid products from the suggestion list for all rows.", "error");
-    }
+    const hasInvalidItem = formData.items.some(item => !item.productId);
+    if (hasInvalidItem) return showMsg("Please select a product from the list for all rows.", "error");
 
     const selectedParty = suppliers.find(s => s.name === formData.customerName);
 
@@ -202,7 +192,7 @@ const SalesEntry = ({ user }) => {
       const payload = {
         billNo: formData.billNo,
         date: formData.date,
-        partyId: selectedParty?._id || "69ddc75636ee8ada6e41102f", // Default fallback if needed
+        partyId: selectedParty?._id,
         customerName: formData.customerName,
         logistics: {
           vehicleNo: formData.vehicleNo.toUpperCase(),
@@ -223,16 +213,11 @@ const SalesEntry = ({ user }) => {
       
       if (res.data.success) {
         showMsg("✅ Bill Saved & Inventory Synced!");
-        // Refresh serial numbers and products for the next bill
-        await fetchData();
-        // Reset form to initial state but keep the new Bill No
-        setFormData(prev => ({ 
-            ...initialState, 
-            billNo: generateBillID(formData.billNo) 
-        }));
+        fetchData();
+        setFormData({ ...initialState, billNo: generateBillID(formData.billNo) });
       }
     } catch (error) {
-      showMsg(error.response?.data?.message || "Submission failed. Please check network.", "error");
+      showMsg(error.response?.data?.message || "Submission failed.", "error");
     } finally { setLoading(false); }
   };
 
@@ -243,7 +228,7 @@ const SalesEntry = ({ user }) => {
         nextSi={nextSi} 
         loading={loading}
         suppliers={suppliers} 
-        products={products}
+        products={products} // 👈 Dynamic Products
         handleChange={handleChange}
         handleCustomerSelect={handleCustomerSelect}
         handleItemChange={handleItemChange}
@@ -251,7 +236,6 @@ const SalesEntry = ({ user }) => {
         removeItem={removeItem}
         handleSubmit={handleSubmit}
         resetForm={() => fetchData()}
-        initialState={initialState}
       />
       <CustomSnackbar 
         open={snackbar.open} 
