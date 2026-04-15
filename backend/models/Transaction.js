@@ -22,7 +22,8 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         enum: [
             'SALE', 'PURCHASE', 'PAYMENT_IN', 'PAYMENT_OUT', 
-            'EXPENSE', 'SALARY', 'OPENING_BALANCE','REVERSAL'
+            'EXPENSE', 'SALARY', 'OPENING_BALANCE', 'REVERSAL',
+            'ADJUSTMENT' // Added for Freight and manual corrections
         ],
         required: true
     },
@@ -31,14 +32,16 @@ const transactionSchema = new mongoose.Schema({
         trim: true,
         uppercase: true 
     },
-    // --- Accounting Logic (Debit/Credit) ---
+    // --- Accounting Logic (Standard Debit/Credit) ---
     debit: {
         type: Number,
-        default: 0
+        default: 0,
+        set: v => Math.round(v * 100) / 100 // Decimal precision fix
     },
     credit: {
         type: Number,
-        default: 0
+        default: 0,
+        set: v => Math.round(v * 100) / 100
     },
     runningBalance: {
         type: Number,
@@ -47,9 +50,10 @@ const transactionSchema = new mongoose.Schema({
     // --- Meta Data ---
     paymentMode: {
         type: String,
-        enum: ['CASH', 'UPI', 'BANK', 'CREDIT'],
+        enum: ['CASH', 'UPI', 'BANK', 'CREDIT', 'ADJUSTMENT', 'CHEQUE'],
         default: 'CREDIT'
     },
+    // referenceId: Can link to Sale, Purchase, or Expense ID
     referenceId: {
         type: mongoose.Schema.Types.ObjectId,
         required: false
@@ -60,13 +64,25 @@ const transactionSchema = new mongoose.Schema({
         required: true 
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Indexing for faster reporting
-transactionSchema.index({ date: -1, partyId: 1 });
-transactionSchema.index({ type: 1 });
+// Virtual for easy identification of IN/OUT for UI
+transactionSchema.virtual('nature').get(function() {
+    if (this.debit > 0) return 'DEBIT';
+    if (this.credit > 0) return 'CREDIT';
+    return 'NEUTRAL';
+});
 
-const Transaction = mongoose.model("Transaction", transactionSchema);
+// Indexing: Optimized for Ledger History and Audit Trails
+transactionSchema.index({ partyId: 1, date: -1 });
+transactionSchema.index({ staffId: 1, date: -1 });
+transactionSchema.index({ referenceId: 1 });
+transactionSchema.index({ type: 1, date: -1 });
+
+// Fix for Model Overwrite during Hot Reloading
+const Transaction = mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);
 
 export default Transaction;

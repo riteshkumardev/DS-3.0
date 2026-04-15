@@ -34,21 +34,16 @@ const partySchema = new mongoose.Schema({
         default: 'URD' 
     },
     address: {
-        street: String,
+        street: { type: String, trim: true },
         city: { type: String, default: 'Samastipur' },
         state: { type: String, default: 'Bihar' },
-        pincode: String
+        pincode: { type: String, trim: true }
     },
     // --- Financial Tracking ---
     openingBalance: {
         type: Number,
-        default: 0
-    },
-    balanceType: {
-        type: String,
-        enum: ['DEBIT', 'CREDIT'], 
-        default: 'DEBIT',
-        comment: 'DEBIT means they owe us (Customer), CREDIT means we owe them (Supplier)'
+        default: 0,
+        comment: 'Positive for Debit (Customer owe us), Negative for Credit (We owe Supplier)'
     },
     currentBalance: {
         type: Number,
@@ -68,6 +63,13 @@ const partySchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
+/**
+ * Logic Explaination:
+ * Dharashakti Standard: 
+ * Positive (+) Balance = DEBIT (Customer se lena hai)
+ * Negative (-) Balance = CREDIT (Supplier ko dena hai)
+ */
+
 // Middleware: Nayi party banane par Opening Balance ko hi Current Balance set karna
 partySchema.pre('save', function(next) {
     if (this.isNew) {
@@ -78,10 +80,16 @@ partySchema.pre('save', function(next) {
 
 // Virtual field for a summary string
 partySchema.virtual('fullAddress').get(function() {
-    return `${this.address.street || ''}, ${this.address.city}, ${this.address.state} - ${this.address.pincode || ''}`;
+    const { street, city, state, pincode } = this.address;
+    return `${street ? street + ', ' : ''}${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
 });
 
-// Fix: Model ko ek hi baar define karein aur sirf export default use karein
+// Virtual for formatted balance display
+partySchema.virtual('formattedBalance').get(function() {
+    const bal = this.currentBalance;
+    return bal >= 0 ? `${bal} Dr` : `${Math.abs(bal)} Cr`;
+});
+
 const Party = mongoose.models.Party || mongoose.model("Party", partySchema);
 
 export default Party;

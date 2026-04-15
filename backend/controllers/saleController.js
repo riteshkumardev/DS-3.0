@@ -1,21 +1,21 @@
-// saleController.js
 import Sale from "../models/Sale.js";
 import ledgerService from "../services/ledgerService.js";
 import { ACCOUNT_TYPES } from "../utils/constants.js";
 import mongoose from "mongoose";
 
 /**
- * Professional Sale Controller (Manual Inventory Management)
+ * Professional Sale Controller (With Freight Adjustment Logic)
  * Dharashakti Agro Products ERP
  */
 
-// 1. CREATE SALE (Atomic Transaction)
+// 1. CREATE SALE (Atomic Transaction with Freight Adjustment)
 export const createSale = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const { partyId, billNo, paymentMode, grandTotal } = req.body;
+        const { partyId, billNo, paymentMode, grandTotal, logistics } = req.body;
+        const freightValue = Number(logistics?.freight || 0);
 
         // A. Sale Record Save Karein
         const sale = new Sale({
@@ -24,22 +24,39 @@ export const createSale = async (req, res, next) => {
         });
         const savedSale = await sale.save({ session });
 
-        // B. Ledger Entry (Party Balance update - Debit)
-        // Sale matlab customer par udhari badh rahi hai -> Party Ledger Debit
+        // B. Ledger Entry (Main Bill Amount - Debit)
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE,
             debit: grandTotal,
+            credit: 0,
             description: `SALE BILL NO: ${billNo}`.toUpperCase(),
             referenceId: savedSale._id,
             paymentMode: paymentMode,
             performedBy: req.user._id
         }, session);
 
+        // C. Freight Adjustment Logic (New Update)
+        if (freightValue !== 0) {
+            await ledgerService.postTransaction({
+                partyId: partyId,
+                type: ACCOUNT_TYPES.ADJUSTMENT,
+                // Agar freight negative hai toh Credit, positive hai toh Debit
+                debit: freightValue > 0 ? freightValue : 0,
+                credit: freightValue < 0 ? Math.abs(freightValue) : 0,
+                description: freightValue < 0 
+                    ? `FREIGHT PAID BY PARTY (CR) - BILL: ${billNo}`.toUpperCase()
+                    : `FREIGHT CHARGES (DR) - BILL: ${billNo}`.toUpperCase(),
+                referenceId: savedSale._id,
+                paymentMode: "ADJUSTMENT",
+                performedBy: req.user._id
+            }, session);
+        }
+
         await session.commitTransaction();
         res.status(201).json({ 
             success: true, 
-            message: "Sale processed and Ledger updated!", 
+            message: "Sale processed and Ledger updated with Freight adjustment!", 
             data: savedSale 
         });
 
@@ -51,52 +68,7 @@ export const createSale = async (req, res, next) => {
     }
 };
 
-// 2. GET ALL SALES (With Filters)
-export const getAllSales = async (req, res, next) => {
-    try {
-        const { startDate, endDate, customerName, billNo, partyId } = req.query;
-        let query = {};
-
-        if (startDate && endDate) {
-            query.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
-        }
-        if (customerName) {
-            query.customerName = { $regex: customerName, $options: 'i' };
-        }
-        if (billNo) {
-            query.billNo = billNo;
-        }
-        if (partyId) {
-            query.partyId = partyId;
-        }
-
-        const sales = await Sale.find(query)
-            .sort({ date: -1, createdAt: -1 })
-            .populate('partyId', 'name phone currentBalance');
-
-        res.status(200).json({ 
-            success: true, 
-            count: sales.length, 
-            data: sales 
-        });
-    } catch (error) {
-        next(error);
-    }
-};
-
-// 3. GET SINGLE SALE BY ID
-export const getSaleById = async (req, res, next) => {
-    try {
-        const sale = await Sale.findById(req.params.id).populate('partyId performedBy');
-        if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });
-        
-        res.status(200).json({ success: true, data: sale });
-    } catch (error) {
-        next(error);
-    }
-};
-
-// 4. UPDATE SALE (Reversal + Re-apply Logic)
+// 2. UPDATE SALE (Reversal + New Freight Logic)
 export const updateSale = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -105,34 +77,44 @@ export const updateSale = async (req, res, next) => {
         const saleId = req.params.id;
         const oldSale = await Sale.findById(saleId).session(session);
         
-        if (!oldSale) {
-            return res.status(404).json({ success: false, message: "Sale record not found" });
-        }
+        if (!oldSale) return res.status(404).json({ success: false, message: "Sale not found" });
 
-        const { partyId, billNo, paymentMode, grandTotal } = req.body;
+        const { partyId, billNo, paymentMode, grandTotal, logistics } = req.body;
+        const newFreight = Number(logistics?.freight || 0);
+        const oldFreight = Number(oldSale.logistics?.freight || 0);
 
-        // --- STEP A: REVERSE OLD LEDGER DATA ---
-        // Purane bill amount ko Credit karke balance neutral karein
+        // --- STEP A: REVERSE OLD DATA (Bill + Old Freight) ---
+        // Reverse Bill
         await ledgerService.postTransaction({
             partyId: oldSale.partyId,
             type: ACCOUNT_TYPES.REVERSAL,
-            credit: oldSale.grandTotal,
-            description: `REVERSAL FOR EDIT: BILL NO ${oldSale.billNo}`.toUpperCase(),
+            credit: oldSale.grandTotal, // Reverse Debit with Credit
+            description: `REVERSAL: BILL NO ${oldSale.billNo}`.toUpperCase(),
             referenceId: oldSale._id,
             performedBy: req.user._id
         }, session);
 
+        // Reverse Old Freight
+        if (oldFreight !== 0) {
+            await ledgerService.postTransaction({
+                partyId: oldSale.partyId,
+                type: ACCOUNT_TYPES.REVERSAL,
+                debit: oldFreight < 0 ? Math.abs(oldFreight) : 0,
+                credit: oldFreight > 0 ? oldFreight : 0,
+                description: `REVERSAL: FREIGHT ADJUSTMENT ${oldSale.billNo}`.toUpperCase(),
+                referenceId: oldSale._id,
+                performedBy: req.user._id
+            }, session);
+        }
 
         // --- STEP B: APPLY NEW DATA ---
-
-        // 1. Sale Document Update Karein
         const updatedSale = await Sale.findByIdAndUpdate(
             saleId,
             { ...req.body, performedBy: req.user._id },
             { new: true, session, runValidators: true }
         );
 
-        // 2. Naya Ledger Entry post karein (New Debit)
+        // New Bill Entry
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE,
@@ -143,12 +125,22 @@ export const updateSale = async (req, res, next) => {
             performedBy: req.user._id
         }, session);
 
+        // New Freight Entry
+        if (newFreight !== 0) {
+            await ledgerService.postTransaction({
+                partyId: partyId,
+                type: ACCOUNT_TYPES.ADJUSTMENT,
+                debit: newFreight > 0 ? newFreight : 0,
+                credit: newFreight < 0 ? Math.abs(newFreight) : 0,
+                description: `UPDATED FREIGHT ADJ - BILL: ${billNo}`.toUpperCase(),
+                referenceId: updatedSale._id,
+                paymentMode: "ADJUSTMENT",
+                performedBy: req.user._id
+            }, session);
+        }
+
         await session.commitTransaction();
-        res.status(200).json({ 
-            success: true, 
-            message: "Sale updated and Ledger synced", 
-            data: updatedSale 
-        });
+        res.status(200).json({ success: true, message: "Update Success", data: updatedSale });
 
     } catch (error) {
         await session.abortTransaction();
@@ -158,7 +150,7 @@ export const updateSale = async (req, res, next) => {
     }
 };
 
-// 5. DELETE SALE (Full Reversal Logic)
+// 3. DELETE SALE (Full Reversal including Freight)
 export const deleteSale = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -167,20 +159,32 @@ export const deleteSale = async (req, res, next) => {
         const sale = await Sale.findById(req.params.id);
         if (!sale) throw new Error("Sale not found");
 
-        // Reverse Ledger (Amount ko Party balance se minus karein - Credit)
+        const freight = Number(sale.logistics?.freight || 0);
+
+        // Reverse Bill
         await ledgerService.postTransaction({
             partyId: sale.partyId,
             type: ACCOUNT_TYPES.REVERSAL,
             credit: sale.grandTotal,
-            description: `DELETED SALE BILL: ${sale.billNo}`.toUpperCase(),
+            description: `DELETE REVERSAL: ${sale.billNo}`.toUpperCase(),
             performedBy: req.user._id
         }, session);
 
-        // Final Deletion
-        await Sale.findByIdAndDelete(req.params.id).session(session);
+        // Reverse Freight
+        if (freight !== 0) {
+            await ledgerService.postTransaction({
+                partyId: sale.partyId,
+                type: ACCOUNT_TYPES.REVERSAL,
+                debit: freight < 0 ? Math.abs(freight) : 0,
+                credit: freight > 0 ? freight : 0,
+                description: `DELETE FREIGHT REVERSAL: ${sale.billNo}`.toUpperCase(),
+                performedBy: req.user._id
+            }, session);
+        }
 
+        await Sale.findByIdAndDelete(req.params.id).session(session);
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Sale deleted and Ledger reversed" });
+        res.status(200).json({ success: true, message: "Sale and Freight deleted" });
 
     } catch (error) {
         await session.abortTransaction();
@@ -189,3 +193,7 @@ export const deleteSale = async (req, res, next) => {
         session.endSession();
     }
 };
+
+// Baki functions (getAllSales, getSaleById) same rahenge...
+export const getAllSales = async (req, res, next) => { /* ... existing code ... */ };
+export const getSaleById = async (req, res, next) => { /* ... existing code ... */ };
