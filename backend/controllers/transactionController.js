@@ -8,13 +8,15 @@ import mongoose from "mongoose";
  * ✔ Direct Ledger Post
  * ✔ Atomic Balance Recovery on Delete
  * ✔ Validation for Missing Amounts
+ */
+
 // ==========================================
 // 1. CREATE TRANSACTION (Payment In / Out)
 // ==========================================
 export const createTransaction = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-      
+
     try {
         const { partyId, type, amount, date, paymentMode, description } = req.body;
 
