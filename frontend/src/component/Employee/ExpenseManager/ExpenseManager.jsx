@@ -349,10 +349,10 @@ const ExpenseManager = ({ user }) => {
                                         <div className="text-[9px] opacity-60">{txn.remark} {txn.txnId && `| ${txn.txnId}`}</div>
                                     </td>
                                     <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                                        {txn.type === 'Payment In' ? `₹${txn.amount.toLocaleString()}` : '-'}
+                                        {txn.type === 'PAYMENT_IN' ? `₹${txn.amount.toLocaleString()}` : '-'}
                                     </td>
                                     <td className="px-4 py-3 text-right font-bold text-red-500">
-                                        {txn.type === 'Payment Out' ? `₹${txn.amount.toLocaleString()}` : '-'}
+                                        {txn.type === 'PAYMENT_OUT' ? `₹${txn.amount.toLocaleString()}` : '-'}
                                     </td>
                                     <td className="px-4 py-3 text-right font-black">
                                         ₹{Math.abs(txn.currentBalance).toLocaleString()}
