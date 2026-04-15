@@ -18,13 +18,13 @@ class LedgerService {
         } = data;
 
         try {
-            // 1. Identification
+            // 1. Entity Identification
             let entityModel = partyId ? Party : Staff;
             let entityId = partyId || staffId;
 
             if (!entityId) throw new Error("Validation Error: partyId or staffId is required");
 
-            // 2. Fetch Entity with Session
+            // 2. Fetch Entity with Session (Concurrency Safety)
             const entity = await entityModel.findById(entityId).session(session);
             if (!entity) throw new Error("Entity not found in Master records");
 
@@ -32,16 +32,16 @@ class LedgerService {
             const debitVal = Number(debit) || 0;
             const creditVal = Number(credit) || 0;
 
-            // 3. FIXED MATH LOGIC
+            // 3. PRECISION MATH LOGIC (Universal Accounting Formula)
             // Formula: Previous Balance + Debit - Credit
-            // Agar result positive (+) hai -> Debit (Dr) Balance
-            // Agar result negative (-) hai -> Credit (Cr) Balance
+            // Customer (Debit Nature): Increase by Debit, Decrease by Credit
+            // Supplier (Credit Nature): Decrease by Debit, Increase by Credit
             const newRunningBalance = Math.round((lastBalance + debitVal - creditVal) * 100) / 100;
 
-            // 4. Determine Nature for UI/Table
+            // 4. Determine Nature for Statement UI
             const nature = debitVal > 0 ? "DEBIT" : (creditVal > 0 ? "CREDIT" : "NEUTRAL");
 
-            // 5. Create Transaction Entry
+            // 5. Create Transaction Document
             const transaction = new Transaction({
                 partyId: partyId || null,
                 staffId: staffId || null,
@@ -50,7 +50,7 @@ class LedgerService {
                 debit: debitVal,
                 credit: creditVal,
                 runningBalance: newRunningBalance,
-                nature: nature, // 👈 Table mein Dr/Cr dikhane ke liye
+                nature: nature,
                 paymentMode: paymentMode || "CREDIT",
                 referenceId: referenceId || null,
                 performedBy: performedBy || null,
@@ -73,6 +73,7 @@ class LedgerService {
 
     /**
      * @desc Cleanup: Delete transactions and REVERSE the balance impact
+     * Used for Edit/Delete Sale/Purchase/Payment
      */
     async deleteByReference(referenceId, session = null) {
         try {
@@ -84,7 +85,7 @@ class LedgerService {
 
                 const entity = await entityModel.findById(entityId).session(session);
                 if (entity) {
-                    // Reverse Math: Current - Debit + Credit (Bill udaya toh balance wapas reset)
+                    // Reverse Math: CurrentBalance - TransactionDebit + TransactionCredit
                     const resetBalance = Number(entity.currentBalance) - Number(txn.debit) + Number(txn.credit);
                     entity.currentBalance = Math.round(resetBalance * 100) / 100;
                     await entity.save({ session });
@@ -99,7 +100,7 @@ class LedgerService {
     }
 
     /**
-     * @desc Audit Tool: Recalculate full balance history if values get messed up
+     * @desc Audit Tool: Recalculate full balance history from day one
      */
     async reSyncBalance(id, isStaff = false) {
         try {
@@ -109,7 +110,7 @@ class LedgerService {
             const masterRecord = await model.findById(id);
             if (!masterRecord) throw new Error("Master record not found");
 
-            // Sort by date AND then by creation time to maintain sequence
+            // Sort by date (ascending) to reconstruct history
             const transactions = await Transaction.find(query).sort({ date: 1, createdAt: 1 });
 
             let runningBal = Number(masterRecord.openingBalance || 0);
@@ -117,7 +118,6 @@ class LedgerService {
             for (const txn of transactions) {
                 runningBal = Math.round((runningBal + txn.debit - txn.credit) * 100) / 100;
                 
-                // Nature correction
                 const nature = txn.debit > 0 ? "DEBIT" : (txn.credit > 0 ? "CREDIT" : txn.nature);
 
                 if (txn.runningBalance !== runningBal || txn.nature !== nature) {
@@ -127,7 +127,7 @@ class LedgerService {
                 }
             }
 
-            // Sync Master Record finally
+            // Sync Master currentBalance
             await model.findByIdAndUpdate(id, { currentBalance: runningBal });
             return runningBal;
 
@@ -136,6 +136,6 @@ class LedgerService {
             throw error;
         }
     }
-}   
+}
 
 export default new LedgerService();
