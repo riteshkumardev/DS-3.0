@@ -31,13 +31,13 @@ const ExpenseManager = ({ user }) => {
     
     const initialForm = {
         date: new Date().toISOString().split('T')[0],
-        category: '',
-        otherDetail: '',
+        category: "",
+        otherDetail: "",
         title: '',
         type: 'PAYMENT_OUT',
-        amount: '',
-        txnId: '',
-        remark: ''
+        amount: "",
+        txnId: "",
+        remark: ""
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -179,7 +179,7 @@ const ExpenseManager = ({ user }) => {
         <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
             <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
-                    @page { size: A4; margin: 1cm; }
+                    @page { size: A4; margin: 0.3cm ; }
                     body * { visibility: hidden !important; }
                     #printable-ledger, #printable-ledger * { visibility: visible !important; }
                     #printable-ledger { position: absolute !important; left: 0; top: 0; width: 100%; display: block !important; }
@@ -243,7 +243,7 @@ const ExpenseManager = ({ user }) => {
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex gap-1"><User size={12}/> Category</label>
-                                <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} required className="form-input-zinc">
+                                <select defaultValue={formData.category} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} required className="form-input-zinc">
                                     <option value="">-- Select --</option>
                                     <option value="LOADING">Loading</option>
                                     <option value="UNLOADING">Unloading</option>
@@ -321,64 +321,108 @@ const ExpenseManager = ({ user }) => {
             </div>
 
             {/* Table */}
-            <div id="printable-ledger" className="max-w-7xl mx-auto bg-white dark:bg-zinc-900 rounded-xl overflow-hidden shadow-sm border border-zinc-200 dark:border-zinc-800">
-                <div className="hidden print:block p-8 border-b-4 border-black mb-4">
-                    <h1 className="text-2xl font-black">DHARA SHAKTI AGRO PRODUCTS</h1>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Statement: {new Date().toLocaleDateString('en-IN')}</p>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-zinc-100 dark:bg-zinc-800 text-[10px] font-black uppercase text-zinc-600 dark:text-zinc-400 border-b dark:border-zinc-700">
-                                <th className="px-4 py-4 text-center">S.No.</th>
-                                <th className="px-4 py-4">Date</th>
-                                <th className="px-4 py-4">Details</th>
-                                <th className="px-4 py-4 text-right">In (Cr)</th>
-                                <th className="px-4 py-4 text-right">Out (Dr)</th>
-                                <th className="px-4 py-4 text-right">Balance</th>
-                                <th className="px-4 py-4 text-center no-print">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-[11px]">
-                            {dataWithBalance.map((txn, i) => (
-                                <tr key={txn._id} className="border-b dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
-                                    <td className="px-4 py-3 text-center font-bold text-zinc-400">{i + 1}</td>
-                                    <td className="px-4 py-3 font-bold">{new Date(txn.date).toLocaleDateString('en-GB')}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-black uppercase text-zinc-900 dark:text-white">{txn.category}</div>
-                                        <div className="text-[9px] opacity-60">{txn.remark} {txn.txnId && `| ${txn.txnId}`}</div>
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                                        {txn.type === 'PAYMENT_IN' ? `₹${txn.amount.toLocaleString()}` : '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-red-500">
-                                        {txn.type === 'PAYMENT_OUT' ? `₹${txn.amount.toLocaleString()}` : '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-black">
-                                        ₹{Math.abs(txn.currentBalance).toLocaleString()}
-                                        <span className="ml-1 text-[8px] opacity-50">{txn.currentBalance >= 0 ? 'Cr' : 'Dr'}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-center no-print">
-                                        <div className="flex justify-center gap-1">
-                                            <button onClick={() => handleEditClick(txn)} className="p-2 hover:text-amber-600"><Pencil size={14} /></button>
-                                            <button onClick={() => handleDelete(txn._id)} className="p-2 hover:text-red-500"><Trash2 size={14} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                        <tfoot className="bg-zinc-900 text-white font-black text-[10px] print:bg-zinc-100 print:text-black">
-                            <tr>
-                                <td colSpan="3" className="px-4 py-4 text-right opacity-70">Statement Totals:</td>
-                                <td className="px-4 py-4 text-right text-emerald-400">₹{totals.totalIn.toLocaleString()}</td>
-                                <td className="px-4 py-4 text-right text-red-400">₹{totals.totalOut.toLocaleString()}</td>
-                                <td className="px-4 py-4 text-right text-base underline">₹{Math.abs(totals.net).toLocaleString()} {totals.net >= 0 ? 'Cr' : 'Dr'}</td>
-                                <td className="no-print"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+            <div 
+    id="printable-ledger" 
+    className="mx-auto bg-white dark:bg-zinc-900 transition-all 
+               /* Screen Style */ 
+               max-w-7xl rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 
+               /* Print Style Fixes (Aggressive) */
+               print:max-w-none print:m-0 print:p-0 print:border-none print:shadow-none print:rounded-none"
+>
+    {/* Minimalist Professional Header for Print */}
+    <div className="hidden print:block p-8 border-b-2 border-black mb-6 bg-white">
+        <div className="flex justify-between items-end">
+            <div className="space-y-1">
+                <h1 className="text-4xl font-black tracking-tighter text-black leading-none">
+                    DHARA SHAKTI AGRO PRODUCTS
+                </h1>
+                <p className="text-[12px] font-black uppercase tracking-[0.4em] text-zinc-500">
+                    Business Transaction Ledger
+                </p>
             </div>
+            <div className="text-right border-l-2 border-zinc-200 pl-6">
+                <p className="text-[9px] font-black uppercase text-zinc-400 leading-none">Statement Date</p>
+                <p className="text-sm font-bold text-black">
+                    {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full text-left border-collapse print:text-black">
+            <thead>
+                <tr className="bg-zinc-50 dark:bg-zinc-800/50 print:bg-zinc-100 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b-2 border-zinc-200 dark:border-zinc-700 print:border-black">
+                    <th className="px-6 py-4 text-center w-16">S.No.</th>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4 text-right">Credit (In)</th>
+                    <th className="px-6 py-4 text-right">Debit (Out)</th>
+                    <th className="px-6 py-4 text-right bg-zinc-100/30 dark:bg-zinc-800/20 print:bg-zinc-50">Balance</th>
+                    <th className="px-6 py-4 text-center no-print">Actions</th>
+                </tr>
+            </thead>
+            <tbody className="text-[11px]">
+                {dataWithBalance.map((txn, i) => (
+                    <tr key={txn._id} className="border-b border-zinc-100 dark:border-zinc-800 print:border-zinc-300 group">
+                        <td className="px-6 py-4 text-center font-bold text-zinc-400 print:text-zinc-600">{i + 1}</td>
+                        <td className="px-6 py-4 whitespace-nowrap font-bold text-zinc-700 dark:text-zinc-300">
+                            {new Date(txn.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-6 py-4">
+                            <div className="font-black uppercase text-zinc-900 dark:text-zinc-100">{txn.title || txn.category}</div>
+                            <div className="flex gap-2 items-center mt-1">
+                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded uppercase border border-zinc-200 dark:border-zinc-700">
+                                    {txn.category}
+                                </span>
+                                <span className="text-[9px] text-zinc-400 italic truncate max-w-[250px]">{txn.remarks}</span>
+                            </div>
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-emerald-600">
+                            {txn.type === 'Payment In' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-red-500">
+                            {txn.type === 'Payment Out' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-right font-black bg-zinc-50/30 dark:bg-zinc-800/10 print:bg-zinc-50">
+                            ₹{Math.abs(txn.currentBalance).toLocaleString('en-IN')}
+                            <span className="ml-1 text-[8px] opacity-40">{txn.currentBalance >= 0 ? 'CR' : 'DR'}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center no-print">
+                            <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleEditClick(txn)} className="p-2 hover:text-amber-600"><Pencil size={14} /></button>
+                                <button onClick={() => handleDelete(txn._id)} className="p-2 hover:text-red-500"><Trash2 size={14} /></button>
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot className="bg-zinc-900 text-white font-black text-[11px] print:bg-black print:text-white">
+                <tr>
+                    <td colSpan="3" className="px-6 py-6 text-right uppercase tracking-[0.2em] opacity-60">Net Statement Summary:</td>
+                    <td className="px-6 py-6 text-right text-emerald-400">₹{totals.totalIn.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-6 text-right text-red-400">₹{totals.totalOut.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-6 text-right text-base border-l-4 border-emerald-500">
+                        ₹{Math.abs(totals.net).toLocaleString('en-IN')}
+                        <span className="text-[8px] ml-1 opacity-50">{totals.net >= 0 ? 'TOTAL CR' : 'TOTAL DR'}</span>
+                    </td>
+                    <td className="no-print"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    {/* Elegant Footer for Print */}
+    <div className="hidden print:flex justify-between items-end mt-16 px-8 pb-12">
+        <div className="text-[9px] text-zinc-400 max-w-[300px] leading-relaxed">
+            * This document is a computer-generated summary of business transactions recorded in the Dharashakti ERP system.
+        </div>
+        <div className="w-48 text-center">
+            <div className="border-b-2 border-black mb-2"></div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-black">Authorized Personnel</p>
+        </div>
+    </div>
+</div>
 
             <CustomSnackbar 
                 open={snackbar.open} message={snackbar.message} severity={snackbar.severity} 
