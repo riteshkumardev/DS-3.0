@@ -81,7 +81,7 @@ const EmployeeLedger = ({ user }) => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/employees`);
+      const res = await axios.get(`${API_URL}/employees`);
       if (res.data.success) setEmployees(res.data.data);
     } catch (err) {
       console.error("Staff load failed");
@@ -102,8 +102,8 @@ const EmployeeLedger = ({ user }) => {
     try {
       // 💡 Fetching using both EmployeeID for payments and ObjectId for Attendance
       const [payRes, attRes] = await Promise.all([
-        axios.get(`${API_URL}/api/salary-payments/${empId}`),
-        axios.get(`${API_URL}/api/attendance/report/${staffId}?month=${month.split('-')[1]}&year=${month.split('-')[0]}`)
+        axios.get(`${API_URL}/salary-payments/${empId}`),
+        axios.get(`${API_URL}/attendance/report/${staffId}?month=${month.split('-')[1]}&year=${month.split('-')[0]}`)
       ]);
 
       if (payRes.data.success) {
@@ -151,7 +151,7 @@ const EmployeeLedger = ({ user }) => {
     e.preventDefault();
     if(!isAuthorized || !advanceAmount) return;
     try {
-      const res = await axios.post(`${API_URL}/api/salary-payments`, {
+      const res = await axios.post(`${API_URL}/salary-payments`, {
         employeeId: selectedEmp.employeeId,
         amount: Number(advanceAmount),
         date: selectedMonth === new Date().toISOString().slice(0,7) 
