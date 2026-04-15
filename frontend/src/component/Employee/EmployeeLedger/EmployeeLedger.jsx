@@ -5,7 +5,8 @@ import {
   User, CreditCard, Landmark, Banknote, CalendarDays, 
   History, BookOpen, ChevronRight,
   TrendingUp, TrendingDown, ShieldCheck, DollarSign,
-  FileText
+  FileText,
+  Users
 } from "lucide-react";
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
@@ -19,9 +20,10 @@ const getDaysInMonth = (monthStr) => {
 };
 
 const EmployeeLedger = ({ user }) => {
-  console.log(user,"user info ");
+
   
   const role = user?.role;
+    console.log(role,"user info ");
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
   const isBoss = isAuthorized || role === "MANAGER";
 
