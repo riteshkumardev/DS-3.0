@@ -1,13 +1,18 @@
 import Transaction from "../models/Transaction.js";
 import Party from "../models/Party.js";
+import ledgerService from "../services/ledgerService.js"; // 👈 Ledger Service use karenge
 import mongoose from "mongoose";
 
 /**
  * Professional Transaction Controller (Payments & Receipts)
- * Dharashakti Agro Products ERP
+ * ✔ Smart Ledger Integration
+ * ✔ Physical Delete Sync
+ * ✔ Correct Debit/Credit Logic
  */
 
-// 1. CREATE TRANSACTION (Payment In / Payment Out)
+// ==========================================
+// 1. CREATE TRANSACTION (Payment In / Out)
+// ==========================================
 export const createTransaction = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -15,90 +20,118 @@ export const createTransaction = async (req, res, next) => {
     try {
         const { partyId, type, amount, date, paymentMode, description } = req.body;
 
-        const party = await Party.findById(partyId);
-        if (!party) {
-            res.status(404);
-            throw new Error("Party not found");
+        if (!partyId || !amount || !type) {
+            throw new Error("Party, Amount and Transaction Type are required");
         }
 
-        // Logic: Payment IN (Customer se aaya) -> Balance kam hoga
-        // Payment OUT (Supplier ko diya) -> Balance kam hoga (Udhari kam hogi)
-        let adjustment = 0;
-        if (type === 'PAYMENT_IN') adjustment = -amount;
-        if (type === 'PAYMENT_OUT') adjustment = -amount;
+        const amountVal = Number(amount);
+        const txnDate = date ? new Date(date) : new Date();
 
-        const transaction = new Transaction({
-            ...req.body,
+        // 🟢 ACCOUNTING LOGIC:
+        // PAYMENT_IN (Customer ne paise diye): Party Credit hogi (Liability kam ya Asset kam)
+        // PAYMENT_OUT (Supplier ko paise diye): Party Debit hogi (Liability kam)
+        let debit = 0;
+        let credit = 0;
+
+        if (type === 'PAYMENT_IN') {
+            credit = amountVal;
+        } else if (type === 'PAYMENT_OUT') {
+            debit = amountVal;
+        } else {
+            throw new Error("Invalid Transaction Type");
+        }
+
+        // Ledger Service ka use karke Transaction aur Balance update karein
+        // Isse aapka 'nature' (Dr/Cr) aur 'runningBalance' automatic sahi ho jayega
+        const savedTransaction = await ledgerService.postTransaction({
+            partyId,
+            type,
+            debit,
+            credit,
+            description: description?.toUpperCase() || `${type} VIA ${paymentMode}`,
+            paymentMode,
             performedBy: req.user._id,
-            runningBalance: party.currentBalance + adjustment
-        });
-
-        const savedTransaction = await transaction.save({ session });
-
-        // Update Party Master Balance
-        party.currentBalance += adjustment;
-        await party.save({ session });
+            date: txnDate
+        }, session);
 
         await session.commitTransaction();
-        res.status(201).json({ success: true, data: savedTransaction });
+        res.status(201).json({ 
+            success: true, 
+            message: "Transaction recorded and Ledger updated",
+            data: savedTransaction 
+        });
 
     } catch (error) {
         await session.abortTransaction();
-        next(error);
+        console.error("❌ Transaction Error:", error.message);
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
 };
 
-// 2. GET ALL TRANSACTIONS (With Filters)
+// ==========================================
+// 2. GET ALL TRANSACTIONS
+// ==========================================
 export const getAllTransactions = async (req, res, next) => {
     try {
-        const { partyId, startDate, endDate } = req.query;
+        const { partyId, startDate, endDate, type } = req.query;
         let query = {};
 
         if (partyId) query.partyId = partyId;
+        if (type) query.type = type;
         if (startDate && endDate) {
             query.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
         }
 
         const transactions = await Transaction.find(query)
             .sort({ date: -1, createdAt: -1 })
-            .populate('partyId', 'name');
+            .populate('partyId', 'name currentBalance')
+            .populate('performedBy', 'name')
+            .lean();
 
-        res.status(200).json({ success: true, count: transactions.length, data: transactions });
+        res.status(200).json({ 
+            success: true, 
+            count: transactions.length, 
+            data: transactions 
+        });
     } catch (error) {
         next(error);
     }
 };
 
-// 3. DELETE TRANSACTION (Reversal)
+// ==========================================
+// 3. DELETE TRANSACTION (Physical Cleanup)
+// ==========================================
 export const deleteTransaction = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const transaction = await Transaction.findById(req.params.id);
+        const transactionId = req.params.id;
+        const transaction = await Transaction.findById(transactionId);
+        
         if (!transaction) throw new Error("Transaction not found");
 
-        const party = await Party.findById(transaction.partyId);
+        // 🚀 SMART CLEANUP:
+        // Hum reversal entry nahi dalenge balki ledger se physical delete karenge
+        // Iske liye humne LedgerService mein deleteByReference ya direct logic use kar sakte hain
         
-        // Reverse balance logic
-        let reverseAdjustment = 0;
-        if (transaction.type === 'PAYMENT_IN' || transaction.type === 'PAYMENT_OUT') {
-            reverseAdjustment = transaction.amount;
+        const entity = await Party.findById(transaction.partyId).session(session);
+        if (entity) {
+            // Balance Reverse: Debit ko minus, Credit ko plus
+            entity.currentBalance = Number(entity.currentBalance) - Number(transaction.debit) + Number(transaction.credit);
+            await entity.save({ session });
         }
 
-        party.currentBalance += reverseAdjustment;
-        await party.save({ session });
-
-        await Transaction.findByIdAndDelete(req.params.id).session(session);
+        await Transaction.findByIdAndDelete(transactionId).session(session);
 
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Transaction deleted and balance reversed" });
+        res.status(200).json({ success: true, message: "Transaction deleted and balance restored" });
 
     } catch (error) {
         await session.abortTransaction();
-        next(error);
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
