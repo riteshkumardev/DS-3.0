@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios'; 
 import 'react-calendar/dist/Calendar.css'; 
 import { 
   User, CreditCard, Landmark, Banknote, CalendarDays, 
   History, BookOpen, ChevronRight,
   TrendingUp, TrendingDown, ShieldCheck, DollarSign,
-  FileText,
-  Users
+  FileText, Users
 } from "lucide-react";
+
+// API Imports
+import { getAllStaff } from './api/staffApi'; 
+import { getStaffMonthlyReport } from './api/attendanceApi';
+// Note: Agar salaryApi nahi banayi hai toh yahan direct axios use kar sakte hain
+import axios from 'axios'; 
+
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
 import EmployeeIDCard from './EmployeeIDCard/EmployeeIDCard';
@@ -20,10 +25,7 @@ const getDaysInMonth = (monthStr) => {
 };
 
 const EmployeeLedger = ({ user }) => {
-
-  
   const role = user?.role;
-    console.log(role,"user info ");
   const isAuthorized = role === "ADMIN" || role === "ACCOUNTANT";
   const isBoss = isAuthorized || role === "MANAGER";
 
@@ -53,13 +55,6 @@ const EmployeeLedger = ({ user }) => {
     return photoPath.startsWith('http') ? photoPath : `${API_URL}/${photoPath.replace(/\\/g, '/')}`;
   };
 
-  const maskID = (id) => {
-    if (!id) return "---";
-    const strID = id.toString();
-    return strID.startsWith("DS-") ? strID : `EMP-${strID.slice(-4)}`;
-  };
-
-  // Memoized available months logic
   const availableMonths = useMemo(() => {
     const monthsSet = new Set();
     const now = new Date();
@@ -78,13 +73,14 @@ const EmployeeLedger = ({ user }) => {
     return Array.from(monthsSet).sort((a,b)=> new Date(b) - new Date(a));
   }, [selectedEmp]);
 
+  // Fetch all staff using staffApi
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/employees`);
+      const res = await getAllStaff();
       if (res.data.success) setEmployees(res.data.data);
     } catch (err) {
-      console.error("Staff load failed");
+      console.error("Staff load failed", err);
     } finally {
       setLoading(false);
     }
@@ -96,14 +92,13 @@ const EmployeeLedger = ({ user }) => {
 
   const viewLedger = async (emp, month = selectedMonth) => {
     setSelectedEmp(emp);
-    const empId = emp.employeeId;
-    const staffId = emp._id; // ObjectId for attendance report
+    const [year, monthNum] = month.split('-');
 
     try {
-      // 💡 Fetching using both EmployeeID for payments and ObjectId for Attendance
+      // Parallel API calls: one for payments, one for attendance (using attendanceApi)
       const [payRes, attRes] = await Promise.all([
-        axios.get(`${API_URL}/salary-payments/${empId}`),
-        axios.get(`${API_URL}/attendance/report/${staffId}?month=${month.split('-')[1]}&year=${month.split('-')[0]}`)
+        axios.get(`${API_URL}/salary-payments/${emp.employeeId}`),
+        getStaffMonthlyReport(emp._id, monthNum, year)
       ]);
 
       if (payRes.data.success) {
@@ -115,7 +110,6 @@ const EmployeeLedger = ({ user }) => {
         const historyArray = attRes.data.data;
         const attendanceMap = {};
         
-        // Syncing with Backend Enums: PRESENT, ABSENT, HALF_DAY
         let p = attRes.data.summary?.PRESENT || 0;
         let a = attRes.data.summary?.ABSENT || 0;
         let h = attRes.data.summary?.HALF_DAY || 0;
@@ -128,7 +122,7 @@ const EmployeeLedger = ({ user }) => {
         setFullAttendanceData(attendanceMap);
       }
     } catch(err) {
-      console.error("Fetch error", err);
+      console.error("Ledger fetch error", err);
     }
   };
 
@@ -136,7 +130,7 @@ const EmployeeLedger = ({ user }) => {
     if (selectedEmp) viewLedger(selectedEmp, selectedMonth);
   }, [selectedMonth]);
 
-  // Financial Calculations
+  // Calculations
   const baseSal = selectedEmp ? Number(selectedEmp.baseSalary || 0) : 0;
   const daysInCurrentMonth = getDaysInMonth(selectedMonth);
   const dayRate = baseSal / daysInCurrentMonth;
@@ -250,7 +244,7 @@ const EmployeeLedger = ({ user }) => {
                 <EmployeePassbook selectedEmp={selectedEmp} availableMonths={availableMonths} fullAttendanceData={fullAttendanceData} allPayments={allPayments} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Earnings Calculation */}
+                  {/* Earnings */}
                   <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6">
                     <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 border-b dark:border-zinc-800 pb-4"><TrendingUp size={18}/> Earnings Structure</h4>
                     <div className="space-y-4 text-sm font-bold">
@@ -270,7 +264,7 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Net Pay & Deductions */}
+                  {/* Net Pay */}
                   <div className="bg-zinc-900 p-8 rounded-[2.5rem] flex flex-col justify-between shadow-2xl relative overflow-hidden">
                     <div className="absolute -bottom-10 -left-10 opacity-10"><DollarSign size={200} className="text-white" /></div>
                     <div className="relative z-10">
