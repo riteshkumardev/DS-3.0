@@ -14,7 +14,7 @@ import mongoose from "mongoose";
 export const createTransaction = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-
+      
     try {
         const { partyId, type, amount, date, paymentMode, description } = req.body;
 
