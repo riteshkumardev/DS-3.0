@@ -18,6 +18,6 @@ export const updateSale = (id, saleData) => API.put(`/sales/${id}`, saleData);
 
 // 5. Delete Sale (Stock & Ledger Reversal)
 export const deleteSale = (id) => API.delete(`/sales/${id}`);
-
+  
 // 6. Print/PDF Invoice
 export const getInvoicePDF = (id) => API.get(`/sales/${id}/print`, { responseType: 'blob' });
