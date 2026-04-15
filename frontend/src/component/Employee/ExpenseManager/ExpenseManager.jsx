@@ -379,10 +379,10 @@ const ExpenseManager = ({ user }) => {
                             </div>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-emerald-600">
-                            {txn.type === 'Payment In' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
+                            {txn.type === 'PAYMENT_IN' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-red-500">
-                            {txn.type === 'Payment Out' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
+                            {txn.type === 'PAYMENT_OUT' ? `₹${txn.amount.toLocaleString('en-IN')}` : <span className="opacity-20">—</span>}
                         </td>
                         <td className="px-6 py-4 text-right font-black bg-zinc-50/30 dark:bg-zinc-800/10 print:bg-zinc-50">
                             ₹{Math.abs(txn.currentBalance).toLocaleString('en-IN')}
