@@ -4,9 +4,7 @@ import Staff from "../models/Staff.js";
 
 /**
  * Professional Ledger Service - Dharashakti Agro Products ERP
- * ✔ Race-condition Safe
- * ✔ Atomic Balance Updates
- * ✔ Smart Cleanup (Reference based deletion)
+ * ✔ Race-condition Safe | ✔ Atomic Balance Updates | ✔ Precision Math
  */
 class LedgerService {
 
@@ -20,25 +18,30 @@ class LedgerService {
         } = data;
 
         try {
-            // 1. Identification & Validation
+            // 1. Identification
             let entityModel = partyId ? Party : Staff;
             let entityId = partyId || staffId;
 
             if (!entityId) throw new Error("Validation Error: partyId or staffId is required");
-            if (!type) throw new Error("Validation Error: Transaction 'type' is required");
 
-            // 2. Fetch Entity with Session (Atomic Balance Check)
+            // 2. Fetch Entity with Session
             const entity = await entityModel.findById(entityId).session(session);
             if (!entity) throw new Error("Entity not found in Master records");
 
             const lastBalance = Number(entity.currentBalance || 0);
-
-            // 3. Precision Math
             const debitVal = Number(debit) || 0;
             const creditVal = Number(credit) || 0;
+
+            // 3. FIXED MATH LOGIC
+            // Formula: Previous Balance + Debit - Credit
+            // Agar result positive (+) hai -> Debit (Dr) Balance
+            // Agar result negative (-) hai -> Credit (Cr) Balance
             const newRunningBalance = Math.round((lastBalance + debitVal - creditVal) * 100) / 100;
 
-            // 4. Create Transaction Entry
+            // 4. Determine Nature for UI/Table
+            const nature = debitVal > 0 ? "DEBIT" : (creditVal > 0 ? "CREDIT" : "NEUTRAL");
+
+            // 5. Create Transaction Entry
             const transaction = new Transaction({
                 partyId: partyId || null,
                 staffId: staffId || null,
@@ -47,6 +50,7 @@ class LedgerService {
                 debit: debitVal,
                 credit: creditVal,
                 runningBalance: newRunningBalance,
+                nature: nature, // 👈 Table mein Dr/Cr dikhane ke liye
                 paymentMode: paymentMode || "CREDIT",
                 referenceId: referenceId || null,
                 performedBy: performedBy || null,
@@ -55,7 +59,7 @@ class LedgerService {
 
             await transaction.save({ session });
 
-            // 5. Update Master Balance
+            // 6. Update Master Balance (Atomic)
             entity.currentBalance = newRunningBalance;
             await entity.save({ session });
 
@@ -68,12 +72,10 @@ class LedgerService {
     }
 
     /**
-     * @desc Smart Cleanup: Delete transactions by reference (Sale/Purchase ID)
-     * Iska use Update aur Delete controllers mein kachra saaf karne ke liye karein.
+     * @desc Cleanup: Delete transactions and REVERSE the balance impact
      */
     async deleteByReference(referenceId, session = null) {
         try {
-            // 1. Reference se judi saari entries dhundein (Bill + Freight)
             const transactions = await Transaction.find({ referenceId }).session(session);
             
             for (const txn of transactions) {
@@ -82,13 +84,11 @@ class LedgerService {
 
                 const entity = await entityModel.findById(entityId).session(session);
                 if (entity) {
-                    // Reverse Math: Debit ko minus aur Credit ko plus karein taaki balance reset ho jaye
+                    // Reverse Math: Current - Debit + Credit (Bill udaya toh balance wapas reset)
                     const resetBalance = Number(entity.currentBalance) - Number(txn.debit) + Number(txn.credit);
                     entity.currentBalance = Math.round(resetBalance * 100) / 100;
                     await entity.save({ session });
                 }
-                
-                // Ledger entry delete karein
                 await Transaction.findByIdAndDelete(txn._id).session(session);
             }
             return true;
@@ -99,7 +99,7 @@ class LedgerService {
     }
 
     /**
-     * @desc Audit Tool: Recalculate full balance from day one
+     * @desc Audit Tool: Recalculate full balance history if values get messed up
      */
     async reSyncBalance(id, isStaff = false) {
         try {
@@ -109,6 +109,7 @@ class LedgerService {
             const masterRecord = await model.findById(id);
             if (!masterRecord) throw new Error("Master record not found");
 
+            // Sort by date AND then by creation time to maintain sequence
             const transactions = await Transaction.find(query).sort({ date: 1, createdAt: 1 });
 
             let runningBal = Number(masterRecord.openingBalance || 0);
@@ -116,12 +117,17 @@ class LedgerService {
             for (const txn of transactions) {
                 runningBal = Math.round((runningBal + txn.debit - txn.credit) * 100) / 100;
                 
-                if (txn.runningBalance !== runningBal) {
+                // Nature correction
+                const nature = txn.debit > 0 ? "DEBIT" : (txn.credit > 0 ? "CREDIT" : txn.nature);
+
+                if (txn.runningBalance !== runningBal || txn.nature !== nature) {
                     txn.runningBalance = runningBal;
+                    txn.nature = nature;
                     await txn.save();
                 }
             }
 
+            // Sync Master Record finally
             await model.findByIdAndUpdate(id, { currentBalance: runningBal });
             return runningBal;
 
