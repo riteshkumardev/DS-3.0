@@ -34,7 +34,7 @@ const Reports_Printing = () => {
         try {
             const [prodRes, partyRes] = await Promise.all([
                 getAllProducts(),
-                axios.get(`${API_URL}/api/parties`)
+                axios.get(`${API_URL}/parties`)
             ]);
             if (prodRes.data.success) setProducts(prodRes.data.data);
             if (partyRes.data.success) setParties(partyRes.data.data);
