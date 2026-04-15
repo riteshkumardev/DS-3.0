@@ -5,9 +5,9 @@ import mongoose from "mongoose";
 
 /**
  * SMART PRODUCTION SALE CONTROLLER
- * ✔ Clean Ledger Sync (No Reversal Rows)
- * ✔ Atomic Transactions
- * ✔ Freight Logic Included
+ * ✔ Clean Ledger Sync (Physical Delete on Edit/Delete)
+ * ✔ Correct Debit/Credit Logic for Statements
+ * ✔ Decimal Precision Handled
  */
 
 // ==========================================
@@ -18,42 +18,49 @@ export const createSale = async (req, res, next) => {
     session.startTransaction();
 
     try {
-        const { partyId, billNo, paymentMode, grandTotal, logistics, date } = req.body;
+        const { partyId, billNo, paymentMode, grandTotal, logistics, date, goods } = req.body;
 
         if (!partyId || !billNo) throw new Error("Party ID and Bill Number are required");
 
+        // Logistics/Freight data
         const freightAmt = Number(logistics?.freight || 0);
-        const billAmount = Number(grandTotal || 0);
+        // Goods ki real value (Total minus freight adjustment)
+        // Agar freight negative hai (paid by party), toh subTotal grandTotal se zyada hoga
+        const subTotal = goods?.reduce((acc, item) => acc + (Number(item.taxableAmount) || 0), 0) || Number(grandTotal);
         const txnDate = date ? new Date(date) : new Date();
 
-        // A. Save Sale Record
+        // A. Save Sale Record to Database
         const sale = new Sale({
             ...req.body,
+            subTotal: subTotal,
             performedBy: req.user?._id
         });
         const savedSale = await sale.save({ session });
 
-        // B. Main Ledger Entry (Debit)
+        // B. Main Ledger Entry (Goods Value - Debit the Customer)
+        // Table Row 1: SALE GOODS VALUE
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE || 'SALE',
-            debit: billAmount,
+            debit: subTotal,
             credit: 0,
-            description: `SALE BILL NO: ${billNo}`.toUpperCase(),
+            description: `SALE GOODS VALUE - BILL: ${billNo}`.toUpperCase(),
             referenceId: savedSale._id,
             paymentMode: paymentMode || 'CREDIT',
             performedBy: req.user?._id,
             date: txnDate
         }, session);
 
-        // C. Freight Adjustment Entry (Separate Row)
+        // C. Freight Adjustment Entry (Table Row 2)
         if (freightAmt !== 0) {
             await ledgerService.postTransaction({
                 partyId: partyId,
                 type: 'ADJUSTMENT',
+                // Positive freight: Party has to pay (Debit)
+                // Negative freight: Party already paid/Discount (Credit)
                 debit: freightAmt > 0 ? freightAmt : 0,
                 credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                description: (freightAmt > 0 ? `FREIGHT CHARGES (DR)` : `FREIGHT PAID BY PARTY (CR)`).toUpperCase() + ` - BILL: ${billNo}`,
+                description: (freightAmt > 0 ? `FREIGHT CHARGES ADDED` : `FREIGHT PAID BY PARTY (CR)`).toUpperCase() + ` - BILL: ${billNo}`,
                 referenceId: savedSale._id,
                 paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
@@ -62,10 +69,11 @@ export const createSale = async (req, res, next) => {
         }
 
         await session.commitTransaction();
-        res.status(201).json({ success: true, message: "Sale created and ledger synced.", data: savedSale });
+        res.status(201).json({ success: true, message: "Sale created and ledger successfully synced.", data: savedSale });
 
     } catch (error) {
         await session.abortTransaction();
+        console.error("❌ Sale Creation Error:", error.message);
         res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
@@ -73,7 +81,7 @@ export const createSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 3. UPDATE SALE (Clean Ledger Logic)
+// 3. UPDATE SALE (Physical Ledger Cleanup)
 // ==========================================
 export const updateSale = async (req, res, next) => {
     const session = await mongoose.startSession();
@@ -81,23 +89,23 @@ export const updateSale = async (req, res, next) => {
 
     try {
         const saleId = req.params.id;
-        const { partyId, billNo, grandTotal, logistics, date, paymentMode } = req.body;
+        const { partyId, billNo, grandTotal, logistics, date, paymentMode, goods } = req.body;
 
-        // 1. Purane Ledger Records ko delete karein (Reversal ki jagah cleanup)
-        // Note: ledgerService.deleteByReference function humne pehle discuss kiya tha
+        // 1. Purane Ledger Records ko delete karein (No Reversal rows)
         await ledgerService.deleteByReference(saleId, session);
 
-        // 2. Sale Document Update Karein
+        // 2. Sale Document Update
+        const subTotal = goods?.reduce((acc, item) => acc + (Number(item.taxableAmount) || 0), 0) || Number(grandTotal);
+        
         const updatedSale = await Sale.findByIdAndUpdate(
             saleId,
-            { ...req.body, performedBy: req.user?._id },
+            { ...req.body, subTotal, performedBy: req.user?._id },
             { new: true, session, runValidators: true }
         );
 
         if (!updatedSale) throw new Error("Sale record not found");
 
-        // 3. Naye Fresh Ledger Entries banayein
-        const billAmount = Number(grandTotal || 0);
+        // 3. Fresh Ledger Entries Post karein
         const freightAmt = Number(logistics?.freight || 0);
         const txnDate = date ? new Date(date) : new Date();
 
@@ -105,8 +113,9 @@ export const updateSale = async (req, res, next) => {
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE || 'SALE',
-            debit: billAmount,
-            description: `UPDATED SALE BILL: ${billNo}`.toUpperCase(),
+            debit: subTotal,
+            credit: 0,
+            description: `UPDATED SALE GOODS - BILL: ${billNo}`.toUpperCase(),
             referenceId: updatedSale._id,
             paymentMode: paymentMode || 'CREDIT',
             performedBy: req.user?._id,
@@ -120,7 +129,7 @@ export const updateSale = async (req, res, next) => {
                 type: 'ADJUSTMENT',
                 debit: freightAmt > 0 ? freightAmt : 0,
                 credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                description: `UPDATED FREIGHT - BILL: ${billNo}`.toUpperCase(),
+                description: `UPDATED FREIGHT ADJ - BILL: ${billNo}`.toUpperCase(),
                 referenceId: updatedSale._id,
                 paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
@@ -129,7 +138,7 @@ export const updateSale = async (req, res, next) => {
         }
 
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Sale & Ledger Updated Successfully", data: updatedSale });
+        res.status(200).json({ success: true, message: "Sale & Ledger updated successfully.", data: updatedSale });
 
     } catch (error) {
         await session.abortTransaction();
@@ -140,7 +149,7 @@ export const updateSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 4. DELETE SALE (Total Cleanup)
+// 4. DELETE SALE (Total Physical Cleanup)
 // ==========================================
 export const deleteSale = async (req, res, next) => {
     const session = await mongoose.startSession();
@@ -149,12 +158,12 @@ export const deleteSale = async (req, res, next) => {
     try {
         const saleId = req.params.id;
 
-        // 1. Ledger entries ko Reference ID se gayab karein (Balance auto-correct hoga)
+        // 1. Ledger Cleanup (Balance revert + Row physical delete)
         await ledgerService.deleteByReference(saleId, session);
 
-        // 2. Sale table se record delete karein
+        // 2. Delete Sale record from DB
         const deletedSale = await Sale.findByIdAndDelete(saleId).session(session);
-        if (!deletedSale) throw new Error("Sale record already deleted or not found");
+        if (!deletedSale) throw new Error("Sale record not found");
 
         await session.commitTransaction();
         res.status(200).json({ success: true, message: "Sale & Ledger records deleted successfully." });
@@ -168,7 +177,7 @@ export const deleteSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 2 & 5. GET ALL & BY ID
+// GET HELPERS (Optimized with Lean)
 // ==========================================
 export const getAllSales = async (req, res, next) => {
     try {
