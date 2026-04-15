@@ -3,20 +3,25 @@ import Party from "../models/Party.js";
 import Staff from "../models/Staff.js";
 
 /**
- * Professional Ledger Service
- * Dharashakti Agro Products ERP
+ * Professional Ledger Service (FIXED & OPTIMIZED)
  */
 class LedgerService {
-    
+
     /**
-     * @desc    Post a transaction to the General Ledger
-     * @param   {Object} data - Transaction details
-     * @param   {Object} session - Mongoose session for atomic operations
+     * @desc Post a transaction to the General Ledger
      */
     async postTransaction(data, session = null) {
-        const { 
-            partyId, staffId, type, debit, credit, 
-            description, paymentMode, referenceId, performedBy, date 
+        const {
+            partyId,
+            staffId,
+            type,
+            debit,
+            credit,
+            description,
+            paymentMode,
+            referenceId,
+            performedBy,
+            date
         } = data;
 
         try {
@@ -24,97 +29,108 @@ class LedgerService {
             let entityModel;
             let entityId;
 
-            // 1. Identify Entity (Party or Staff)
+            // ✅ 1. Identify Entity
             if (partyId) {
                 entityModel = Party;
                 entityId = partyId;
             } else if (staffId) {
                 entityModel = Staff;
                 entityId = staffId;
+            } else {
+                throw new Error("partyId or staffId is required");
             }
 
-            // 2. Get Last Running Balance
-            // Hum hamesha latest entry check karenge balance calculate karne ke liye
-            const lastEntry = await Transaction.findOne({ 
-                $or: [{ partyId }, { staffId }] 
-            })
-            .sort({ date: -1, createdAt: -1 }) // Latest date and latest created record
-            .session(session);
+            // ✅ 2. FIXED QUERY (NO $or BUG)
+            let query = {};
+            if (partyId) {
+                query = { partyId };
+            } else {
+                query = { staffId };
+            }
 
+            const lastEntry = await Transaction.findOne(query)
+                .sort({ date: -1, createdAt: -1 })
+                .session(session);
+
+            // ✅ 3. Get Last Balance
             if (lastEntry) {
                 lastBalance = lastEntry.runningBalance;
-            } else if (entityModel) {
-                // Agar pehli transaction hai, toh Master model se balance uthayein
+            } else {
                 const entity = await entityModel.findById(entityId).session(session);
                 lastBalance = entity?.openingBalance || entity?.currentBalance || 0;
             }
 
-            // 3. Calculate New Running Balance
-            // Standard Accounting Logic: 
-            // Assets/Receivables (Debit +) | Liability/Payables (Credit +)
-            // Dharashakti Context: Balance + Debit (Udhari/Sales) - Credit (Payment/Purchases)
-            const newRunningBalance = lastBalance + (Number(debit) || 0) - (Number(credit) || 0);
+            // ✅ 4. Calculate Running Balance
+            const debitVal = Number(debit) || 0;
+            const creditVal = Number(credit) || 0;
 
-            // 4. Create Transaction Entry
+            const newRunningBalance = lastBalance + debitVal - creditVal;
+
+            // ✅ 5. Create Transaction
             const transaction = new Transaction({
                 partyId,
                 staffId,
                 type,
                 description: description?.toUpperCase(),
-                debit: Number(debit) || 0,
-                credit: Number(credit) || 0,
+                debit: debitVal,
+                credit: creditVal,
                 runningBalance: newRunningBalance,
-                paymentMode: paymentMode || 'CREDIT',
+                paymentMode: paymentMode || "CREDIT",
                 referenceId,
                 performedBy,
-                date: date || new Date() // Use actual transaction date instead of current time
+                date: date || new Date()
             });
 
             await transaction.save({ session });
 
-            // 5. Sync Current Balance in Master Model (Party or Staff)
-            if (entityModel) {
-                await entityModel.findByIdAndUpdate(
-                    entityId, 
-                    { currentBalance: newRunningBalance },
-                    { session, new: true }
-                );
-            }
+            // ✅ 6. Update Master Balance
+            await entityModel.findByIdAndUpdate(
+                entityId,
+                { currentBalance: newRunningBalance },
+                { session, new: true }
+            );
 
             return transaction;
+
         } catch (error) {
-            console.error("Ledger Posting Error:", error);
+            console.error("❌ Ledger Posting Error:", error);
             throw new Error("Failed to post ledger entry: " + error.message);
         }
     }
 
     /**
-     * @desc    Calculate Party/Staff Balance from scratch (Audit/Re-sync)
-     * @param   {String} id - Party or Staff ID
+     * @desc Recalculate full balance (Audit / Fix tool)
      */
     async reSyncBalance(id, isStaff = false) {
-        const query = isStaff ? { staffId: id } : { partyId: id };
-        
-        // Purani date se lekar ab tak saari transactions uthayein
-        const transactions = await Transaction.find(query).sort({ date: 1, createdAt: 1 });
-        
-        let runningBal = 0;
-        
-        // Pehle opening balance lein (Master record se)
-        const model = isStaff ? Staff : Party;
-        const masterRecord = await model.findById(id);
-        runningBal = masterRecord?.openingBalance || 0;
+        try {
+            const query = isStaff ? { staffId: id } : { partyId: id };
 
-        for (const txn of transactions) {
-            runningBal = runningBal + txn.debit - txn.credit;
-            txn.runningBalance = runningBal;
-            await txn.save(); // Har entry ka balance theek karein
+            const transactions = await Transaction.find(query)
+                .sort({ date: 1, createdAt: 1 });
+
+            let runningBal = 0;
+
+            const model = isStaff ? Staff : Party;
+            const masterRecord = await model.findById(id);
+
+            runningBal = masterRecord?.openingBalance || 0;
+
+            for (const txn of transactions) {
+                runningBal = runningBal + txn.debit - txn.credit;
+                txn.runningBalance = runningBal;
+                await txn.save();
+            }
+
+            await model.findByIdAndUpdate(id, {
+                currentBalance: runningBal
+            });
+
+            return runningBal;
+
+        } catch (error) {
+            console.error("❌ ReSync Error:", error);
+            throw error;
         }
-
-        // Master balance update karein
-        await model.findByIdAndUpdate(id, { currentBalance: runningBal });
-        
-        return runningBal;
     }
 }
 
