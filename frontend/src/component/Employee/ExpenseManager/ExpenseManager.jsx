@@ -34,7 +34,7 @@ const ExpenseManager = ({ user }) => {
         category: '',
         otherDetail: '',
         title: '',
-        type: 'Payment Out',
+        type: 'PAYMENT_OUT',
         amount: '',
         txnId: '',
         remark: ''
@@ -162,7 +162,7 @@ const ExpenseManager = ({ user }) => {
         let runningBal = 0;
         const withBal = transactions.map(txn => {
             const amt = Number(txn.amount) || 0;
-            txn.type === 'Payment In' ? runningBal += amt : runningBal -= amt;
+            txn.type === 'PAYMENT_IN' ? runningBal += amt : runningBal -= amt;
             return { ...txn, currentBalance: runningBal };
         });
         let result = withBal.filter(item => filteredData.some(f => f._id === item._id));
@@ -170,8 +170,8 @@ const ExpenseManager = ({ user }) => {
     }, [filteredData, transactions]);
 
     const totals = useMemo(() => {
-        const totalIn = filteredData.filter(t => t.type === 'Payment In').reduce((s, c) => s + Number(c.amount || 0), 0);
-        const totalOut = filteredData.filter(t => t.type === 'Payment Out').reduce((s, c) => s + Number(c.amount || 0), 0);
+        const totalIn = filteredData.filter(t => t.type === 'PAYMENT_IN').reduce((s, c) => s + Number(c.amount || 0), 0);
+        const totalOut = filteredData.filter(t => t.type === 'PAYMENT_OUT').reduce((s, c) => s + Number(c.amount || 0), 0);
         return { totalIn, totalOut, net: totalIn - totalOut };
     }, [filteredData]);
 
