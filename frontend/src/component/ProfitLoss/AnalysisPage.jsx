@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 // reportsApi import karein
-import { getDashboardStats, getProfitLossReport } from "../api/reportsApi";
+// import { getDashboardStats, getProfitLossReport } from "../../api/reportsApi";
 import { 
   TrendingUp, TrendingDown, Activity, BarChart3, Sparkles, 
   AlertCircle, Users, Package, ArrowUpRight, ShieldCheck 
 } from "lucide-react";
 import Loader from "../Core_Component/Loader/Loader";
+import { getDashboardStats, getProfitLossReport } from "../../api/reportApi";
 
 const AnalysisPage = () => {
   const [loading, setLoading] = useState(true);
