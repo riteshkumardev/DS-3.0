@@ -4,12 +4,14 @@ import { ACCOUNT_TYPES } from "../utils/constants.js";
 import mongoose from "mongoose";
 
 /**
- * FINAL PRODUCTION SALE CONTROLLER (BUG-FREE & LEDGER SYNCED)
- * Dharashakti Agro Products ERP
+ * SMART PRODUCTION SALE CONTROLLER
+ * ✔ Clean Ledger Sync (No Reversal Rows)
+ * ✔ Atomic Transactions
+ * ✔ Freight Logic Included
  */
 
 // ==========================================
-// 1. CREATE SALE (Atomic & Freight Aware)
+// 1. CREATE SALE
 // ==========================================
 export const createSale = async (req, res, next) => {
     const session = await mongoose.startSession();
@@ -18,9 +20,7 @@ export const createSale = async (req, res, next) => {
     try {
         const { partyId, billNo, paymentMode, grandTotal, logistics, date } = req.body;
 
-        // Validation Checks
-        if (!partyId) throw new Error("Validation Failed: Party ID is required");
-        if (!billNo) throw new Error("Validation Failed: Bill Number is required");
+        if (!partyId || !billNo) throw new Error("Party ID and Bill Number are required");
 
         const freightAmt = Number(logistics?.freight || 0);
         const billAmount = Number(grandTotal || 0);
@@ -29,11 +29,11 @@ export const createSale = async (req, res, next) => {
         // A. Save Sale Record
         const sale = new Sale({
             ...req.body,
-            performedBy: req.user?._id // Null safety check
+            performedBy: req.user?._id
         });
         const savedSale = await sale.save({ session });
 
-        // B. Main Ledger Entry (Debit the Customer)
+        // B. Main Ledger Entry (Debit)
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE || 'SALE',
@@ -46,44 +46,26 @@ export const createSale = async (req, res, next) => {
             date: txnDate
         }, session);
 
-        // C. Freight Entry Logic
-        let debitVal = 0;
-        let creditVal = 0;
-        let freightDesc = "";
-
-        if (freightAmt > 0) {
-            debitVal = freightAmt;
-            freightDesc = `FREIGHT CHARGES (DR) - BILL: ${billNo}`;
-        } else if (freightAmt < 0) {
-            creditVal = Math.abs(freightAmt);
-            freightDesc = `FREIGHT PAID BY PARTY (CR) - BILL: ${billNo}`;
-        } else {
-            freightDesc = `FREIGHT SELF - BILL: ${billNo}`;
+        // C. Freight Adjustment Entry (Separate Row)
+        if (freightAmt !== 0) {
+            await ledgerService.postTransaction({
+                partyId: partyId,
+                type: 'ADJUSTMENT',
+                debit: freightAmt > 0 ? freightAmt : 0,
+                credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
+                description: (freightAmt > 0 ? `FREIGHT CHARGES (DR)` : `FREIGHT PAID BY PARTY (CR)`).toUpperCase() + ` - BILL: ${billNo}`,
+                referenceId: savedSale._id,
+                paymentMode: "ADJUSTMENT",
+                performedBy: req.user?._id,
+                date: txnDate
+            }, session);
         }
 
-        // D. Post Freight to Ledger (Always track even if 0 for audit)
-        await ledgerService.postTransaction({
-            partyId: partyId,
-            type: ACCOUNT_TYPES.ADJUSTMENT || 'ADJUSTMENT',
-            debit: debitVal,
-            credit: creditVal,
-            description: freightDesc.toUpperCase(),
-            referenceId: savedSale._id,
-            paymentMode: "ADJUSTMENT",
-            performedBy: req.user?._id,
-            date: txnDate
-        }, session);
-
         await session.commitTransaction();
-        res.status(201).json({
-            success: true,
-            message: "Sale created and ledger successfully synced.",
-            data: savedSale
-        });
+        res.status(201).json({ success: true, message: "Sale created and ledger synced.", data: savedSale });
 
     } catch (error) {
         await session.abortTransaction();
-        console.error("❌ Sale Creation Bug:", error.message);
         res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
@@ -91,29 +73,7 @@ export const createSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 2. GET ALL SALES (Optimized)
-// ==========================================
-export const getAllSales = async (req, res, next) => {
-    try {
-        // Optimized with Lean for faster performance
-        const sales = await Sale.find()
-            .populate("partyId", "name phone currentBalance")
-            .sort({ date: -1, createdAt: -1 })
-            .lean();
-
-        res.status(200).json({
-            success: true,
-            count: sales.length,
-            data: sales
-        });
-    } catch (error) {
-        console.error("❌ Fetch Sales Error:", error.message);
-        next(error);
-    }
-};
-
-// ==========================================
-// 3. UPDATE SALE (Reversal Integrity)
+// 3. UPDATE SALE (Clean Ledger Logic)
 // ==========================================
 export const updateSale = async (req, res, next) => {
     const session = await mongoose.startSession();
@@ -121,71 +81,52 @@ export const updateSale = async (req, res, next) => {
 
     try {
         const saleId = req.params.id;
-        const oldSale = await Sale.findById(saleId).session(session);
-        if (!oldSale) throw new Error("Sale record not found in database");
+        const { partyId, billNo, grandTotal, logistics, date, paymentMode } = req.body;
 
-        const { partyId, billNo, paymentMode, grandTotal, logistics, date } = req.body;
-        const oldFreight = Number(oldSale.logistics?.freight || 0);
-        const newFreight = Number(logistics?.freight || 0);
-        const newBillAmt = Number(grandTotal || 0);
-        const txnDate = date ? new Date(date) : new Date();
+        // 1. Purane Ledger Records ko delete karein (Reversal ki jagah cleanup)
+        // Note: ledgerService.deleteByReference function humne pehle discuss kiya tha
+        await ledgerService.deleteByReference(saleId, session);
 
-        // STEP A: Reverse Old Bill (Debit reversed by Credit)
-        await ledgerService.postTransaction({
-            partyId: oldSale.partyId,
-            type: ACCOUNT_TYPES.REVERSAL || 'REVERSAL',
-            credit: Number(oldSale.grandTotal),
-            debit: 0,
-            description: `REVERSAL: BILL ${oldSale.billNo} FOR EDIT`,
-            referenceId: oldSale._id,
-            performedBy: req.user?._id,
-            date: txnDate
-        }, session);
-
-        // STEP B: Reverse Old Freight
-        await ledgerService.postTransaction({
-            partyId: oldSale.partyId,
-            type: ACCOUNT_TYPES.REVERSAL || 'REVERSAL',
-            debit: oldFreight < 0 ? Math.abs(oldFreight) : 0,
-            credit: oldFreight > 0 ? oldFreight : 0,
-            description: `REVERSAL FREIGHT: ${oldSale.billNo}`,
-            referenceId: oldSale._id,
-            performedBy: req.user?._id,
-            date: txnDate
-        }, session);
-
-        // STEP C: Atomic Document Update
+        // 2. Sale Document Update Karein
         const updatedSale = await Sale.findByIdAndUpdate(
             saleId,
             { ...req.body, performedBy: req.user?._id },
             { new: true, session, runValidators: true }
         );
 
-        // STEP D: Apply New Bill Entry
+        if (!updatedSale) throw new Error("Sale record not found");
+
+        // 3. Naye Fresh Ledger Entries banayein
+        const billAmount = Number(grandTotal || 0);
+        const freightAmt = Number(logistics?.freight || 0);
+        const txnDate = date ? new Date(date) : new Date();
+
+        // Fresh Main Bill Entry
         await ledgerService.postTransaction({
             partyId: partyId,
             type: ACCOUNT_TYPES.SALE || 'SALE',
-            debit: newBillAmt,
-            credit: 0,
-            description: `UPDATED BILL ${billNo}`,
+            debit: billAmount,
+            description: `UPDATED SALE BILL: ${billNo}`.toUpperCase(),
             referenceId: updatedSale._id,
             paymentMode: paymentMode || 'CREDIT',
             performedBy: req.user?._id,
             date: txnDate
         }, session);
 
-        // STEP E: Apply New Freight Entry
-        await ledgerService.postTransaction({
-            partyId: partyId,
-            type: ACCOUNT_TYPES.ADJUSTMENT || 'ADJUSTMENT',
-            debit: newFreight > 0 ? newFreight : 0,
-            credit: newFreight < 0 ? Math.abs(newFreight) : 0,
-            description: `UPDATED FREIGHT - BILL: ${billNo}`.toUpperCase(),
-            referenceId: updatedSale._id,
-            paymentMode: "ADJUSTMENT",
-            performedBy: req.user?._id,
-            date: txnDate
-        }, session);
+        // Fresh Freight Entry
+        if (freightAmt !== 0) {
+            await ledgerService.postTransaction({
+                partyId: partyId,
+                type: 'ADJUSTMENT',
+                debit: freightAmt > 0 ? freightAmt : 0,
+                credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
+                description: `UPDATED FREIGHT - BILL: ${billNo}`.toUpperCase(),
+                referenceId: updatedSale._id,
+                paymentMode: "ADJUSTMENT",
+                performedBy: req.user?._id,
+                date: txnDate
+            }, session);
+        }
 
         await session.commitTransaction();
         res.status(200).json({ success: true, message: "Sale & Ledger Updated Successfully", data: updatedSale });
@@ -199,45 +140,24 @@ export const updateSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 4. DELETE SALE (Full Cleanup)
+// 4. DELETE SALE (Total Cleanup)
 // ==========================================
 export const deleteSale = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const sale = await Sale.findById(req.params.id);
-        if (!sale) throw new Error("Sale not found");
+        const saleId = req.params.id;
 
-        const freightAmt = Number(sale.logistics?.freight || 0);
+        // 1. Ledger entries ko Reference ID se gayab karein (Balance auto-correct hoga)
+        await ledgerService.deleteByReference(saleId, session);
 
-        // Reverse Main Bill
-        await ledgerService.postTransaction({
-            partyId: sale.partyId,
-            type: ACCOUNT_TYPES.REVERSAL || 'REVERSAL',
-            credit: Number(sale.grandTotal),
-            debit: 0,
-            description: `DELETE REVERSAL: BILL ${sale.billNo}`,
-            performedBy: req.user?._id,
-            date: new Date()
-        }, session);
+        // 2. Sale table se record delete karein
+        const deletedSale = await Sale.findByIdAndDelete(saleId).session(session);
+        if (!deletedSale) throw new Error("Sale record already deleted or not found");
 
-        // Reverse Freight
-        if (freightAmt !== 0) {
-            await ledgerService.postTransaction({
-                partyId: sale.partyId,
-                type: ACCOUNT_TYPES.REVERSAL || 'REVERSAL',
-                debit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                credit: freightAmt > 0 ? freightAmt : 0,
-                description: `DELETE REVERSAL FREIGHT: ${sale.billNo}`,
-                performedBy: req.user?._id,
-                date: new Date()
-            }, session);
-        }
-
-        await Sale.findByIdAndDelete(req.params.id).session(session);
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Sale permanently deleted and ledger cleared." });
+        res.status(200).json({ success: true, message: "Sale & Ledger records deleted successfully." });
 
     } catch (error) {
         await session.abortTransaction();
@@ -248,17 +168,24 @@ export const deleteSale = async (req, res, next) => {
 };
 
 // ==========================================
-// 5. GET BY ID (Lean & Secure)
+// 2 & 5. GET ALL & BY ID
 // ==========================================
+export const getAllSales = async (req, res, next) => {
+    try {
+        const sales = await Sale.find()
+            .populate("partyId", "name phone currentBalance")
+            .sort({ date: -1, createdAt: -1 })
+            .lean();
+        res.status(200).json({ success: true, count: sales.length, data: sales });
+    } catch (error) { next(error); }
+};
+
 export const getSaleById = async (req, res, next) => {
     try {
         const sale = await Sale.findById(req.params.id)
             .populate("partyId", "name phone address gstin currentBalance")
             .lean();
-        
         if (!sale) return res.status(404).json({ success: false, message: "Sale record not found" });
         res.status(200).json({ success: true, data: sale });
-    } catch (error) {
-        next(error);
-    }
+    } catch (error) { next(error); }
 };

@@ -193,6 +193,7 @@ const SalesEntry = ({ user }) => {
         billNo: formData.billNo,
         date: formData.date,
         partyId: selectedParty?._id,
+      grandTotal: toSafeNumber(formData.grandTotal),
         customerName: formData.customerName,
         logistics: {
           vehicleNo: formData.vehicleNo.toUpperCase(),
