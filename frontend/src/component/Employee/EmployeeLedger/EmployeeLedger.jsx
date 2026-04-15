@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 
 // API Imports
-import { getAllStaff } from './api/staffApi'; 
-import { getStaffMonthlyReport } from './api/attendanceApi';
+import { getAllStaff } from '../../../api/staffApi'; 
+import { getStaffMonthlyReport } from '../../../api/attendanceApi';
 // Note: Agar salaryApi nahi banayi hai toh yahan direct axios use kar sakte hain
 import axios from 'axios'; 
 
