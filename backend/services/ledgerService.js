@@ -3,25 +3,23 @@ import Party from "../models/Party.js";
 import Staff from "../models/Staff.js";
 
 /**
- * 🚀 FINAL LEDGER SERVICE (BUG FIXED + HARDENED)
+ * 🚀 FINAL LEDGER SERVICE (100% FIXED + HARDENED)
  */
 
 class LedgerService {
 
-    /**
-     * 🔹 Normalize Transaction (AUTO FIX)
-     */
+    // ===============================
+    // NORMALIZE
+    // ===============================
     normalizeAmounts(type, debit, credit) {
         let d = Number(debit) || 0;
         let c = Number(credit) || 0;
 
-        // PAYMENT_IN → always credit
         if (type === "PAYMENT_IN") {
             c = c || d;
             d = 0;
         }
 
-        // PAYMENT_OUT → always debit
         if (type === "PAYMENT_OUT") {
             d = d || c;
             c = 0;
@@ -33,39 +31,40 @@ class LedgerService {
         };
     }
 
-    /**
-     * 🔹 Get Correct Party Type (FIXED CORE BUG)
-     */
+    // ===============================
+    // ENTITY TYPE
+    // ===============================
     getEntityType(entity) {
-        const type = entity.type || entity.partyType;
+        const type = entity.partyType || entity.type;
 
-        if (!type) {
-            throw new Error("Party type missing (CUSTOMER / SUPPLIER required)");
-        }
+        if (!type) throw new Error("Party type missing");
 
         return type.toUpperCase();
     }
 
-    /**
-     * 🔹 Calculate Running Balance (FIXED LOGIC)
-     */
+    // ===============================
+    // BALANCE CALCULATION
+    // ===============================
     calculateBalance(type, lastBalance, debit, credit) {
+
         if (type === "SUPPLIER") {
-            // Supplier: Credit ↑ liability
             return lastBalance - debit + credit;
         }
 
         if (type === "CUSTOMER") {
-            // Customer: Debit ↑ receivable
+            return lastBalance + debit - credit;
+        }
+
+        if (type === "BOTH") {
             return lastBalance + debit - credit;
         }
 
         throw new Error("Invalid party type");
     }
 
-    /**
-     * 🔹 POST TRANSACTION
-     */
+    // ===============================
+    // POST TRANSACTION
+    // ===============================
     async postTransaction(data, session = null) {
         try {
             const {
@@ -81,82 +80,71 @@ class LedgerService {
 
             let { debit, credit } = data;
 
-            // 1. ENTITY CHECK
-            const entityModel = partyId ? Party : Staff;
+            const model = partyId ? Party : Staff;
             const entityId = partyId || staffId;
 
             if (!entityId) throw new Error("partyId or staffId required");
 
-            const entity = await entityModel.findById(entityId).session(session);
+            const entity = await model.findById(entityId).session(session);
             if (!entity) throw new Error("Entity not found");
 
-            // 2. NORMALIZE
-            const normalized = this.normalizeAmounts(type, debit, credit);
-            const debitVal = normalized.debit;
-            const creditVal = normalized.credit;
+            // NORMALIZE
+            const { debit: d, credit: c } = this.normalizeAmounts(type, debit, credit);
 
-            if (debitVal === 0 && creditVal === 0) {
-                throw new Error("Invalid transaction: both debit & credit are zero");
+            // ❌ BLOCK ZERO TRANSACTION
+            if (d === 0 && c === 0) {
+                throw new Error("Zero transaction blocked");
             }
 
             const lastBalance = Number(entity.currentBalance || 0);
-
-            // 🔥 FIXED: SAFE TYPE FETCH
             const entityType = this.getEntityType(entity);
 
-            // 🔥 FIXED: CORRECT BALANCE CALCULATION
-            let newRunningBalance = this.calculateBalance(
-                entityType,
-                lastBalance,
-                debitVal,
-                creditVal
-            );
+            let newBalance = this.calculateBalance(entityType, lastBalance, d, c);
+            newBalance = Math.round(newBalance * 100) / 100;
 
-            newRunningBalance = Math.round(newRunningBalance * 100) / 100;
-
-            // 3. SAVE TRANSACTION
-            const transaction = new Transaction({
+            const txn = new Transaction({
                 partyId: partyId || null,
                 staffId: staffId || null,
                 type,
                 description: description?.toUpperCase() || "NO DESCRIPTION",
-                debit: debitVal,
-                credit: creditVal,
-                runningBalance: newRunningBalance,
+                debit: d,
+                credit: c,
+                runningBalance: newBalance,
                 paymentMode: paymentMode || "CREDIT",
                 referenceId: referenceId || null,
-                performedBy: performedBy || null,
+                performedBy,
                 date: date ? new Date(date) : new Date()
             });
 
-            await transaction.save({ session });
+            await txn.save({ session });
 
-            // 4. UPDATE MASTER BALANCE
-            entity.currentBalance = newRunningBalance;
+            entity.currentBalance = newBalance;
             await entity.save({ session });
 
-            return transaction;
+            return txn;
 
-        } catch (error) {
-            console.error("❌ Ledger Error:", error.message);
-            throw error;
+        } catch (err) {
+            console.error("❌ Ledger Error:", err.message);
+            throw err;
         }
     }
 
-    /**
-     * 🔥 DELETE + RESYNC
-     */
+    // ===============================
+    // DELETE + RESYNC
+    // ===============================
     async deleteByReference(referenceId, session = null) {
         try {
             const txns = await Transaction.find({ referenceId }).session(session);
 
             if (!txns.length) return true;
 
+            const isStaff = !!txns[0].staffId;
             const entityId = txns[0].partyId || txns[0].staffId;
 
             await Transaction.deleteMany({ referenceId }).session(session);
 
-            await this.reSyncBalance(entityId, !txns[0].partyId, session);
+            // ✅ FIXED
+            await this.reSyncBalance(entityId, isStaff, session);
 
             return true;
 
@@ -166,9 +154,9 @@ class LedgerService {
         }
     }
 
-    /**
-     * 🔁 FULL RESYNC (CRITICAL FIX)
-     */
+    // ===============================
+    // FULL RESYNC (CRITICAL)
+    // ===============================
     async reSyncBalance(id, isStaff = false, session = null) {
         try {
             const model = isStaff ? Staff : Party;
@@ -186,6 +174,10 @@ class LedgerService {
             let balance = Number(master.openingBalance || 0);
 
             for (const txn of txns) {
+
+                // ❌ SKIP ZERO BROKEN ENTRIES
+                if (txn.debit === 0 && txn.credit === 0) continue;
+
                 balance = this.calculateBalance(
                     entityType,
                     balance,

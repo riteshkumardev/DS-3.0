@@ -4,13 +4,20 @@ import logService from "../services/logService.js";
 import { ACCOUNT_TYPES } from "../utils/constants.js";
 import mongoose from "mongoose";
 
-/**
- * SMART PRODUCTION SALE CONTROLLER
- * ✔ Clean Ledger Sync (Physical Delete on Edit/Delete)
- * ✔ Correct Debit/Credit Logic
- * ✔ Audit Logs Integrated
- * ✔ Decimal Safe
- */
+// ==========================================
+// HELPER: Freight Entry Logic (CENTRAL FIX)
+// ==========================================
+const getFreightEntry = (freightAmt) => {
+    const amt = Math.abs(Number(freightAmt || 0));
+
+    if (freightAmt > 0) {
+        // ➜ Party se lena hai (Debit)
+        return { debit: amt, credit: 0, label: "FREIGHT CHARGES ADDED" };
+    } else {
+        // ➜ Party ne diya (Credit)
+        return { debit: 0, credit: amt, label: "FREIGHT PAID BY PARTY (CR)" };
+    }
+};
 
 // ==========================================
 // 1. CREATE SALE
@@ -34,7 +41,6 @@ export const createSale = async (req, res) => {
 
         const txnDate = date ? new Date(date) : new Date();
 
-        // ✅ Create Sale
         const sale = new Sale({
             ...req.body,
             subTotal,
@@ -43,45 +49,36 @@ export const createSale = async (req, res) => {
 
         const savedSale = await sale.save({ session });
 
-        // ✅ Ledger Entry - Goods
-        await ledgerService.postTransaction(
-            {
+        // ✅ GOODS ENTRY
+        await ledgerService.postTransaction({
+            partyId,
+            type: ACCOUNT_TYPES.SALE || "SALE",
+            debit: subTotal,
+            credit: 0,
+            description: `SALE GOODS VALUE - BILL: ${billNo}`,
+            referenceId: savedSale._id,
+            paymentMode: paymentMode || "CREDIT",
+            performedBy: req.user?._id,
+            date: txnDate,
+        }, session);
+
+        // ✅ FREIGHT ENTRY
+        if (freightAmt !== 0) {
+            const { debit, credit, label } = getFreightEntry(freightAmt);
+
+            await ledgerService.postTransaction({
                 partyId,
-                type: ACCOUNT_TYPES.SALE || "SALE",
-                debit: subTotal,
-                credit: 0,
-                description: `SALE GOODS VALUE - BILL: ${billNo}`.toUpperCase(),
+                type: "ADJUSTMENT",
+                debit,
+                credit,
+                description: `${label} - BILL: ${billNo}`,
                 referenceId: savedSale._id,
-                paymentMode: paymentMode || "CREDIT",
+                paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
                 date: txnDate,
-            },
-            session
-        );
-
-        // ✅ Ledger Entry - Freight
-        if (freightAmt !== 0) {
-            await ledgerService.postTransaction(
-                {
-                    partyId,
-                    type: "ADJUSTMENT",
-                    debit: freightAmt > 0 ? freightAmt : 0,
-                    credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                    description:
-                        (freightAmt > 0
-                            ? "FREIGHT CHARGES ADDED"
-                            : "FREIGHT PAID BY PARTY (CR)") +
-                        ` - BILL: ${billNo}`,
-                    referenceId: savedSale._id,
-                    paymentMode: "ADJUSTMENT",
-                    performedBy: req.user?._id,
-                    date: txnDate,
-                },
-                session
-            );
+            }, session);
         }
 
-        // ✅ Audit Log
         await logService.createLog({
             performedBy: req.user?._id,
             action: "CREATE",
@@ -99,14 +96,10 @@ export const createSale = async (req, res) => {
             message: "Sale created & ledger synced",
             data: savedSale,
         });
+
     } catch (error) {
         await session.abortTransaction();
-        console.error("❌ Create Sale Error:", error.message);
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
@@ -121,23 +114,18 @@ export const updateSale = async (req, res) => {
 
     try {
         const saleId = req.params.id;
-
         const { partyId, billNo, grandTotal, logistics, date, paymentMode, goods } = req.body;
 
-        // 🔴 Get Old Data (for logging)
         const oldSale = await Sale.findById(saleId).lean();
-
         if (!oldSale) throw new Error("Sale record not found");
 
-        // 1. Ledger Cleanup
+        // ❌ Delete old ledger
         await ledgerService.deleteByReference(saleId, session);
 
-        // 2. Recalculate subtotal
         const subTotal =
             goods?.reduce((acc, item) => acc + (Number(item.taxableAmount) || 0), 0) ||
             Number(grandTotal);
 
-        // 3. Update Sale
         const updatedSale = await Sale.findByIdAndUpdate(
             saleId,
             { ...req.body, subTotal, performedBy: req.user?._id },
@@ -147,41 +135,36 @@ export const updateSale = async (req, res) => {
         const freightAmt = Number(logistics?.freight || 0);
         const txnDate = date ? new Date(date) : new Date();
 
-        // 4. Fresh Ledger Entry - Goods
-        await ledgerService.postTransaction(
-            {
+        // ✅ GOODS ENTRY
+        await ledgerService.postTransaction({
+            partyId,
+            type: ACCOUNT_TYPES.SALE || "SALE",
+            debit: subTotal,
+            credit: 0,
+            description: `UPDATED SALE GOODS - BILL: ${billNo}`,
+            referenceId: updatedSale._id,
+            paymentMode: paymentMode || "CREDIT",
+            performedBy: req.user?._id,
+            date: txnDate,
+        }, session);
+
+        // ✅ FREIGHT ENTRY
+        if (freightAmt !== 0) {
+            const { debit, credit, label } = getFreightEntry(freightAmt);
+
+            await ledgerService.postTransaction({
                 partyId,
-                type: ACCOUNT_TYPES.SALE || "SALE",
-                debit: subTotal,
-                credit: 0,
-                description: `UPDATED SALE GOODS - BILL: ${billNo}`,
+                type: "ADJUSTMENT",
+                debit,
+                credit,
+                description: `${label} - BILL: ${billNo}`,
                 referenceId: updatedSale._id,
-                paymentMode: paymentMode || "CREDIT",
+                paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
                 date: txnDate,
-            },
-            session
-        );
-
-        // 5. Freight Entry
-        if (freightAmt !== 0) {
-            await ledgerService.postTransaction(
-                {
-                    partyId,
-                    type: "ADJUSTMENT",
-                    debit: freightAmt > 0 ? freightAmt : 0,
-                    credit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                    description: `UPDATED FREIGHT ADJ - BILL: ${billNo}`,
-                    referenceId: updatedSale._id,
-                    paymentMode: "ADJUSTMENT",
-                    performedBy: req.user?._id,
-                    date: txnDate,
-                },
-                session
-            );
+            }, session);
         }
 
-        // ✅ Audit Log
         await logService.createLog({
             performedBy: req.user?._id,
             action: "UPDATE",
@@ -200,13 +183,10 @@ export const updateSale = async (req, res) => {
             message: "Sale updated successfully",
             data: updatedSale,
         });
+
     } catch (error) {
         await session.abortTransaction();
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
@@ -225,13 +205,9 @@ export const deleteSale = async (req, res) => {
         const sale = await Sale.findById(saleId).lean();
         if (!sale) throw new Error("Sale record not found");
 
-        // 1. Ledger Cleanup
         await ledgerService.deleteByReference(saleId, session);
-
-        // 2. Delete Sale
         await Sale.findByIdAndDelete(saleId).session(session);
 
-        // ✅ Audit Log
         await logService.logDeletion(
             req.user?._id,
             "SALE",
@@ -246,20 +222,17 @@ export const deleteSale = async (req, res) => {
             success: true,
             message: "Sale deleted successfully",
         });
+
     } catch (error) {
         await session.abortTransaction();
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
 };
 
 // ==========================================
-// 4. GET ALL SALES
+// 4. GET ALL SALES (FIXED ERROR)
 // ==========================================
 export const getAllSales = async (req, res, next) => {
     try {
@@ -279,7 +252,7 @@ export const getAllSales = async (req, res, next) => {
 };
 
 // ==========================================
-// 5. GET SINGLE SALE
+// 5. GET SINGLE SALE (FIXED ERROR)
 // ==========================================
 export const getSaleById = async (req, res, next) => {
     try {

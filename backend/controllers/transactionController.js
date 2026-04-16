@@ -4,7 +4,7 @@ import ledgerService from "../services/ledgerService.js";
 import mongoose from "mongoose";
 
 /**
- * 🚀 FINAL SMART TRANSACTION CONTROLLER
+ * 🚀 FINAL SMART TRANSACTION CONTROLLER (100% SAFE)
  */
 
 const VALID_TYPES = ["PAYMENT_IN", "PAYMENT_OUT"];
@@ -25,23 +25,25 @@ export const createTransaction = async (req, res) => {
     try {
         let { partyId, type, amount, date, paymentMode, description, referenceId } = req.body;
 
-        // 🔒 Normalize
         type = String(type || "").toUpperCase();
 
         // 🔴 Validation
         if (!partyId) throw new Error("Party is required");
         if (!VALID_TYPES.includes(type)) throw new Error("Invalid transaction type");
-        if (!amount || toSafeNumber(amount) <= 0) throw new Error("Valid amount required");
 
         const amountVal = toSafeNumber(amount);
+        if (amountVal <= 0) throw new Error("Valid amount required");
+
         const txnDate = date ? new Date(date) : new Date();
 
-        // 🔴 Prevent duplicate (idempotency)
+        // 🔒 Party check (NEW)
+        const party = await Party.findById(partyId).session(session);
+        if (!party) throw new Error("Party not found");
+
+        // 🔒 Duplicate protection
         if (referenceId) {
             const existing = await Transaction.findOne({ referenceId }).session(session);
-            if (existing) {
-                throw new Error("Duplicate transaction detected");
-            }
+            if (existing) throw new Error("Duplicate transaction detected");
         }
 
         // 🔥 Accounting Logic
@@ -53,7 +55,7 @@ export const createTransaction = async (req, res) => {
             debit = amountVal;
         }
 
-        // 🔥 Ledger Entry (Single Source of Truth)
+        // 🔥 Ledger Entry
         const savedTransaction = await ledgerService.postTransaction({
             partyId,
             type,
@@ -139,7 +141,7 @@ export const getAllTransactions = async (req, res) => {
 };
 
 // ==========================================
-// 3. DELETE TRANSACTION (SAFE REVERSAL)
+// 3. DELETE TRANSACTION (REVERSAL SAFE)
 // ==========================================
 export const deleteTransaction = async (req, res) => {
     const session = await mongoose.startSession();
@@ -151,23 +153,28 @@ export const deleteTransaction = async (req, res) => {
         const transaction = await Transaction.findById(transactionId).session(session);
         if (!transaction) throw new Error("Transaction not found");
 
-        // 🔒 Authorization (basic)
         if (!req.user) throw new Error("Unauthorized");
 
-        // 🔥 Reverse Ledger Entry instead of manual balance hack
+        // 🔥 UNIQUE reference (FIXED)
+        const reversalRef = `REV-${transaction._id}-${Date.now()}`;
+
+        // 🔥 Reverse Entry
         await ledgerService.postTransaction({
             partyId: transaction.partyId,
             type: "REVERSAL",
             debit: transaction.credit,
             credit: transaction.debit,
-            description: `REVERSAL OF ${transaction._id}`,
+            description: `REVERSAL OF TXN ${transaction._id}`,
             paymentMode: "SYSTEM",
             performedBy: req.user._id,
-            referenceId: transaction._id
+            referenceId: reversalRef
         }, session);
 
-        // 🔥 Delete original transaction
+        // 🔥 Delete original
         await Transaction.findByIdAndDelete(transactionId).session(session);
+
+        // 🔁 Optional (extra safety)
+        await ledgerService.reSyncBalance(transaction.partyId, false, session);
 
         await session.commitTransaction();
 
