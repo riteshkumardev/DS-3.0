@@ -272,6 +272,6 @@ export const getSaleById = async (req, res, next) => {
             data: sale,
         });
     } catch (error) {
-        next(error);
+        next(error);  
     }
 };
