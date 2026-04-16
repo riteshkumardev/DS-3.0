@@ -1,49 +1,112 @@
-// logMiddleware.js
 import logService from "../services/logService.js";
 
 /**
- * Professional Activity Logging Middleware
- * Dharashakti Agro Products ERP
+ * 🚀 Dharashakti ERP - Activity Logger Middleware (Production Ready)
  */
-const activityLogger = async (req, res, next) => {
-    // Sirf wahi requests log karenge jo data badalti hain (Mutations)
-    const monitoredMethods = ['POST', 'PUT', 'DELETE'];
-    
+
+const activityLogger = (req, res, next) => {
+
+    // ✅ Only log mutation requests
+    const monitoredMethods = ["POST", "PUT", "PATCH", "DELETE"];
     if (!monitoredMethods.includes(req.method)) {
         return next();
     }
 
-    // Response khatam hone ka intezar karein taaki humein pata chale action success hua ya nahi
-    res.on('finish', async () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-            try {
-                // URL se module ka naam nikalna (e.g., /api/sales -> SALE)
-                const pathParts = req.originalUrl.split('/');
-                const moduleName = pathParts[2] ? pathParts[2].slice(0, -1).toUpperCase() : 'SYSTEM';
+    // ===============================
+    // 🔹 CAPTURE RESPONSE BODY
+    // ===============================
+    const originalJson = res.json;
+    let responseBody;
 
-                // Action define karna
-                let action = '';
-                switch (req.method) {
-                    case 'POST': action = `CREATE_${moduleName}`; break;
-                    case 'PUT': action = `UPDATE_${moduleName}`; break;
-                    case 'DELETE': action = `DELETE_${moduleName}`; break;
-                }
+    res.json = function (body) {
+        responseBody = body;
+        return originalJson.call(this, body);
+    };
 
-                // Log create karna (logService ka use karke)
+    // ===============================
+    // 🔹 AFTER RESPONSE FINISH
+    // ===============================
+    res.on("finish", async () => {
+        try {
+            // ✅ Only log successful responses
+            if (res.statusCode < 200 || res.statusCode >= 300) return;
+
+            // ===============================
+            // 🔹 MODULE DETECTION (SMART)
+            // ===============================
+            const urlParts = req.originalUrl.split("?")[0].split("/").filter(Boolean);
+
+            // e.g. /api/sales/123 → SALES
+            let moduleName = "SYSTEM";
+            if (urlParts.length >= 2) {
+                moduleName = urlParts[1].toUpperCase();
+            }
+
+            // ===============================
+            // 🔹 ACTION DETECTION
+            // ===============================
+            const actionMap = {
+                POST: "CREATE",
+                PUT: "UPDATE",
+                PATCH: "UPDATE",
+                DELETE: "DELETE"
+            };
+
+            const actionPrefix = actionMap[req.method] || "ACTION";
+            const action = `${actionPrefix}_${moduleName}`;
+
+            // ===============================
+            // 🔹 SENSITIVE DATA CLEANER
+            // ===============================
+            const sanitize = (data) => {
+                if (!data) return null;
+
+                const clone = JSON.parse(JSON.stringify(data));
+
+                const sensitiveFields = ["password", "token", "refreshToken"];
+
+                const removeSensitive = (obj) => {
+                    if (typeof obj !== "object" || obj === null) return;
+
+                    Object.keys(obj).forEach((key) => {
+                        if (sensitiveFields.includes(key)) {
+                            obj[key] = "******";
+                        } else if (typeof obj[key] === "object") {
+                            removeSensitive(obj[key]);
+                        }
+                    });
+                };
+
+                removeSensitive(clone);
+                return clone;
+            };
+
+            // ===============================
+            // 🔹 DOCUMENT ID DETECTION
+            // ===============================
+            const documentId =
+                req.params?.id ||
+                responseBody?.data?._id ||
+                null;
+
+            // ===============================
+            // 🔹 NON-BLOCKING LOGGING
+            // ===============================
+            setImmediate(async () => {
                 await logService.createLog({
                     performedBy: req.user ? req.user._id : null,
-                    action: action,
+                    action,
                     module: moduleName,
-                    documentId: req.params.id || null,
-                    // Security: Password jaise sensitive data ko newValue se hatana
-                    newValue: req.body ? { ...req.body, password: undefined } : null,
-                    remark: `Automatic log via ${req.method} request`,
-                    req: req
+                    documentId,
+                    oldValue: null, // (optional future use)
+                    newValue: sanitize(req.body),
+                    remark: `${req.method} ${req.originalUrl}`,
+                    req
                 });
+            });
 
-            } catch (error) {
-                console.error("Middleware Logging Error:", error.message);
-            }
+        } catch (error) {
+            console.error("❌ Activity Logger Error:", error.message);
         }
     });
 

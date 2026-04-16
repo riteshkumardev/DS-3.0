@@ -1,52 +1,101 @@
-// errorMiddleware.js
-import logger from '../utils/logger.js';
+import logger from "../utils/logger.js";
 
 /**
- * Professional Global Error Handler
- * Dharashakti Agro Products ERP
+ * 🚀 Dharashakti ERP - Global Error Handling System
  */
 
-// 1. Not Found Middleware (Jab koi galat URL hit kare)
+// ===============================
+// 🔹 1. NOT FOUND HANDLER
+// ===============================
 export const notFound = (req, res, next) => {
-    const error = new Error(`Not Found - ${req.originalUrl}`);
+    const error = new Error(`Route Not Found - ${req.originalUrl}`);
     res.status(404);
     next(error);
 };
 
-// 2. Custom Error Handler (Pakda gaya har error yahan se pass hoga)
+// ===============================
+// 🔹 2. GLOBAL ERROR HANDLER
+// ===============================
 export const errorHandler = (err, req, res, next) => {
-    // Agar status code 200 hai par error aaya hai, toh usey 500 (Server Error) kar dein
     let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    let message = err.message;
+    let message = err.message || "Something went wrong";
 
-    // --- Mongoose Specific Errors ---
+    // ===============================
+    // 🔹 MONGOOSE ERRORS
+    // ===============================
 
-    // 1. CastError (Galti se galat ID bhejna)
-    if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    // Invalid ObjectId
+    if (err.name === "CastError" && err.kind === "ObjectId") {
         statusCode = 404;
-        message = 'Resource not found: Invalid ID format';
+        message = "Resource not found (Invalid ID)";
     }
 
-    // 2. Duplicate Key Error (e.g., Same Bill No ya Phone double entry)
+    // Duplicate Key
     if (err.code === 11000) {
         statusCode = 400;
-        const field = Object.keys(err.keyValue);
-        message = `Duplicate field value entered: ${field}. Please use another value.`;
+        const fields = Object.keys(err.keyValue).join(", ");
+        message = `Duplicate value for: ${fields}`;
     }
 
-    // 3. ValidationError (Schema rules follow nahi kiye)
-    if (err.name === 'ValidationError') {
+    // Schema Validation
+    if (err.name === "ValidationError") {
         statusCode = 400;
-        message = Object.values(err.errors).map((val) => val.message).join(', ');
+        message = Object.values(err.errors)
+            .map((val) => val.message)
+            .join(", ");
     }
 
-    // --- Log the error for Admin debugging ---
-    logger.error(`${req.method} ${req.originalUrl} - ${message}`);
+    // ===============================
+    // 🔹 ZOD VALIDATION ERRORS
+    // ===============================
+    if (err.name === "ZodError") {
+        statusCode = 400;
+        message = err.errors.map(e => `${e.path.join(".")} : ${e.message}`).join(", ");
+    }
 
+    // ===============================
+    // 🔹 JWT / AUTH ERRORS
+    // ===============================
+    if (err.name === "JsonWebTokenError") {
+        statusCode = 401;
+        message = "Invalid token";
+    }
+
+    if (err.name === "TokenExpiredError") {
+        statusCode = 401;
+        message = "Session expired. Please login again.";
+    }
+
+    // ===============================
+    // 🔹 CUSTOM APP ERRORS (Optional)
+    // ===============================
+    if (err.isOperational) {
+        // Already handled custom error
+        statusCode = err.statusCode || statusCode;
+        message = err.message;
+    }
+
+    // ===============================
+    // 🔹 LOGGING (DETAILED)
+    // ===============================
+    logger.error({
+        message,
+        statusCode,
+        method: req.method,
+        url: req.originalUrl,
+        user: req.user?._id || "GUEST",
+        ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress,
+        stack: err.stack
+    });
+
+    // ===============================
+    // 🔹 RESPONSE STRUCTURE
+    // ===============================
     res.status(statusCode).json({
         success: false,
-        message: message,
-        // Stack trace sirf development mode mein dikhayenge, production mein nahi (Security)
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+        message,
+        errorType: err.name || "Error",
+        // Dev mode में ही stack दिखेगा
+        stack: process.env.NODE_ENV === "production" ? null : err.stack
     });
 };

@@ -1,92 +1,191 @@
-// payrollService.js
+import mongoose from "mongoose";
 import Staff from "../models/Staff.js";
 import Attendance from "../models/Attendance.js";
 import Transaction from "../models/Transaction.js";
 import ledgerService from "./ledgerService.js";
 
 /**
- * Professional Payroll & Salary Service
- * Dharashakti Agro Products ERP
+ * 🚀 PROFESSIONAL PAYROLL SERVICE (FINAL)
  */
 class PayrollService {
-    
+
     /**
-     * @desc    Calculate Monthly Salary based on Attendance & Advances
-     * @param   {String} staffId 
-     * @param   {Number} month (1-12)
-     * @param   {Number} year
+     * 🔧 VALIDATE INPUT
+     */
+    validate(month, year) {
+        if (!month || month < 1 || month > 12) {
+            throw new Error("Invalid month");
+        }
+        if (!year || year < 2000) {
+            throw new Error("Invalid year");
+        }
+    }
+
+    /**
+     * @desc CALCULATE SALARY
      */
     async calculateMonthlySalary(staffId, month, year) {
         try {
+            this.validate(month, year);
+
             const staff = await Staff.findById(staffId);
             if (!staff) throw new Error("Staff member not found");
 
-            // 1. Get Date Range for the month
             const startDate = new Date(year, month - 1, 1);
             const endDate = new Date(year, month, 0);
 
-            // 2. Fetch Attendance Stats
+            // 🔥 Fetch attendance
             const attendanceRecords = await Attendance.find({
                 staffId,
                 date: { $gte: startDate, $lte: endDate }
             });
 
-            const daysInMonth = endDate.getDate();
-            const presentDays = attendanceRecords.filter(a => a.status === 'PRESENT').length;
-            const halfDays = attendanceRecords.filter(a => a.status === 'HALF_DAY').length;
-            const absentDays = attendanceRecords.filter(a => a.status === 'ABSENT').length;
-            const overtimeHours = attendanceRecords.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
+            // 🔥 REMOVE DUPLICATES (one record per day)
+            const uniqueMap = new Map();
+            attendanceRecords.forEach(a => {
+                const key = new Date(a.date).toDateString();
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, a);
+                }
+            });
 
-            // 3. Calculation Logic
+            const records = Array.from(uniqueMap.values());
+
+            const daysInMonth = endDate.getDate();
+
+            let presentDays = 0;
+            let halfDays = 0;
+            let absentDays = 0;
+            let overtimeHours = 0;
+
+            records.forEach(a => {
+                if (a.status === "PRESENT") presentDays++;
+                else if (a.status === "HALF_DAY") halfDays++;
+                else absentDays++;
+
+                overtimeHours += Number(a.overtimeHours || 0);
+            });
+
             const dailyRate = staff.baseSalary / daysInMonth;
-            const totalWorkingDays = presentDays + (halfDays * 0.5);
-            
-            let grossSalary = dailyRate * totalWorkingDays;
-            
-            // Overtime (Assuming double rate for OT or fixed - yahan hum 1.5x le rahe hain)
-            const otRate = (dailyRate / 8) * 1.5; 
+            const workingDays = presentDays + (halfDays * 0.5);
+
+            let grossSalary = dailyRate * workingDays;
+
+            // 🔥 Overtime
+            const otRate = (dailyRate / 8) * 1.5;
             const otAmount = overtimeHours * otRate;
 
-            // 4. Final Calculation
-            const netSalary = Math.round(grossSalary + otAmount);
+            grossSalary += otAmount;
+
+            // 🔥 ADVANCE ADJUSTMENT
+            const advance = Number(staff.currentBalance || 0);
+            const netSalary = Math.max(0, Math.round(grossSalary - advance));
 
             return {
+                staffId,
                 staffName: staff.name,
                 baseSalary: staff.baseSalary,
+                daysInMonth,
                 presentDays,
                 halfDays,
                 absentDays,
                 overtimeHours,
                 otAmount: Math.round(otAmount),
-                netSalary,
-                currentAdvance: staff.currentBalance // Staff model se advance balance uthayenge
+                grossSalary: Math.round(grossSalary),
+                advanceDeducted: advance,
+                netSalary
             };
+
         } catch (error) {
-            console.error("Payroll Calculation Error:", error);
+            console.error("❌ Payroll Calculation Error:", error.message);
             throw error;
         }
     }
 
     /**
-     * @desc    Finalize and Post Salary to Ledger
+     * @desc PROCESS SALARY (SAFE + NO DUPLICATE)
      */
     async processSalaryPayment(data, performedBy) {
-        const { staffId, amount, month, year, paymentMode, remarks } = data;
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-        // Session start karein (Transaction safety ke liye)
-        // Yahan ledgerService khud session handle kar sakta hai
-        
-        const description = `SALARY FOR ${month}/${year} - ${remarks || ''}`;
+        try {
+            const { staffId, amount, month, year, paymentMode, remarks } = data;
 
-        // Ledger Entry: Staff account ko Credit karein (Company ka kharcha)
-        return await ledgerService.postTransaction({
-            staffId,
-            type: 'SALARY',
-            credit: amount, // Liability/Expense for company
-            description: description.toUpperCase(),
-            paymentMode,
-            performedBy
-        });
+            this.validate(month, year);
+
+            // 🔴 Prevent duplicate salary
+            const existing = await Transaction.findOne({
+                staffId,
+                type: "SALARY",
+                month,
+                year
+            }).session(session);
+
+            if (existing) {
+                throw new Error("Salary already processed for this month");
+            }
+
+            // 🔥 Ledger entry
+            const description = `SALARY ${month}/${year} ${remarks || ""}`.toUpperCase();
+
+            const txn = await ledgerService.postTransaction({
+                staffId,
+                type: "SALARY",
+                credit: amount,
+                description,
+                paymentMode,
+                month,
+                year,
+                performedBy,
+                session
+            });
+
+            // 🔥 Reset advance after salary
+            await Staff.findByIdAndUpdate(
+                staffId,
+                { currentBalance: 0 },
+                { session }
+            );
+
+            await session.commitTransaction();
+            session.endSession();
+
+            return txn;
+
+        } catch (error) {
+            await session.abortTransaction();
+            session.endSession();
+
+            console.error("❌ Salary Processing Error:", error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 📊 GET MONTHLY SUMMARY (NEW)
+     */
+    async getPayrollSummary(month, year) {
+        this.validate(month, year);
+
+        const result = await Transaction.aggregate([
+            {
+                $match: {
+                    type: "SALARY",
+                    month,
+                    year
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalSalaryPaid: { $sum: "$credit" },
+                    totalEmployees: { $sum: 1 }
+                }
+            }
+        ]);
+
+        return result[0] || { totalSalaryPaid: 0, totalEmployees: 0 };
     }
 }
 

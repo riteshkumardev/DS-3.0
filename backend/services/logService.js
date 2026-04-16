@@ -1,70 +1,161 @@
-// logService.js
 import AuditLog from "../models/AuditLog.js";
 
 /**
- * Professional Audit Logging Service
- * Dharashakti Agro Products ERP
+ * 🚀 PROFESSIONAL AUDIT LOG SERVICE (FINAL)
+ * ✔ Non-blocking logging
+ * ✔ Crash-safe
+ * ✔ IP + Device parsing fixed
+ * ✔ Payload size control
  */
+
 class LogService {
-    
+
     /**
-     * @desc    Create a new activity log
-     * @param   {Object} logData - user, action, module, docId, oldVal, newVal, remark, req
+     * 🔧 SAFE STRING
      */
-    async createLog({ performedBy, action, module, documentId, oldValue, newValue, remark, req }) {
+    safeUpper(value, fallback = "UNKNOWN") {
+        return String(value || fallback).toUpperCase();
+    }
+
+    /**
+     * 🔧 EXTRACT IP
+     */
+    getIP(req) {
+        if (!req) return "SYSTEM";
+
+        let ip =
+            req.headers["x-forwarded-for"] ||
+            req.connection?.remoteAddress ||
+            req.socket?.remoteAddress ||
+            req.ip;
+
+        // handle multiple IPs
+        if (ip && ip.includes(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+
+        return ip || "UNKNOWN";
+    }
+
+    /**
+     * 🔧 LIMIT LARGE OBJECTS
+     */
+    sanitizeData(data, maxLength = 2000) {
         try {
-            // Get IP and Device Info from request object if available
-            const ipAddress = req ? (req.headers['x-forwarded-for'] || req.socket.remoteAddress) : 'SYSTEM';
-            const deviceInfo = req ? req.headers['user-agent'] : 'UNKNOWN';
+            if (!data) return null;
 
-            const log = new AuditLog({
-                performedBy,
-                action: action.toUpperCase(),
-                module: module.toUpperCase(),
-                documentId,
-                oldValue: oldValue || null,
-                newValue: newValue || null,
-                ipAddress,
-                deviceInfo,
-                remark: remark || `Activity recorded in ${module} module`
-            });
+            let str = JSON.stringify(data);
 
-            await log.save();
-            return log;
-        } catch (error) {
-            // Hum system ko crash nahi karenge agar logging fail ho jaye
-            console.error("Critical Logging Error:", error.message);
+            if (str.length > maxLength) {
+                return str.substring(0, maxLength) + "...[TRUNCATED]";
+            }
+
+            return JSON.parse(str);
+        } catch {
+            return null;
         }
     }
 
     /**
-     * @desc    Specific log for Stock Adjustments
+     * @desc CREATE LOG (NON-BLOCKING)
+     */
+    async createLog({
+        performedBy,
+        action,
+        module,
+        documentId,
+        oldValue,
+        newValue,
+        remark,
+        req
+    }) {
+        try {
+            const logData = {
+                performedBy: performedBy || null,
+                action: this.safeUpper(action),
+                module: this.safeUpper(module),
+                documentId: documentId || null,
+                oldValue: this.sanitizeData(oldValue),
+                newValue: this.sanitizeData(newValue),
+                ipAddress: this.getIP(req),
+                deviceInfo: req?.headers?.["user-agent"] || "UNKNOWN",
+                remark:
+                    remark ||
+                    `Activity recorded in ${this.safeUpper(module)} module`,
+            };
+
+            // 🔥 NON-BLOCKING (no await)
+            AuditLog.create(logData).catch((err) => {
+                console.error("❌ Log Save Failed:", err.message);
+            });
+
+            return true;
+
+        } catch (error) {
+            console.error("❌ Critical Logging Error:", error.message);
+            return false;
+        }
+    }
+
+    /**
+     * 📦 STOCK ADJUSTMENT LOG
      */
     async logStockAdjustment(userId, productId, oldQty, newQty, remark, req) {
-        return await this.createLog({
+        return this.createLog({
             performedBy: userId,
-            action: 'STOCK_ADJUSTMENT',
-            module: 'STOCK',
+            action: "STOCK_ADJUSTMENT",
+            module: "STOCK",
             documentId: productId,
             oldValue: { quantity: oldQty },
             newValue: { quantity: newQty },
             remark,
-            req
+            req,
         });
     }
 
     /**
-     * @desc    Specific log for Critical Deletions (Sale/Purchase)
+     * 🗑️ DELETE LOG
      */
     async logDeletion(userId, module, docId, data, req) {
-        return await this.createLog({
+        return this.createLog({
             performedBy: userId,
-            action: `DELETE_${module}`,
+            action: `DELETE_${this.safeUpper(module)}`,
             module,
             documentId: docId,
             oldValue: data,
-            remark: `CRITICAL: Document deleted from ${module}`,
-            req
+            remark: `CRITICAL: Document deleted from ${this.safeUpper(module)}`,
+            req,
+        });
+    }
+
+    /**
+     * ✏️ UPDATE LOG (NEW - IMPORTANT)
+     */
+    async logUpdate(userId, module, docId, oldData, newData, req) {
+        return this.createLog({
+            performedBy: userId,
+            action: `UPDATE_${this.safeUpper(module)}`,
+            module,
+            documentId: docId,
+            oldValue: oldData,
+            newValue: newData,
+            remark: `Document updated in ${this.safeUpper(module)}`,
+            req,
+        });
+    }
+
+    /**
+     * ➕ CREATE LOG (NEW)
+     */
+    async logCreate(userId, module, docId, data, req) {
+        return this.createLog({
+            performedBy: userId,
+            action: `CREATE_${this.safeUpper(module)}`,
+            module,
+            documentId: docId,
+            newValue: data,
+            remark: `New record created in ${this.safeUpper(module)}`,
+            req,
         });
     }
 }

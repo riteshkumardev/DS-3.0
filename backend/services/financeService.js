@@ -1,4 +1,3 @@
-// financeService.js
 import Sale from "../models/Sale.js";
 import Purchase from "../models/Purchase.js";
 import Expense from "../models/Expense.js";
@@ -6,83 +5,164 @@ import Stock from "../models/Stock.js";
 import Transaction from "../models/Transaction.js";
 
 /**
- * Professional Finance & Reporting Service
- * Dharashakti Agro Products ERP
+ * 🚀 PROFESSIONAL FINANCE SERVICE (FIXED)
+ * ✔ Correct P&L Logic
+ * ✔ Real COGS Calculation
+ * ✔ Accurate Cash Flow
  */
+
 class FinanceService {
 
     /**
-     * @desc    Calculate Real-time Profit & Loss Statement
-     * @param   {Date} startDate 
-     * @param   {Date} endDate 
+     * 📊 PROFIT & LOSS STATEMENT
      */
     async getProfitLoss(startDate, endDate) {
         try {
-            const query = {
-                date: { $gte: new Date(startDate), $lte: new Date(endDate) }
-            };
+            const start = new Date(startDate);
+            const end = new Date(endDate);
 
-            // 1. Total Revenue (Sales)
+            // 1️⃣ SALES (Revenue)
             const salesData = await Sale.aggregate([
-                { $match: { ...query, status: { $ne: 'CANCELLED' } } },
-                { $group: { _id: null, totalSales: { $sum: "$subTotal" }, totalTax: { $sum: { $add: ["$cgst", "$sgst", "$igst"] } } } }
+                {
+                    $match: {
+                        date: { $gte: start, $lte: end },
+                        status: { $ne: "CANCELLED" }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalSales: { $sum: "$subTotal" }
+                    }
+                }
             ]);
 
-            // 2. Total Direct Costs (Purchases)
+            // 2️⃣ PURCHASES
             const purchaseData = await Purchase.aggregate([
-                { $match: { purchaseDate: query.date, paymentStatus: { $ne: 'CANCELLED' } } },
-                { $group: { _id: null, totalPurchase: { $sum: "$subTotal" } } }
+                {
+                    $match: {
+                        purchaseDate: { $gte: start, $lte: end },
+                        status: { $ne: "CANCELLED" }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalPurchase: { $sum: "$subTotal" }
+                    }
+                }
             ]);
 
-            // 3. Total Indirect Expenses (General Expenses + Salaries)
+            // 3️⃣ EXPENSES
             const expenseData = await Expense.aggregate([
-                { $match: query },
-                { $group: { _id: null, totalExpense: { $sum: "$amount" } } }
+                {
+                    $match: {
+                        date: { $gte: start, $lte: end }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalExpense: { $sum: "$amount" }
+                    }
+                }
             ]);
 
-            // 4. Current Stock Valuation (Assets)
-            const stockValuation = await Stock.aggregate([
-                { $group: { _id: null, totalValue: { $sum: { $multiply: ["$currentQuantity", "$avgPurchasePrice"] } } } }
+            // 4️⃣ CLOSING STOCK
+            const closingStockData = await Stock.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalValue: {
+                            $sum: {
+                                $multiply: ["$currentQuantity", "$avgPurchasePrice"]
+                            }
+                        }
+                    }
+                }
             ]);
+
+            // ⚠️ OPTIONAL: Opening Stock (if stored)
+            const openingStock = 0; // 👉 future improvement (store in DB)
 
             const revenue = salesData[0]?.totalSales || 0;
-            const cogs = purchaseData[0]?.totalPurchase || 0;
+            const purchases = purchaseData[0]?.totalPurchase || 0;
             const expenses = expenseData[0]?.totalExpense || 0;
-            const stockValue = stockValuation[0]?.totalValue || 0;
+            const closingStock = closingStockData[0]?.totalValue || 0;
 
-            // --- P&L Formula ---
-            // Gross Profit = Revenue - Purchase Cost
-            // Net Profit = (Gross Profit + Closing Stock) - Operating Expenses
+            // ✅ CORRECT ACCOUNTING
+            const cogs = openingStock + purchases - closingStock;
             const grossProfit = revenue - cogs;
-            const netProfit = (grossProfit + stockValue) - expenses;
+            const netProfit = grossProfit - expenses;
 
             return {
                 period: { startDate, endDate },
+
                 revenue,
+                purchases,
+                openingStock,
+                closingStock,
+
                 costOfGoodsSold: cogs,
                 grossProfit,
+
                 operatingExpenses: expenses,
-                closingStockValue: stockValue,
                 netProfit,
-                profitMargin: revenue > 0 ? ((netProfit / revenue) * 100).toFixed(2) : 0
+
+                profitMargin:
+                    revenue > 0
+                        ? ((netProfit / revenue) * 100).toFixed(2)
+                        : "0.00"
             };
+
         } catch (error) {
-            console.error("Finance Service Error:", error);
-            throw new Error("P&L Calculation failed: " + error.message);
+            console.error("❌ Finance Error:", error);
+            throw new Error("P&L failed: " + error.message);
         }
     }
 
     /**
-     * @desc    Get Cash-flow Summary (Cash in Hand vs Bank)
+     * 💰 CASH & BANK SUMMARY (REAL FIX)
      */
     async getCashSummary() {
-        const summary = await Transaction.aggregate([
-            { $group: {
-                _id: "$paymentMode",
-                balance: { $sum: { $subtract: ["$debit", "$credit"] } }
-            }}
-        ]);
-        return summary;
+        try {
+            const summary = await Transaction.aggregate([
+                {
+                    $match: {
+                        paymentMode: { $in: ["CASH", "BANK"] }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$paymentMode",
+
+                        // Cash In
+                        totalIn: {
+                            $sum: "$credit"
+                        },
+
+                        // Cash Out
+                        totalOut: {
+                            $sum: "$debit"
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        paymentMode: "$_id",
+                        totalIn: 1,
+                        totalOut: 1,
+                        balance: { $subtract: ["$totalIn", "$totalOut"] }
+                    }
+                }
+            ]);
+
+            return summary;
+
+        } catch (error) {
+            console.error("❌ Cash Summary Error:", error);
+            throw error;
+        }
     }
 }
 

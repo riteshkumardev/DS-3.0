@@ -1,90 +1,214 @@
+// attendanceController.js
+import mongoose from "mongoose";
 import Attendance from "../models/Attendance.js";
 import Staff from "../models/Staff.js";
+import logService from "../services/logService.js";
 
-/**
- * Dharashakti Agro Products - Attendance Controller
- */
+// 🔧 Helper
+const toDateOnly = (dateStr) => {
+    const d = new Date(dateStr);
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
 
-// 1. MARK BULK ATTENDANCE (Ek saath sabki haajri)
+// ==========================================
+// 1. MARK BULK ATTENDANCE (SAFE + ATOMIC)
+// ==========================================
 export const markBulkAttendance = async (req, res, next) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-        const { attendanceData, date, performedBy } = req.body;
+        const { attendanceData, date } = req.body;
 
         if (!attendanceData || !Array.isArray(attendanceData) || !date) {
-            res.status(400);
-            throw new Error("Invalid data format. Attendance list and date are required.");
+            throw new Error("Attendance data & date required");
         }
 
-        // Sabhi entries ko bulkWrite ke liye prepare karna
+        const formattedDate = toDateOnly(date);
+
         const operations = attendanceData.map((record) => ({
             updateOne: {
-                filter: { staffId: record.staffId, date: date },
-                update: { 
-                    $set: { 
-                        ...record, 
-                        date, 
-                        performedBy,
-                        employeeId: record.employeeId // Data consistency ke liye
-                    } 
+                filter: {
+                    staffId: record.staffId,
+                    date: formattedDate
                 },
-                upsert: true // Agar record nahi hai to naya banaye, hai to update kare
+                update: {
+                    $set: {
+                        ...record,
+                        date: formattedDate,
+                        performedBy: req.user?._id
+                    }
+                },
+                upsert: true
             }
         }));
 
-        await Attendance.bulkWrite(operations);
+        await Attendance.bulkWrite(operations, { session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        // ✅ Audit log
+        await logService.createLog({
+            performedBy: req.user?._id,
+            action: "BULK_MARK",
+            module: "ATTENDANCE",
+            remark: `Bulk attendance marked (${attendanceData.length} records)`,
+            req,
+        });
 
         res.status(200).json({
             success: true,
-            message: `Attendance processed for ${attendanceData.length} employees on ${date}`
+            message: `Attendance saved for ${attendanceData.length} employees`
         });
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        next(error);
+    }
+};
+
+// ==========================================
+// 2. GET DAILY ATTENDANCE
+// ==========================================
+export const getDailyAttendance = async (req, res, next) => {
+    try {
+        const { date } = req.query;
+
+        if (!date) throw new Error("Date required");
+
+        const formattedDate = toDateOnly(date);
+
+        const records = await Attendance.find({ date: formattedDate })
+            .populate("staffId", "name designation")
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            count: records.length,
+            data: records
+        });
+
     } catch (error) {
         next(error);
     }
 };
 
-// 2. GET DAILY ATTENDANCE (Check karne ke liye ki aaj kiski lag chuki hai)
-export const getDailyAttendance = async (req, res, next) => {
-  try {
-    const { date } = req.query; // Format: YYYY-MM-DD
-    const records = await Attendance.find({ date }).populate('staffId', 'name designation');
-    
-    res.status(200).json({
-      success: true,
-      data: records
-    });
-  } catch (error) {
-    next(error);
-  }
+// ==========================================
+// 3. MONTHLY REPORT (FAST + AGGREGATE)
+// ==========================================
+export const getMonthlyReport = async (req, res, next) => {
+    try {
+        const { staffId } = req.params;
+        const { month, year } = req.query;
+
+        if (!staffId || !month || !year) {
+            throw new Error("staffId, month, year required");
+        }
+
+        const startDate = new Date(`${year}-${month}-01`);
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 1);
+
+        // ✅ Aggregation summary (FAST)
+        const summaryAgg = await Attendance.aggregate([
+            {
+                $match: {
+                    staffId: new mongoose.Types.ObjectId(staffId),
+                    date: { $gte: startDate, $lt: endDate }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    PRESENT: {
+                        $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] }
+                    },
+                    ABSENT: {
+                        $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] }
+                    },
+                    HALF_DAY: {
+                        $sum: { $cond: [{ $eq: ["$status", "HALF_DAY"] }, 1, 0] }
+                    },
+                    OVERTIME_TOTAL: {
+                        $sum: { $ifNull: ["$overtimeHours", 0] }
+                    }
+                }
+            }
+        ]);
+
+        // Detailed data
+        const attendance = await Attendance.find({
+            staffId,
+            date: { $gte: startDate, $lt: endDate }
+        }).sort({ date: 1 }).lean();
+
+        res.status(200).json({
+            success: true,
+            summary: summaryAgg[0] || {
+                PRESENT: 0,
+                ABSENT: 0,
+                HALF_DAY: 0,
+                OVERTIME_TOTAL: 0
+            },
+            data: attendance
+        });
+
+    } catch (error) {
+        next(error);
+    }
 };
 
-// 3. GET MONTHLY REPORT (Payroll calculation ke liye)
-export const getMonthlyReport = async (req, res, next) => {
-  try {
-    const { staffId } = req.params;
-    const { month, year } = req.query; // e.g., 04, 2026
+// ==========================================
+// 4. STAFF ATTENDANCE SUMMARY (ALL STAFF)
+// ==========================================
+export const getStaffAttendanceSummary = async (req, res, next) => {
+    try {
+        const { month, year } = req.query;
 
-    // Regex to match dates starting with YYYY-MM
-    const datePattern = new RegExp(`^${year}-${month}`);
+        const startDate = new Date(`${year}-${month}-01`);
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 1);
 
-    const attendance = await Attendance.find({
-      staffId,
-      date: { $regex: datePattern }
-    }).sort({ date: 1 });
+        const summary = await Attendance.aggregate([
+            {
+                $match: {
+                    date: { $gte: startDate, $lt: endDate }
+                }
+            },
+            {
+                $group: {
+                    _id: "$staffId",
+                    PRESENT: {
+                        $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] }
+                    },
+                    ABSENT: {
+                        $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] }
+                    },
+                    HALF_DAY: {
+                        $sum: { $cond: [{ $eq: ["$status", "HALF_DAY"] }, 1, 0] }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: "staffs",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "staff"
+                }
+            },
+            { $unwind: "$staff" }
+        ]);
 
-    // Summary calculation
-    const summary = {
-      PRESENT: attendance.filter(a => a.status === 'PRESENT').length,
-      ABSENT: attendance.filter(a => a.status === 'ABSENT').length,
-      HALF_DAY: attendance.filter(a => a.status === 'HALF_DAY').length,
-      OVERTIME_TOTAL: attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0)
-    };
+        res.status(200).json({
+            success: true,
+            data: summary
+        });
 
-    res.status(200).json({
-      success: true,
-      summary,
-      data: attendance
-    });
-  } catch (error) {
-    next(error);
-  }
+    } catch (error) {
+        next(error);
+    }
 };

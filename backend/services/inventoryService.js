@@ -3,74 +3,94 @@ import StockLog from "../models/StockLog.js";
 import Product from "../models/Product.js";
 
 /**
- * Professional Inventory Service - Crash Proof & Auto-Sync
- * Dharashakti Agro Products ERP
+ * 🚀 PROFESSIONAL INVENTORY SERVICE (FIXED)
+ * ✔ No Negative Stock
+ * ✔ Accurate Valuation
+ * ✔ Duplicate Safe
+ * ✔ Strict Type Handling
  */
+
 class InventoryService {
 
     /**
-     * @desc    Update Stock and Record Log (Handles HSN or ObjectId)
+     * 🔹 MAIN STOCK UPDATE
      */
     async updateStock(data, session = null) {
-        const { 
-            productId, 
-            productName, 
-            totalQuantity, 
-            quantity, 
-            type, 
-            referenceId, 
-            performedBy, 
-            remarks, 
-            rate, 
-            hsn, 
-            unit, 
-            category 
-        } = data;
-
         try {
-            // 1. Find Product in Master (Flexible Search: ID or HSN)
-            let product;
-            // Ensure productId is treated as string for length check
+            const {
+                productId,
+                productName,
+                quantity,
+                totalQuantity,
+                type,
+                referenceId,
+                performedBy,
+                remarks,
+                rate,
+                hsn,
+                unit,
+                category
+            } = data;
+
+            // 🔒 VALIDATION
+            if (!type) throw new Error("Transaction type required");
+
+            const allowedTypes = [
+                "INWARD", "OUTWARD", "SALE",
+                "PURCHASE", "RETURN_IN", "RETURN_OUT", "WASTAGE"
+            ];
+
+            if (!allowedTypes.includes(type)) {
+                throw new Error(`Invalid stock type: ${type}`);
+            }
+
+            // 🔢 Quantity normalize (single source)
+            const qty = toSafeNumber(totalQuantity || quantity);
+            if (qty <= 0) throw new Error("Quantity must be greater than 0");
+
+            // 1️⃣ PRODUCT FIND (STRICT)
+            let product = null;
+
             const pidStr = String(productId || "");
 
             if (pidStr && pidStr.length === 24) {
                 product = await Product.findById(pidStr).session(session);
-            } else {
-                product = await Product.findOne({ hsnCode: pidStr }).session(session);
             }
 
-            // 🚀 AUTO-CREATE PRODUCT: Fix for .toUpperCase() error
-            if (!product) {
-                // We convert to String before calling toUpperCase to prevent crashes
-                const safeName = String(productName || pidStr || "UNKNOWN PRODUCT").toUpperCase();
-                const safeHsn = String(hsn || pidStr || "N/A");
+            // fallback HSN
+            if (!product && hsn) {
+                product = await Product.findOne({ hsnCode: String(hsn) }).session(session);
+            }
 
-                console.log(`📦 Creating missing product master for: ${safeName}`);
-                
+            // 🚀 AUTO CREATE (SAFE)
+            if (!product) {
+                const safeName = String(productName || "UNKNOWN").toUpperCase();
+
                 product = new Product({
                     name: safeName,
-                    hsnCode: safeHsn,
+                    hsnCode: String(hsn || pidStr || Date.now()),
                     unit: unit || "KG",
-                    category: category || "GRAINS",
+                    category: category || "GENERAL",
                     currentStock: 0,
-                    purchasePrice: rate || 0,
-                    salesPrice: rate || 0
+                    purchasePrice: toSafeNumber(rate),
+                    salesPrice: toSafeNumber(rate)
                 });
+
                 await product.save({ session });
             }
 
-            // 2. Fetch or Create Stock Record
+            // 2️⃣ STOCK FETCH
             let stock = await Stock.findOne({ productId: product._id }).session(session);
-            
+
             if (!stock) {
                 stock = new Stock({
                     productId: product._id,
                     productName: product.name,
-                    category: product.category || category || "GRAINS",
-                    unit: product.unit || unit || "KG",
+                    category: product.category,
+                    unit: product.unit,
                     currentQuantity: 0,
-                    pricePerUnit: rate || product.purchasePrice || 0,
-                    avgPurchasePrice: rate || product.purchasePrice || 0,
+                    pricePerUnit: toSafeNumber(rate) || product.purchasePrice || 0,
+                    avgPurchasePrice: toSafeNumber(rate) || product.purchasePrice || 0,
                     lastUpdatedBy: performedBy
                 });
             }
@@ -78,76 +98,104 @@ class InventoryService {
             const previousStock = toSafeNumber(stock.currentQuantity);
             let newStock = previousStock;
 
-            // 3. Logic for Inward/Outward (Industrial Weight logic)
-            const stockDelta = toSafeNumber(totalQuantity) || toSafeNumber(quantity) || 0;
-
-            const inwardTypes = ['INWARD', 'RETURN_IN'];
-            const outwardTypes = ['OUTWARD', 'WASTAGE', 'RETURN_OUT', 'SALE'];
+            // 3️⃣ TYPE LOGIC
+            const inwardTypes = ["INWARD", "PURCHASE", "RETURN_IN"];
+            const outwardTypes = ["OUTWARD", "SALE", "RETURN_OUT", "WASTAGE"];
 
             if (inwardTypes.includes(type)) {
-                newStock += stockDelta;
-                
-                // Valuation logic (Moving Average)
+                newStock += qty;
+
+                // 💰 MOVING AVERAGE (FIXED)
                 if (rate && rate > 0) {
                     const oldVal = previousStock * toSafeNumber(stock.avgPurchasePrice);
-                    const newVal = stockDelta * toSafeNumber(rate);
-                    stock.avgPurchasePrice = newStock > 0 ? (oldVal + newVal) / newStock : rate;
-                    stock.pricePerUnit = rate; 
+                    const newVal = qty * toSafeNumber(rate);
+
+                    const avg = newStock > 0 ? (oldVal + newVal) / newStock : rate;
+
+                    stock.avgPurchasePrice = round2(avg);
+                    stock.pricePerUnit = round2(rate);
                 }
+
             } else if (outwardTypes.includes(type)) {
-                newStock -= stockDelta;
+
+                // ❌ PREVENT NEGATIVE STOCK
+                if (previousStock < qty) {
+                    throw new Error(`Insufficient stock: Available ${previousStock}, Required ${qty}`);
+                }
+
+                newStock -= qty;
             }
 
-            // 4. Master Sync: Update Stock & Product Master
-            stock.currentQuantity = newStock;
+            // 4️⃣ SAVE STOCK
+            stock.currentQuantity = round2(newStock);
             stock.lastUpdatedBy = performedBy;
             await stock.save({ session });
 
-            product.currentStock = newStock;
+            // 5️⃣ SYNC PRODUCT
+            product.currentStock = stock.currentQuantity;
             await product.save({ session });
 
-            // 5. Audit Log Entry
+            // 6️⃣ LOG ENTRY
             const log = new StockLog({
                 productId: product._id,
                 transactionType: type,
-                quantity: stockDelta,
+                quantity: qty,
                 previousStock,
-                newStock,
+                newStock: stock.currentQuantity,
                 referenceId,
-                remarks: remarks ? String(remarks).toUpperCase() : `SYNC: ${type}`,
+                remarks: remarks
+                    ? String(remarks).toUpperCase()
+                    : `AUTO: ${type}`,
                 performedBy
             });
 
             await log.save({ session });
 
             return { stock, log };
+
         } catch (error) {
-            console.error("❌ Inventory Sync Critical Error:", error.message);
-            throw new Error("Inventory process failed: " + error.message);
+            console.error("❌ Inventory Error:", error.message);
+            throw error;
         }
     }
 
+    /**
+     * 🔍 CHECK AVAILABILITY
+     */
     async checkAvailability(productId, requestedQty) {
-        let product;
-        const pidStr = String(productId || "");
-        if (pidStr && pidStr.length === 24) {
-            product = await Product.findById(pidStr);
-        } else {
-            product = await Product.findOne({ hsnCode: pidStr });
-        }
+        try {
+            let product;
 
-        const currentQty = product ? toSafeNumber(product.currentStock) : 0;
-        return { 
-            available: currentQty >= requestedQty, 
-            current: currentQty 
-        };
+            const pidStr = String(productId || "");
+
+            if (pidStr.length === 24) {
+                product = await Product.findById(pidStr);
+            } else {
+                product = await Product.findOne({ hsnCode: pidStr });
+            }
+
+            const currentQty = product ? toSafeNumber(product.currentStock) : 0;
+
+            return {
+                available: currentQty >= requestedQty,
+                current: currentQty
+            };
+
+        } catch (error) {
+            console.error("❌ Availability Error:", error.message);
+            throw error;
+        }
     }
 }
 
-// Internal Helper
+/**
+ * 🔧 HELPERS
+ */
 const toSafeNumber = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
 };
+
+const round2 = (n) => Math.round(n * 100) / 100;
 
 export default new InventoryService();

@@ -4,142 +4,186 @@ import ledgerService from "../services/ledgerService.js";
 import mongoose from "mongoose";
 
 /**
- * 🚀 SMART TRANSACTION CONTROLLER
- * ✔ Direct Ledger Post
- * ✔ Atomic Balance Recovery on Delete
- * ✔ Validation for Missing Amounts
+ * 🚀 FINAL SMART TRANSACTION CONTROLLER
  */
 
+const VALID_TYPES = ["PAYMENT_IN", "PAYMENT_OUT"];
+
+// 🔧 Safe Number
+const toSafeNumber = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+};
+
 // ==========================================
-// 1. CREATE TRANSACTION (Payment In / Out)
+// 1. CREATE TRANSACTION
 // ==========================================
-export const createTransaction = async (req, res, next) => {
+export const createTransaction = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const { partyId, type, amount, date, paymentMode, description } = req.body;
+        let { partyId, type, amount, date, paymentMode, description, referenceId } = req.body;
 
-        // Validation: Ensure mandatory fields exist
-        if (!partyId) throw new Error("Validation Error: Party selection is required");
-        if (!amount || Number(amount) <= 0) throw new Error("Validation Error: Valid amount is required");
-        if (!type) throw new Error("Validation Error: Transaction type (IN/OUT) is required");
+        // 🔒 Normalize
+        type = String(type || "").toUpperCase();
 
-        const amountVal = Number(amount);
+        // 🔴 Validation
+        if (!partyId) throw new Error("Party is required");
+        if (!VALID_TYPES.includes(type)) throw new Error("Invalid transaction type");
+        if (!amount || toSafeNumber(amount) <= 0) throw new Error("Valid amount required");
+
+        const amountVal = toSafeNumber(amount);
         const txnDate = date ? new Date(date) : new Date();
 
-        // ACCOUNTING LOGIC:
-        // PAYMENT_IN (Customer pays us) -> Party is Credited (Balance goes down)
-        // PAYMENT_OUT (We pay Supplier) -> Party is Debited (Balance goes up/Liability down)
-        let debit = 0;
-        let credit = 0;
-
-        if (type === 'PAYMENT_IN') {
-            credit = amountVal;
-        } else if (type === 'PAYMENT_OUT') {
-            debit = amountVal;
-        } else {
-            throw new Error("Invalid Transaction Type provided");
+        // 🔴 Prevent duplicate (idempotency)
+        if (referenceId) {
+            const existing = await Transaction.findOne({ referenceId }).session(session);
+            if (existing) {
+                throw new Error("Duplicate transaction detected");
+            }
         }
 
-        // 1. Post to Ledger via Service (Handles nature, runningBalance & Party currentBalance)
-        // Note: ReferenceId is NULL for direct payments as they are the primary record
+        // 🔥 Accounting Logic
+        let debit = 0, credit = 0;
+
+        if (type === "PAYMENT_IN") {
+            credit = amountVal;
+        } else {
+            debit = amountVal;
+        }
+
+        // 🔥 Ledger Entry (Single Source of Truth)
         const savedTransaction = await ledgerService.postTransaction({
             partyId,
             type,
             debit,
             credit,
-            description: description?.toUpperCase() || `${type} VIA ${paymentMode}`,
+            description: (description || `${type} VIA ${paymentMode || "CASH"}`).toUpperCase(),
             paymentMode: paymentMode || "CASH",
             performedBy: req.user?._id,
-            date: txnDate
+            date: txnDate,
+            referenceId
         }, session);
 
         await session.commitTransaction();
-        
-        res.status(201).json({ 
-            success: true, 
-            message: "Payment successfully recorded and ledger synced.",
-            data: savedTransaction 
+
+        res.status(201).json({
+            success: true,
+            message: "Transaction recorded successfully",
+            data: savedTransaction
         });
 
     } catch (error) {
         await session.abortTransaction();
-        console.error("❌ Transaction Creation Bug:", error.message);
-        res.status(400).json({ success: false, message: error.message });
+        console.error("❌ CREATE TXN ERROR:", error.message);
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
     } finally {
         session.endSession();
     }
 };
 
 // ==========================================
-// 2. GET ALL TRANSACTIONS (Filtered)
+// 2. GET ALL TRANSACTIONS
 // ==========================================
-export const getAllTransactions = async (req, res, next) => {
+export const getAllTransactions = async (req, res) => {
     try {
-        const { partyId, startDate, endDate, type } = req.query;
+        const { partyId, startDate, endDate, type, page = 1, limit = 50 } = req.query;
+
         let query = {};
 
         if (partyId) query.partyId = partyId;
-        if (type) query.type = type;
+        if (type) query.type = String(type).toUpperCase();
+
         if (startDate && endDate) {
-            query.date = { 
-                $gte: new Date(startDate), 
-                $lte: new Date(endDate) 
+            query.date = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
             };
         }
 
-        const transactions = await Transaction.find(query)
-            .sort({ date: -1, createdAt: -1 })
-            .populate('partyId', 'name currentBalance phone')
-            .populate('performedBy', 'name')
-            .lean();
+        const skip = (Number(page) - 1) * Number(limit);
 
-        res.status(200).json({ 
-            success: true, 
-            count: transactions.length, 
-            data: transactions 
+        const [transactions, total] = await Promise.all([
+            Transaction.find(query)
+                .sort({ date: -1, createdAt: -1 })
+                .skip(skip)
+                .limit(Number(limit))
+                .populate("partyId", "name currentBalance phone")
+                .populate("performedBy", "name")
+                .lean(),
+
+            Transaction.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            total,
+            page: Number(page),
+            pages: Math.ceil(total / limit),
+            data: transactions
         });
+
     } catch (error) {
-        console.error("❌ Fetch Transactions Error:", error.message);
-        res.status(500).json({ success: false, message: "Server Error while fetching transactions" });
+        console.error("❌ FETCH TXN ERROR:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Error fetching transactions"
+        });
     }
 };
 
 // ==========================================
-// 3. DELETE TRANSACTION (Physical Recovery)
+// 3. DELETE TRANSACTION (SAFE REVERSAL)
 // ==========================================
-export const deleteTransaction = async (req, res, next) => {
+export const deleteTransaction = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
         const transactionId = req.params.id;
+
         const transaction = await Transaction.findById(transactionId).session(session);
-        
-        if (!transaction) throw new Error("Transaction record not found");
+        if (!transaction) throw new Error("Transaction not found");
 
-        // 🟢 SMART RECOVERY:
-        // Pehle Party ka balance reverse calculate karenge
-        const entity = await Party.findById(transaction.partyId).session(session);
-        
-        if (entity) {
-            // Reverse Logic: (Current - what was Debited + what was Credited)
-            const resetBalance = Number(entity.currentBalance) - Number(transaction.debit) + Number(transaction.credit);
-            entity.currentBalance = Math.round(resetBalance * 100) / 100;
-            await entity.save({ session });
-        }
+        // 🔒 Authorization (basic)
+        if (!req.user) throw new Error("Unauthorized");
 
-        // Transaction record delete karein
+        // 🔥 Reverse Ledger Entry instead of manual balance hack
+        await ledgerService.postTransaction({
+            partyId: transaction.partyId,
+            type: "REVERSAL",
+            debit: transaction.credit,
+            credit: transaction.debit,
+            description: `REVERSAL OF ${transaction._id}`,
+            paymentMode: "SYSTEM",
+            performedBy: req.user._id,
+            referenceId: transaction._id
+        }, session);
+
+        // 🔥 Delete original transaction
         await Transaction.findByIdAndDelete(transactionId).session(session);
 
         await session.commitTransaction();
-        res.status(200).json({ success: true, message: "Transaction removed and party balance restored." });
+
+        res.status(200).json({
+            success: true,
+            message: "Transaction reversed and deleted successfully"
+        });
 
     } catch (error) {
         await session.abortTransaction();
-        console.error("❌ Delete Transaction Error:", error.message);
-        res.status(400).json({ success: false, message: error.message });
+        console.error("❌ DELETE TXN ERROR:", error.message);
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
     } finally {
         session.endSession();
     }

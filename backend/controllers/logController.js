@@ -6,90 +6,146 @@ import Log from "../models/Log.js";
  * Dharashakti Agro Products ERP
  */
 
-// 1. GET ALL LOGS (With Deep Filtering)
+// ==========================================
+// 1. GET ALL LOGS (With Deep Filtering + Safe Pagination)
+// ==========================================
 export const getAllLogs = async (req, res, next) => {
     try {
-        const { user, module, action, startDate, endDate, limit = 50, page = 1 } = req.query;
+        const {
+            user,
+            module,
+            action,
+            startDate,
+            endDate,
+            limit = 50,
+            page = 1
+        } = req.query;
+
         let query = {};
 
-        // Filter by User ID
+        // ✅ USER FILTER
         if (user) {
             query.performedBy = user;
         }
 
-        // Filter by Module (e.g., SALE, PURCHASE, STOCK)
+        // ✅ MODULE FILTER (Safe Uppercase)
         if (module) {
-            query.module = module.toUpperCase();
+            query.module = String(module).toUpperCase();
         }
 
-        // Filter by Action Type (e.g., CREATE_SALE, DELETE_STOCK)
+        // ✅ ACTION FILTER
         if (action) {
-            query.action = action.toUpperCase();
+            query.action = String(action).toUpperCase();
         }
 
-        // Filter by Date Range
-        if (startDate && endDate) {
-            query.createdAt = {
-                $gte: new Date(startDate),
-                $lte: new Date(endDate)
-            };
+        // ✅ DATE FILTER (Safe handling)
+        if (startDate || endDate) {
+            query.createdAt = {};
+
+            if (startDate) {
+                query.createdAt.$gte = new Date(startDate);
+            }
+
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999); // full day cover
+                query.createdAt.$lte = end;
+            }
         }
 
-        // Pagination Logic (Zaruri hai kyunki logs hazaron mein ho sakte hain)
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        // ✅ PAGINATION FIX (avoid NaN / negative)
+        const parsedLimit = Math.max(parseInt(limit) || 50, 1);
+        const parsedPage = Math.max(parseInt(page) || 1, 1);
+        const skip = (parsedPage - 1) * parsedLimit;
 
+        // ✅ FETCH LOGS
         const logs = await Log.find(query)
-            .populate('performedBy', 'name role') // User ka naam aur role dikhane ke liye
-            .sort({ createdAt: -1 }) // Sabse naya log sabse upar
-            .limit(parseInt(limit))
-            .skip(skip);
+            .populate('performedBy', 'name role')
+            .sort({ createdAt: -1 })
+            .limit(parsedLimit)
+            .skip(skip)
+            .lean(); // performance boost
 
         const total = await Log.countDocuments(query);
 
         res.status(200).json({
             success: true,
             count: logs.length,
-            totalPages: Math.ceil(total / limit),
-            currentPage: parseInt(page),
+            totalRecords: total,
+            totalPages: Math.ceil(total / parsedLimit),
+            currentPage: parsedPage,
             data: logs
         });
+
     } catch (error) {
+        console.error("❌ Log Fetch Error:", error.message);
         next(error);
     }
 };
 
-// 2. GET LOGS FOR A SPECIFIC DOCUMENT (Document History)
+// ==========================================
+// 2. GET DOCUMENT HISTORY (Optimized)
+// ==========================================
 export const getDocumentHistory = async (req, res, next) => {
     try {
         const { docId } = req.params;
 
+        if (!docId) {
+            return res.status(400).json({
+                success: false,
+                message: "Document ID is required"
+            });
+        }
+
         const history = await Log.find({ documentId: docId })
             .populate('performedBy', 'name')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         res.status(200).json({
             success: true,
+            count: history.length,
             data: history
         });
+
     } catch (error) {
+        console.error("❌ Document History Error:", error.message);
         next(error);
     }
 };
 
-// 3. DELETE OLD LOGS (System Maintenance)
+// ==========================================
+// 3. DELETE OLD LOGS (Safe Cleanup)
+// ==========================================
 export const clearOldLogs = async (req, res, next) => {
     try {
-        const { days = 90 } = req.body; // Default 90 din se purane logs delete karein
+        let { days = 90 } = req.body;
+
+        days = Number(days);
+
+        // ✅ VALIDATION
+        if (!days || days <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid days value"
+            });
+        }
+
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
-        const result = await Log.deleteMany({ createdAt: { $lt: cutoffDate } });
+        const result = await Log.deleteMany({
+            createdAt: { $lt: cutoffDate }
+        });
 
         res.status(200).json({
             success: true,
-            message: `${result.deletedCount} old logs cleared from system.`
+            message: `${result.deletedCount} old logs cleared from system.`,
+            deletedCount: result.deletedCount
         });
+
     } catch (error) {
+        console.error("❌ Log Cleanup Error:", error.message);
         next(error);
     }
 };
