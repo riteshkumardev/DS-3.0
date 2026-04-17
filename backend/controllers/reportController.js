@@ -169,23 +169,60 @@ export const getPartyStatement = async (req, res, next) => {
 
         const skip = (Number(page) - 1) * Number(limit);
 
-        const [transactions, total] = await Promise.all([
-            Transaction.find(query)
-                .sort({ date: 1, createdAt: 1 })
-                .populate("performedBy", "name")
-                .skip(skip)
-                .limit(Number(limit))
-                .lean(),
+        // ✅ FETCH TRANSACTIONS
+        const transactions = await Transaction.find(query)
+            .sort({ date: 1, createdAt: 1 })
+            .populate("performedBy", "name")
+            .lean();
 
-            Transaction.countDocuments(query)
-        ]);
+        // 🔥 IMPORTANT: Attach Sale/Purchase Data
+        const formatted = await Promise.all(
+            transactions.map(async (txn) => {
+                let goods = [];
+                let billNo = "-";
+
+                // ✅ SALE
+                if (txn.referenceType === "SALE" && txn.referenceId) {
+                    const sale = await Sale.findById(txn.referenceId)
+                        .select("billNo goods")
+                        .lean();
+
+                    if (sale) {
+                        goods = sale.goods || [];
+                        billNo = sale.billNo;
+                    }
+                }
+
+                // ✅ PURCHASE (optional future)
+                if (txn.referenceType === "PURCHASE" && txn.referenceId) {
+                    const purchase = await Purchase.findById(txn.referenceId)
+                        .select("billNo goods")
+                        .lean();
+
+                    if (purchase) {
+                        goods = purchase.goods || [];
+                        billNo = purchase.billNo;
+                    }
+                }
+
+                return {
+                    ...txn,
+                    billNo,
+                    goods
+                };
+            })
+        );
+
+        // ✅ PAGINATION MANUAL (after mapping)
+        const total = formatted.length;
+        const paginated = formatted.slice(skip, skip + Number(limit));
 
         res.status(200).json({
             success: true,
             total,
             page: Number(page),
             pages: Math.ceil(total / limit),
-            data: transactions
+            data: paginated
         });
 
     } catch (error) {
