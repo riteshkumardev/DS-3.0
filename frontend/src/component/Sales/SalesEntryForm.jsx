@@ -45,7 +45,7 @@ const SalesEntryForm = ({
             </div>
             <div className="h-10 w-px bg-white/20 mx-2" />
             <span className="text-xs font-black bg-white/20 px-4 py-2 rounded-xl border border-white/30">
-              {formData.billNo || "NEW BILL"}
+              {formData?.billNo || "NEW BILL"}
             </span>
           </div>
         </div>

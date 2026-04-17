@@ -35,8 +35,8 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
       icon: <TrendingUp size={18} />,
       visible: isBoss, // Only Managers & Admins
       subItems: [
-        { label: "Sales Entry", path: "/sales-entry" },
-        { label: "Sales Table", path: "/sales-table" },
+        
+        { label: "Sales Manager", path: "/sales-table" },
       ],
     },
     {
@@ -45,8 +45,8 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
       icon: <ShoppingCart size={18} />,
       visible: isBoss,
       subItems: [
-        { label: "Purchase Entry", path: "/purchase-form" },
-        { label: "Purchase Table", path: "/purchase-table" },
+       
+        { label: "Purchase Manager", path: "/purchase-table" },
       ],
     },
     {
