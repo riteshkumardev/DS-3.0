@@ -200,4 +200,4 @@ class LedgerService {
     }
 }
 
-export default new LedgerService();
+export default new LedgerService(); 
