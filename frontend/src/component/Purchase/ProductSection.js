@@ -2,12 +2,13 @@ import React from "react";
 import { Layers, Plus, Minus, Tag } from "lucide-react";
 
 /**
- * ProductSection Component (Optimized)
- * Ab ye internal network call nahi karega, balki props se products lega.
+ * ProductSection Component (Updated Schema)
+ * - uses 'freight' instead of 'travelingCost'
+ * - uses 'productId' and 'productName' from props
  */
 const ProductSection = ({ 
   formData, 
-  products, // 👈 Parent se aane wali master product list
+  products, 
   loading, 
   isAuthorized, 
   setFormData, 
@@ -28,14 +29,15 @@ const ProductSection = ({
         productName: product.name,
         hsn: product.hsnCode || "",
         unit: product.unit || "KG",
-        rate: product.purchasePrice || prev.rate // Auto-fill purchase price from master
+        rate: product.purchasePrice || prev.rate // Master se purchase price uthayega
       }));
     } else {
       setFormData((prev) => ({ 
         ...prev, 
         productId: "", 
         productName: "",
-        hsn: ""
+        hsn: "",
+        unit: "KG"
       }));
     }
   };
@@ -43,13 +45,13 @@ const ProductSection = ({
   return (
     <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       
-      {/* 📦 Product Name Dropdown (Dynamic from Props) */}
+      {/* 📦 Product Name Dropdown (productId sync) */}
       <div className="space-y-1.5 text-left">
         <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
           <Layers size={12} className="text-emerald-500" /> Select Product
         </label>
         <select 
-          name="productId" // 👈 name change to productId for DB consistency
+          name="productId" 
           value={formData.productId} 
           onChange={handleProductSelect} 
           required 
@@ -99,10 +101,10 @@ const ProductSection = ({
         />
       </div>
 
-      {/* 🚚 Traveling / Freight Section */}
+      {/* 🚚 Freight Section (Updated Field Name) */}
       <div className="space-y-1.5 text-left">
         <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
-          Freight / Traveling (₹)
+          Freight Charges (₹)
         </label>
         <div className="flex gap-2">
           <button 
@@ -117,8 +119,8 @@ const ProductSection = ({
           </button>
           <input 
             type="number" 
-            name="travelingCost" 
-            value={formData.travelingCost} 
+            name="freight" // ✅ travelingCost se badal kar freight kar diya
+            value={formData.freight} 
             onChange={handleChange} 
             placeholder="0" 
             disabled={loading || !isAuthorized} 
@@ -136,9 +138,15 @@ const ProductSection = ({
                 <span className="text-[10px] font-mono font-bold dark:text-emerald-400">{formData.hsn}</span>
             </div>
             <div className="flex items-center gap-2 border-l border-zinc-200 dark:border-zinc-700 pl-4">
-                <span className="text-[10px] font-black text-zinc-500 uppercase">Total:</span>
+                <span className="text-[10px] font-black text-zinc-500 uppercase">Goods Value:</span>
                 <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
                     ₹{(Number(formData.quantity) * Number(formData.rate)).toLocaleString()}
+                </span>
+            </div>
+            <div className="flex items-center gap-2 border-l border-zinc-200 dark:border-zinc-700 pl-4">
+                <span className="text-[10px] font-black text-zinc-500 uppercase">Selected:</span>
+                <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 italic">
+                  {formData.productName}
                 </span>
             </div>
         </div>

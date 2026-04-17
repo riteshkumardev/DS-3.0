@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 
-const purchaseItemSchema = new mongoose.Schema({
+// 🔧 Helper
+const toNumber = (val) => (isNaN(Number(val)) ? 0 : Number(val));
+
+const goodsSchema = new mongoose.Schema({
     productId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Product', 
@@ -15,28 +18,38 @@ const purchaseItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const purchaseSchema = new mongoose.Schema({
-    // Business Identification
+    // ✅ SAME AS SALE
     billNo: { 
         type: String, 
         required: true, 
         uppercase: true,
     },
 
-    purchaseDate: { type: Date, default: Date.now },
-    
-    // Supplier Linking
-    supplierId: { 
+    date: { type: Date, default: Date.now }, // ✅ FIXED
+
+    // ✅ SAME AS SALE
+    partyId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Party',
         required: true 
     },
 
-    supplierName: { type: String, required: true },
+    customerName: { type: String, required: true }, // ✅ FIXED
 
-    // ✅ NEW STANDARD FIELD
-    goods: [purchaseItemSchema],
+    // ✅ SAME STRUCTURE AS SALE
+    logistics: {
+        vehicleNo: { type: String, uppercase: true },
+        dispatchedThrough: { type: String, uppercase: true },
+        destination: { type: String, uppercase: true },
+        lrRrNo: { type: String },
+        freight: { type: Number, default: 0 },
+        isFreightPaid: { type: Boolean, default: false }
+    },
 
-    // ❗ OLD FIELD (for backward compatibility - optional remove later)
+    // ✅ MAIN FIELD
+    goods: [goodsSchema],
+
+    // ⚠️ OLD SUPPORT
     items: { type: Array, select: false },
 
     // --- Financials ---
@@ -52,7 +65,6 @@ const purchaseSchema = new mongoose.Schema({
     sgst: { type: Number, default: 0 },
     igst: { type: Number, default: 0 },
     
-    otherCharges: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     roundOff: { type: Number, default: 0 },
     
@@ -61,7 +73,8 @@ const purchaseSchema = new mongoose.Schema({
     amountPaid: { type: Number, default: 0 },
     balanceDue: { type: Number, default: 0 },
 
-    paymentStatus: { 
+    // ✅ SAME AS SALE
+    status: { 
         type: String, 
         enum: ['PAID', 'PARTIAL', 'UNPAID'], 
         default: 'UNPAID' 
@@ -78,38 +91,51 @@ const purchaseSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 
-// 🔥 --- AUTO CALCULATIONS ---
+// 🔥 AUTO CALCULATION (MATCHED WITH SALE)
 purchaseSchema.pre("save", function (next) {
 
-    // ✅ BACKWARD COMPATIBILITY (IMPORTANT)
+    // ✅ BACKWARD SUPPORT
     if ((!this.goods || this.goods.length === 0) && this.items?.length > 0) {
         this.goods = this.items;
     }
 
-    // 1. Calculate Subtotal
-    this.subTotal = (this.goods || []).reduce((sum, item) => {
-        item.taxableAmount = item.quantity * item.rate;
+    if (!Array.isArray(this.goods)) this.goods = [];
+
+    // 1. SubTotal
+    this.subTotal = this.goods.reduce((sum, item) => {
+        const qty = toNumber(item.quantity);
+        const rate = toNumber(item.rate);
+
+        item.taxableAmount = qty * rate;
+
         return sum + item.taxableAmount;
     }, 0);
 
-    // 2. Tax Calculation
-    const totalTaxes = this.cgst + this.sgst + this.igst;
+    // 2. Tax
+    const totalTaxes =
+        toNumber(this.cgst) +
+        toNumber(this.sgst) +
+        toNumber(this.igst);
 
-    // 3. Grand Total
+    // 3. Freight (same as Sale)
+    const freight = toNumber(this.logistics?.freight);
+
+    // 4. Grand Total (🔥 SAME FORMULA)
     this.grandTotal =
-        (this.subTotal + totalTaxes + this.otherCharges + this.roundOff) 
-        - this.discount;
+        (this.subTotal + totalTaxes + freight + toNumber(this.roundOff))
+        - toNumber(this.discount);
 
-    // 4. Balance Due
+    // 5. Balance
+    this.amountPaid = toNumber(this.amountPaid);
     this.balanceDue = this.grandTotal - this.amountPaid;
 
-    // 5. Payment Status
+    // 6. Status
     if (this.balanceDue <= 0) {
-        this.paymentStatus = 'PAID';
+        this.status = 'PAID';
     } else if (this.balanceDue < this.grandTotal) {
-        this.paymentStatus = 'PARTIAL';
+        this.status = 'PARTIAL';
     } else {
-        this.paymentStatus = 'UNPAID';
+        this.status = 'UNPAID';
     }
 
     next();

@@ -4,7 +4,7 @@ import { Package, ShieldAlert, Save, X } from "lucide-react";
 // API & Core Components
 import { createPurchase } from "../../api/purchaseApi"; 
 import { fetchPartiesList } from "../../api/partyApi";
-import { getAllProducts } from "../../api/productApi"; // 👈 Master Product API
+import { getAllProducts } from "../../api/productApi"; 
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
@@ -23,23 +23,23 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
   const userRole = user?.role?.toUpperCase();
   const isAuthorized = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 
-  // ✅ INITIAL STATE - Dynamic & Clean
+  // ✅ INITIAL STATE - Updated for your New Schema
   const initialState = {
-    purchaseDate: new Date().toISOString().split("T")[0],
-    purchaseBillNo: "",
-    supplierName: "",
-    supplierId: "",
+    date: new Date().toISOString().split("T")[0], // ❌ purchaseDate -> ✅ date
+    billNo: "", // purchaseBillNo -> billNo
+    customerName: "", // ❌ supplierName -> ✅ customerName (as per your request)
+    partyId: "", // ❌ supplierId -> ✅ partyId
     gstin: "",      
     mobile: "",     
     address: "",    
     productName: "", 
-    productId: "", // DB _id storage
-    hsn: "",       // Master HSN
+    productId: "", 
+    hsn: "",       
     unit: "KG",
     vehicleNo: "",
     quantity: "",
     rate: "",
-    travelingCost: "", 
+    freight: "", // ❌ travelingCost -> ✅ freight
     cashDiscount: "", 
     grandTotal: 0,
     amountPaid: "",
@@ -49,20 +49,19 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
 
   const [formData, setFormData] = useState(initialState);
   const [suppliers, setSuppliers] = useState([]); 
-  const [products, setProducts] = useState([]); // 👈 Master Product State
+  const [products, setProducts] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [travelMode, setTravelMode] = useState("-"); 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const showMsg = (msg, type = "success") => setSnackbar({ open: true, message: msg, severity: type });
 
-  // 🔄 LOAD MASTER DATA (Suppliers & Products)
   const loadMasterData = useCallback(async () => {
     try {
       setLoading(true);
       const [supRes, prodRes] = await Promise.all([
         fetchPartiesList('SUPPLIER'),
-        getAllProducts({ isActive: true }) // 👈 Fetch from Product Master
+        getAllProducts({ isActive: true }) 
       ]);
 
       if (supRes.data?.success) setSuppliers(supRes.data.data);
@@ -74,17 +73,17 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
 
   useEffect(() => { loadMasterData(); }, [loadMasterData]);
 
-  // 🧮 LIVE CALCULATIONS (Grand Total & Balance)
+  // 🧮 LIVE CALCULATIONS
   useEffect(() => {
     const qty = toSafeNumber(formData.quantity);
     const rate = toSafeNumber(formData.rate);
-    const travel = toSafeNumber(formData.travelingCost);
+    const freightVal = toSafeNumber(formData.freight);
     const cdPercent = toSafeNumber(formData.cashDiscount);
     const paid = toSafeNumber(formData.amountPaid);
 
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
-    const travelEffect = travelMode === "+" ? travel : (travelMode === "-" ? -travel : 0);
+    const travelEffect = travelMode === "+" ? freightVal : (travelMode === "-" ? -freightVal : 0);
 
     const total = Math.round(basePrice - discountAmount + travelEffect); 
     const balance = Math.round(total - paid);
@@ -94,13 +93,12 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
       grandTotal: total,
       balanceDue: balance,
     }));
-  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.amountPaid, formData.travelingCost, travelMode]);
+  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.amountPaid, formData.freight, travelMode]);
 
-  // 🚀 SMART CHANGE HANDLER
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === "productId") { // 👈 Dropdown selection logic
+    if (name === "productId") { 
       const selected = products.find(p => p._id === value);
       if (selected) {
         setFormData(prev => ({
@@ -109,7 +107,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
           productName: selected.name,
           hsn: selected.hsnCode,
           unit: selected.unit,
-          rate: selected.purchasePrice || prev.rate // Auto-fill purchase price
+          rate: selected.purchasePrice || prev.rate 
         }));
       }
     } else {
@@ -117,29 +115,36 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
     }
   };
 
-  // 💾 SUBMIT PURCHASE
+  // 💾 SUBMIT PURCHASE - Updated with NEW Mappings
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) return showMsg("Unauthorized!", "error");
     if (!formData.productId) return showMsg("Kripya Product select karein", "error");
 
-    const selectedSupplier = suppliers.find(s => s.name === formData.supplierName);
+    // Supplier selection logic for ID and Name mapping
+    const selectedSupplier = suppliers.find(s => s.name === formData.customerName || s._id === formData.partyId);
 
     setLoading(true);
     try {
       const isBihar = selectedSupplier?.gstin?.startsWith("10");
       const calculatedGstType = isBihar ? "CGST/SGST" : "IGST";
 
+      // DETERMINING STATUS
+      let status = "UNPAID";
+      if (toSafeNumber(formData.amountPaid) > 0) {
+          status = toSafeNumber(formData.balanceDue) <= 0 ? "PAID" : "PARTIAL";
+      }
+
       const payload = {
-        purchaseDate: formData.purchaseDate,
-        billNo: formData.purchaseBillNo || `PUR-${Date.now()}`,
-        supplierId: selectedSupplier?._id || formData.supplierId,
-        supplierName: formData.supplierName,
+        date: formData.date, // ✅ Fixed Field
+        billNo: formData.billNo || `PUR-${Date.now()}`,
+        partyId: selectedSupplier?._id || formData.partyId, // ✅ Fixed Field
+        customerName: selectedSupplier?.name || formData.customerName, // ✅ Fixed Field
         gstin: formData.gstin || "URD",
         mobile: formData.mobile || "",
         address: formData.address || "",
 
-        // Goods Array for Inventory Sync
+        // ✅ Fixed goods[] Structure
         goods: [{
           productId: formData.productId, 
           productName: formData.productName,
@@ -150,10 +155,11 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
           unit: formData.unit
         }],
 
+        // ✅ Fixed logistics.freight Structure
         logistics: {
           vehicleNo: (formData.vehicleNo || "").toUpperCase(),
-          freight: toSafeNumber(formData.travelingCost),
-          travelMode: travelMode
+          freight: toSafeNumber(formData.freight), 
+          isFreightPaid: travelMode === "-" // logic for internal sync
         },
 
         gstType: calculatedGstType,
@@ -162,6 +168,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
         grandTotal: toSafeNumber(formData.grandTotal),
         amountPaid: toSafeNumber(formData.amountPaid),
         balanceDue: toSafeNumber(formData.balanceDue),
+        status: status, // ✅ Added status
         performedBy: user?._id,
         remarks: formData.remarks
       };
@@ -201,11 +208,12 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
 
         <form onSubmit={handleSubmit} className="p-8 space-y-10">
           
-          {/* 🏢 SECTION 1: SUPPLIER INFO */}
+          {/* SECTION 1: SUPPLIER INFO */}
           <div className="glass-section relative p-6 bg-zinc-50 dark:bg-zinc-800/30 rounded-3xl border border-zinc-200 dark:border-zinc-700">
             <div className="absolute -top-3 left-6 bg-zinc-900 dark:bg-emerald-600 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
               1. Supplier & Logistics
             </div>
+            {/* Note: In your Sub-Components, ensure they use 'date', 'customerName', and 'freight' props */}
             <SupplierSection 
               formData={formData} 
               suppliers={suppliers} 
@@ -216,14 +224,14 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
             />
           </div>
 
-          {/* 📦 SECTION 2: PRODUCT & STOCK ENTRY */}
+          {/* SECTION 2: PRODUCT INFO */}
           <div className="glass-section relative p-6 bg-zinc-50 dark:bg-zinc-800/30 rounded-3xl border border-zinc-200 dark:border-zinc-700">
             <div className="absolute -top-3 left-6 bg-zinc-900 dark:bg-emerald-600 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
               2. Product & Inventory Data
             </div>
             <ProductSection 
               formData={formData} 
-              products={products} // 👈 Dynamic products passed here
+              products={products}
               setFormData={setFormData}
               loading={loading} 
               isAuthorized={isAuthorized} 
@@ -233,7 +241,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
             />
           </div>
 
-          {/* 💰 SECTION 3: FINANCIALS */}
+          {/* SECTION 3: FINANCIALS */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 glass-section relative p-6 bg-zinc-50 dark:bg-zinc-800/30 rounded-3xl border border-zinc-200 dark:border-zinc-700">
                <div className="absolute -top-3 left-6 bg-zinc-900 dark:bg-emerald-600 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
@@ -255,7 +263,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
             </div>
           </div>
 
-          {/* 🚀 ACTION BUTTONS */}
+          {/* ACTION BUTTONS */}
           <div className="flex justify-end items-center gap-4 pt-6 border-t dark:border-zinc-800">
             <button 
               type="button" 
@@ -279,11 +287,6 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
       </div>
 
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
-      
-      <style>{`
-        .glass-section { transition: all 0.3s ease; }
-        .glass-section:hover { border-color: #10b981; }
-      `}</style>
     </div>
   );
 };

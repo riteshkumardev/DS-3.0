@@ -1,6 +1,12 @@
 import React from "react";
-import { Calendar, User, CreditCard, Hash, Truck, MapPin } from "lucide-react";
+import { Calendar, User, CreditCard, Hash, Truck, MapPin, Fingerprint } from "lucide-react";
 
+/**
+ * SupplierSection Component (Updated Schema)
+ * - uses 'date' instead of 'purchaseDate'
+ * - uses 'partyId' instead of 'supplierId'
+ * - uses 'customerName' instead of 'supplierName'
+ */
 const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormData, handleChange }) => {
   
   const handleSupplierSelect = (e) => {
@@ -9,6 +15,7 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
 
     if (supplier) {
       let finalName = supplier.name;
+      
       // Local Customer handling logic
       if (supplier.name === "Local customer") {
         const customName = prompt("कृपया लोकल कस्टमर का नाम दर्ज करें:");
@@ -17,8 +24,8 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
 
       setFormData(prev => ({
         ...prev,
-        supplierName: finalName,
-        supplierId: supplier._id, // Backend strictly ID mangta hai
+        customerName: finalName, // ✅ supplierName -> customerName
+        partyId: supplier._id,   // ✅ supplierId -> partyId
         gstin: supplier.gstin || "URD",
         mobile: supplier.phone || "N/A",
         address: supplier.address?.street || "N/A",
@@ -26,8 +33,8 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
     } else {
       setFormData(prev => ({ 
         ...prev, 
-        supplierName: selectedName, 
-        supplierId: "", 
+        customerName: selectedName, 
+        partyId: "", 
         gstin: "", 
         mobile: "", 
         address: "" 
@@ -36,103 +43,118 @@ const SupplierSection = ({ formData, suppliers, loading, isAuthorized, setFormDa
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-      {/* 📅 Date Field - purchaseDate sync */}
-      <div className="space-y-1">
-        <label className="label-style"><Calendar size={12}/> Date</label>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      
+      {/* 📅 Date Field - ✅ Synced with 'date' */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <Calendar size={12} className="text-emerald-500"/> Transaction Date
+        </label>
         <input 
           type="date" 
-          name="purchaseDate" 
-          value={formData.purchaseDate} 
+          name="date" 
+          value={formData.date} 
           onChange={handleChange} 
           disabled={loading || !isAuthorized} 
-          className="w-full border rounded-lg p-2 text-xs" 
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all" 
         />
       </div>
 
-      {/* 👤 Supplier Selection */}
-      <div className="space-y-1">
-        <label className="label-style"><User size={12}/> Select Supplier</label>
+      {/* 👤 Supplier Selection - ✅ Synced with 'customerName' */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <User size={12} className="text-emerald-500"/> Select Supplier
+        </label>
         <select 
-          name="supplierName" 
-          value={formData.supplierName === "" ? "" : (suppliers.find(s => s.name === formData.supplierName) ? formData.supplierName : "Local customer")} 
+          name="customerName" 
+          value={suppliers.find(s => s.name === formData.customerName) ? formData.customerName : (formData.customerName ? "Local customer" : "")} 
           onChange={handleSupplierSelect} 
           required 
           disabled={loading || !isAuthorized} 
-          className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all appearance-none cursor-pointer"
         >
           <option value="">-- Choose Supplier --</option>
-          {suppliers.map((s) => <option key={s._id} value={s.name}>{s.name}</option>)}
+          {suppliers.map((s) => <option key={s._id} value={s.name}>{s.name.toUpperCase()}</option>)}
         </select>
       </div>
 
-      {/* Supplier Name (Read Only) */}
-      <div className="space-y-1">
-        <label className="label-style">Supplier Name (Saved)</label>
+      {/* 🆔 Party ID (Read Only) - ✅ Synced with 'partyId' */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <Fingerprint size={12} className="text-zinc-400"/> Party Reference ID
+        </label>
         <input 
-          name="supplierName" 
-          value={formData.supplierName} 
+          name="partyId" 
+          value={formData.partyId || "AUTO-GENERATED"} 
           readOnly 
-          className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-[10px] font-mono font-bold text-zinc-500 outline-none"
         />
       </div>
 
-      {/* GSTIN (Read Only) */}
-      <div className="space-y-1">
-        <label className="label-style">GSTIN</label>
+      {/* 🔢 Bill No - ✅ Synced with 'billNo' */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <Hash size={12} className="text-emerald-500"/> Bill Number
+        </label>
         <input 
-          name="gstin" 
-          value={formData.gstin} 
-          readOnly 
-          className="w-full border rounded-lg p-2 text-xs" 
-        />
-      </div>
-
-      {/* Mobile No (Read Only) */}
-      <div className="space-y-1">
-        <label className="label-style"><CreditCard size={12}/> Mobile No</label>
-        <input 
-          name="mobile" 
-          value={formData.mobile} 
-          readOnly 
-          className="w-full border rounded-lg p-2 text-xs" 
-        />
-      </div>
-
-      {/* 🔢 Bill No - purchaseBillNo sync */}
-      <div className="space-y-1">
-        <label className="label-style"><Hash size={12}/> Bill No</label>
-        <input 
-          name="purchaseBillNo" 
-          value={formData.purchaseBillNo} 
+          name="billNo" 
+          value={formData.billNo} 
           onChange={handleChange} 
-          placeholder="Optional" 
+          placeholder="Optional (e.g. PUR-001)" 
           disabled={loading || !isAuthorized} 
-         className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all"
         />
       </div>
 
       {/* 🚛 Vehicle No */}
-      <div className="space-y-1">
-        <label className="label-style"><Truck size={12}/> Vehicle No</label>
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <Truck size={12} className="text-emerald-500"/> Vehicle Number
+        </label>
         <input 
           name="vehicleNo" 
           value={formData.vehicleNo} 
           onChange={handleChange} 
           placeholder="BR-01-XXXX" 
           disabled={loading || !isAuthorized} 
-         className="w-full border rounded-lg p-2 text-xs"
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold outline-none focus:border-emerald-500 dark:text-white transition-all uppercase"
+        />
+      </div>
+
+      {/* GSTIN (Read Only) */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">GST Number</label>
+        <input 
+          name="gstin" 
+          value={formData.gstin} 
+          readOnly 
+          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold text-zinc-500 outline-none" 
+        />
+      </div>
+
+      {/* Mobile No (Read Only) */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <CreditCard size={12}/> Contact Mobile
+        </label>
+        <input 
+          name="mobile" 
+          value={formData.mobile} 
+          readOnly 
+          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold text-zinc-500 outline-none" 
         />
       </div>
 
       {/* 📍 Address (Read Only) */}
-      <div className="space-y-1">
-        <label className="label-style"><MapPin size={12}/> Address</label>
+      <div className="space-y-1.5 text-left">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+          <MapPin size={12}/> Supplier Address
+        </label>
         <input 
           name="address" 
           value={formData.address} 
           readOnly 
-          className="w-full border rounded-lg p-2 text-xs" 
+          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-2 border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-bold text-zinc-500 outline-none" 
         />
       </div>
     </div>
