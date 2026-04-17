@@ -33,6 +33,7 @@ const PurchaseForm = ({ user, editData, onCancel, onSuccess }) => {
     mobile: "",     
     address: "",    
     productName: "", 
+    goods: [{ productId: "", productName: "", hsn: "", quantity: "", rate: "", unit: "KG" }], // Backend expects 'goods' array, frontend will manage 'items' for form rendering
     productId: "", 
     hsn: "",       
     unit: "KG",
