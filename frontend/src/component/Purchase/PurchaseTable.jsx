@@ -72,7 +72,7 @@ const PurchaseTable = ({ user }) => {
     setTravelMode(item.logistics?.travelMode || "-"); 
     
     // Flattening items for easy editing (taking 1st item as per your simple form)
-    const firstItem = item.items?.[0] || {};
+    const firstItem = item.goods?.[0] || {};
     setEditData({ 
       ...item, 
       quantity: firstItem.quantity || 0,
@@ -93,8 +93,8 @@ const PurchaseTable = ({ user }) => {
            freight: toSafeNumber(editData.travelingCost),
            travelMode: travelMode
         },
-        items: [{
-           productId: editData.items?.[0]?.productId,
+        goods: [{
+           productId: editData.goods?.[0]?.productId,
            productName: editData.productName,
            quantity: toSafeNumber(editData.quantity),
            rate: toSafeNumber(editData.rate),
@@ -136,7 +136,7 @@ const PurchaseTable = ({ user }) => {
   };
 
   const filteredData = purchaseData.filter(item =>
-    String(item.items?.[0]?.productName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.goods?.[0]?.productName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     String(item.supplierName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     String(item.billNo || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -238,8 +238,8 @@ const PurchaseTable = ({ user }) => {
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                          <span className="text-emerald-600">{item.items?.[0]?.quantity || 0}</span> @ ₹{item.items?.[0]?.rate || 0}
-                          <div className="text-[9px] text-zinc-400 uppercase font-black">{item.items?.[0]?.productName}</div>
+                          <span className="text-emerald-600">{item.goods?.[0]?.quantity || 0}</span> @ ₹{item.goods?.[0]?.rate || 0}
+                          <div className="text-[9px] text-zinc-400 uppercase font-black">{item.goods?.[0]?.productName}</div>
                         </span>
                       </td>
                       <td className="px-6 py-4">

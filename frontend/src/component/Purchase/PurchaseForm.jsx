@@ -140,7 +140,7 @@ const PurchaseForm = ({ user, onCancel, onSuccess }) => {
         address: formData.address || "",
 
         // Goods Array for Inventory Sync
-        items: [{
+        goods: [{
           productId: formData.productId, 
           productName: formData.productName,
           hsn: formData.hsn,
