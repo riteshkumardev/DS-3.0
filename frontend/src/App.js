@@ -7,8 +7,8 @@ import Login from "./component/Login";
 import Home from "./component/Home";
 import LandingPage from "./component/LandingPage"; 
 import SalesEntry from "./component/Sales/SalesEntry";
-import SalesTable from "./component/Sales/SalesTable";
-import PurchaseTable from "./component/Purchase/PurchaseTable";
+import SalesManager from "./component/Sales/SalesManager";
+import PurchaseManager from "./component/Purchase/PurchaseManager";
 import PurchaseForm from "./component/Purchase/PurchaseForm";
 import EmployeeTable from "./component/Employee/EmployeeTable";
 import EmployeeAdd from "./component/Employee/EmployeeAdd";
@@ -152,9 +152,9 @@ function App() {
             <Route path="/profit-loss" element={<ProtectedRoute managerAllowed><ProfitLoss /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute managerAllowed><ExpenseManager user={user} /></ProtectedRoute>} />
             <Route path="/sales-entry" element={<ProtectedRoute managerAllowed><SalesEntry user={user} /></ProtectedRoute>} />
-            <Route path="/sales-table" element={<ProtectedRoute managerAllowed><SalesTable user={user} /></ProtectedRoute>} />
+            <Route path="/sales-table" element={<ProtectedRoute managerAllowed><SalesManager user={user} /></ProtectedRoute>} />
             <Route path="/purchase-form" element={<ProtectedRoute managerAllowed><PurchaseForm user={user} /></ProtectedRoute>} />
-            <Route path="/purchase-table" element={<ProtectedRoute managerAllowed><PurchaseTable user={user} /></ProtectedRoute>} />
+            <Route path="/purchase-table" element={<ProtectedRoute managerAllowed><PurchaseManager user={user} /></ProtectedRoute>} />
             <Route path="/stock-management" element={<ProtectedRoute managerAllowed><StockManagement user={user} /></ProtectedRoute>} />
             <Route path="/stock-add" element={<ProtectedRoute managerAllowed><StockAddForm user={user} /></ProtectedRoute>} />
             <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable user={user} /></ProtectedRoute>} />
