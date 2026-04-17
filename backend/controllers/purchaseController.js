@@ -4,96 +4,83 @@ import logService from "../services/logService.js";
 import { ACCOUNT_TYPES } from "../utils/constants.js";
 import mongoose from "mongoose";
 
-// 🔧 Helpers
-const toNumber = (val) => (isNaN(Number(val)) ? 0 : Number(val));
+// ==========================================
+// HELPER: Freight Entry Logic (PURCHASE SPECIFIC)
+// ==========================================
+const getFreightEntry = (freightAmt) => {
+    const amt = Math.abs(Number(freightAmt || 0));
+
+    if (freightAmt > 0) {
+        // ➜ Purchase mein freight add hua matlab humein supplier ko zyada dena hai (Credit)
+        return { debit: 0, credit: amt, label: "FREIGHT CHARGES ADDED (CR)" };
+    } else {
+        // ➜ Negative freight matlab humne freight khud bhara ya discount mila (Debit)
+        return { debit: amt, credit: 0, label: "FREIGHT PAID BY US (DR)" };
+    }
+};
 
 // ==========================================
-// 1. CREATE PURCHASE (FINAL)
+// 1. CREATE PURCHASE
 // ==========================================
 export const createPurchase = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const {
-            partyId,
-            customerName,
-            billNo,
-            grandTotal,
-            paymentMode,
-            logistics,
-            date,
-            goods,
-            items
-        } = req.body;
+        const { partyId, billNo, paymentMode, grandTotal, logistics, date, goods } = req.body;
 
         if (!partyId || !billNo) {
             throw new Error("Party ID and Bill Number are required");
         }
 
-        const billAmount = toNumber(grandTotal);
-        if (billAmount <= 0) {
-            throw new Error("Invalid purchase amount");
-        }
+        const freightAmt = Number(logistics?.freight || 0);
+
+        // Calculate subtotal from goods taxableAmount or fallback to grandTotal
+        const subTotal =
+            goods?.reduce((acc, item) => acc + (Number(item.taxableAmount) || 0), 0) ||
+            Number(grandTotal);
 
         const txnDate = date ? new Date(date) : new Date();
 
-        const freightAmt = toNumber(logistics?.freight);
-
-        // ✅ Normalize goods
-        const finalGoods = goods || items || [];
-
-        // ✅ Save Purchase (SALE STRUCTURE)
         const purchase = new Purchase({
             ...req.body,
-            partyId,
-            customerName,
-            date: txnDate,
-            goods: finalGoods,
+            subTotal,
             performedBy: req.user?._id,
         });
 
         const savedPurchase = await purchase.save({ session });
 
-        // ✅ Ledger Entry (same as SALE)
-        await ledgerService.postTransaction(
-            {
+        // ✅ GOODS VALUE ENTRY (Purchase is a Credit entry for Suppliers)
+        await ledgerService.postTransaction({
+            partyId,
+            type: ACCOUNT_TYPES.PURCHASE || "PURCHASE",
+            debit: 0,
+            credit: subTotal,
+            description: `PURCHASE GOODS VALUE - BILL: ${billNo}`,
+            referenceId: savedPurchase._id,
+            paymentMode: paymentMode || "CREDIT",
+            performedBy: req.user?._id,
+            date: txnDate,
+            goods: goods || [] // Passing goods for product-wise ledger sync
+        }, session);
+
+        // ✅ FREIGHT ENTRY
+        if (freightAmt !== 0) {
+            const { debit, credit, label } = getFreightEntry(freightAmt);
+
+            await ledgerService.postTransaction({
                 partyId,
-                type: ACCOUNT_TYPES.PURCHASE || "PURCHASE",
-                debit: 0,
-                credit: billAmount,
-                description: `PURCHASE BILL NO: ${billNo}`,
+                type: "ADJUSTMENT",
+                debit,
+                credit,
+                description: `${label} - BILL: ${billNo}`,
                 referenceId: savedPurchase._id,
-                paymentMode: paymentMode || "CREDIT",
+                paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
                 date: txnDate,
-            },
-            session
-        );
-
-        // ✅ Freight Adjustment
-        if (freightAmt !== 0) {
-            await ledgerService.postTransaction(
-                {
-                    partyId,
-                    type: "ADJUSTMENT",
-                    credit: freightAmt > 0 ? freightAmt : 0,
-                    debit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                    description:
-                        (freightAmt > 0
-                            ? "FREIGHT CHARGES ADDED"
-                            : "FREIGHT PAID BY US") +
-                        ` - BILL: ${billNo}`,
-                    referenceId: savedPurchase._id,
-                    paymentMode: "ADJUSTMENT",
-                    performedBy: req.user?._id,
-                    date: txnDate,
-                },
-                session
-            );
+            }, session);
         }
 
-        // ✅ Log
         await logService.createLog({
             performedBy: req.user?._id,
             action: "CREATE",
@@ -108,24 +95,20 @@ export const createPurchase = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: "Purchase recorded successfully",
+            message: "Purchase created & ledger synced",
             data: savedPurchase,
         });
 
     } catch (error) {
         await session.abortTransaction();
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
 };
 
 // ==========================================
-// 2. UPDATE PURCHASE (FINAL)
+// 2. UPDATE PURCHASE
 // ==========================================
 export const updatePurchase = async (req, res) => {
     const session = await mongoose.startSession();
@@ -133,80 +116,58 @@ export const updatePurchase = async (req, res) => {
 
     try {
         const purchaseId = req.params.id;
-
-        const {
-            partyId,
-            customerName,
-            billNo,
-            grandTotal,
-            logistics,
-            date,
-            paymentMode,
-            goods,
-            items
-        } = req.body;
+        const { partyId, billNo, grandTotal, logistics, date, paymentMode, goods } = req.body;
 
         const oldPurchase = await Purchase.findById(purchaseId).lean();
-        if (!oldPurchase) throw new Error("Purchase not found");
+        if (!oldPurchase) throw new Error("Purchase record not found");
 
-        // ✅ Remove old ledger
+        // ❌ Delete old ledger entries linked to this purchase
         await ledgerService.deleteByReference(purchaseId, session);
 
-        const billAmount = toNumber(grandTotal);
-        const txnDate = date ? new Date(date) : new Date();
-        const freightAmt = toNumber(logistics?.freight);
+        const subTotal =
+            goods?.reduce((acc, item) => acc + (Number(item.taxableAmount) || 0), 0) ||
+            Number(grandTotal);
 
-        const finalGoods = goods || items || [];
-
-        // ✅ Update Purchase
         const updatedPurchase = await Purchase.findByIdAndUpdate(
             purchaseId,
-            {
-                ...req.body,
-                partyId,
-                customerName,
-                date: txnDate,
-                goods: finalGoods,
-                performedBy: req.user?._id
-            },
+            { ...req.body, subTotal, performedBy: req.user?._id },
             { new: true, session, runValidators: true }
         );
 
-        // ✅ Ledger Re-entry
-        await ledgerService.postTransaction(
-            {
+        const freightAmt = Number(logistics?.freight || 0);
+        const txnDate = date ? new Date(date) : new Date();
+
+        // ✅ RE-ENTRY: GOODS VALUE
+        await ledgerService.postTransaction({
+            partyId,
+            type: ACCOUNT_TYPES.PURCHASE || "PURCHASE",
+            debit: 0,
+            credit: subTotal,
+            description: `UPDATED PURCHASE GOODS - BILL: ${billNo}`,
+            referenceId: updatedPurchase._id,
+            paymentMode: paymentMode || "CREDIT",
+            performedBy: req.user?._id,
+            date: txnDate,
+            goods: goods || []
+        }, session);
+
+        // ✅ RE-ENTRY: FREIGHT
+        if (freightAmt !== 0) {
+            const { debit, credit, label } = getFreightEntry(freightAmt);
+
+            await ledgerService.postTransaction({
                 partyId,
-                type: ACCOUNT_TYPES.PURCHASE || "PURCHASE",
-                debit: 0,
-                credit: billAmount,
-                description: `UPDATED PURCHASE BILL: ${billNo}`,
+                type: "ADJUSTMENT",
+                debit,
+                credit,
+                description: `${label} - BILL: ${billNo}`,
                 referenceId: updatedPurchase._id,
-                paymentMode: paymentMode || "CREDIT",
+                paymentMode: "ADJUSTMENT",
                 performedBy: req.user?._id,
                 date: txnDate,
-            },
-            session
-        );
-
-        // ✅ Freight
-        if (freightAmt !== 0) {
-            await ledgerService.postTransaction(
-                {
-                    partyId,
-                    type: "ADJUSTMENT",
-                    credit: freightAmt > 0 ? freightAmt : 0,
-                    debit: freightAmt < 0 ? Math.abs(freightAmt) : 0,
-                    description: `UPDATED FREIGHT ADJ - BILL: ${billNo}`,
-                    referenceId: updatedPurchase._id,
-                    paymentMode: "ADJUSTMENT",
-                    performedBy: req.user?._id,
-                    date: txnDate,
-                },
-                session
-            );
+            }, session);
         }
 
-        // ✅ Log
         await logService.createLog({
             performedBy: req.user?._id,
             action: "UPDATE",
@@ -228,18 +189,14 @@ export const updatePurchase = async (req, res) => {
 
     } catch (error) {
         await session.abortTransaction();
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
 };
 
 // ==========================================
-// 3. DELETE PURCHASE (UNCHANGED)
+// 3. DELETE PURCHASE
 // ==========================================
 export const deletePurchase = async (req, res) => {
     const session = await mongoose.startSession();
@@ -249,10 +206,9 @@ export const deletePurchase = async (req, res) => {
         const purchaseId = req.params.id;
 
         const purchase = await Purchase.findById(purchaseId).lean();
-        if (!purchase) throw new Error("Purchase not found");
+        if (!purchase) throw new Error("Purchase record not found");
 
         await ledgerService.deleteByReference(purchaseId, session);
-
         await Purchase.findByIdAndDelete(purchaseId).session(session);
 
         await logService.logDeletion(
@@ -272,18 +228,14 @@ export const deletePurchase = async (req, res) => {
 
     } catch (error) {
         await session.abortTransaction();
-
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
+        res.status(400).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }
 };
 
 // ==========================================
-// 4. GET ALL (SORT FIXED)
+// 4. GET ALL PURCHASES (SORTED BY DATE)
 // ==========================================
 export const getAllPurchases = async (req, res, next) => {
     try {
@@ -297,14 +249,13 @@ export const getAllPurchases = async (req, res, next) => {
             count: purchases.length,
             data: purchases,
         });
-
     } catch (error) {
         next(error);
     }
 };
 
 // ==========================================
-// 5. GET BY ID
+// 5. GET SINGLE PURCHASE BY ID
 // ==========================================
 export const getPurchaseById = async (req, res, next) => {
     try {
@@ -324,8 +275,7 @@ export const getPurchaseById = async (req, res, next) => {
             success: true,
             data: purchase,
         });
-
     } catch (error) {
-        next(error);
+        next(error);  
     }
 };

@@ -3,7 +3,8 @@ import Party from "../models/Party.js";
 import Staff from "../models/Staff.js";
 
 /**
- * 🚀 UPDATED LEDGER SERVICE (SCHEMA SYNCED)
+ * 🚀 FINAL LEDGER SERVICE (v3 - HARDENED)
+ * Optimized for Dharashakti Agro Management System [cite: 1, 9]
  */
 class LedgerService {
 
@@ -14,6 +15,7 @@ class LedgerService {
         let d = Number(debit) || 0;
         let c = Number(credit) || 0;
 
+        // Payment logic normalization
         if (type === "PAYMENT_IN") {
             c = c || d;
             d = 0;
@@ -33,29 +35,29 @@ class LedgerService {
     // GET ENTITY TYPE
     // ===============================
     getEntityType(entity) {
-        // Dhara Shakti ledger format ke hisaab se type check [cite: 7, 10]
+        // PartyType check for Supplier/Customer classification [cite: 10]
         const type = entity.partyType || entity.type;
-        if (!type) throw new Error("Party type missing");
+        if (!type) throw new Error("Party type missing in Master");
         return type.toUpperCase();
     }
 
     // ===============================
-    // BALANCE CALCULATION logic
+    // BALANCE CALCULATION LOGIC
     // ===============================
     calculateBalance(type, lastBalance, debit, credit) {
-        // SUPPLIER ke liye credit balance badhta hai
+        // SUPPLIER: Credit increases balance, Debit decreases it
         if (type === "SUPPLIER") {
             return lastBalance - debit + credit;
         }
-        // CUSTOMER/BOTH ke liye debit balance badhta hai 
+        // CUSTOMER/BOTH: Debit increases balance, Credit decreases it
         if (type === "CUSTOMER" || type === "BOTH") {
             return lastBalance + debit - credit;
         }
-        throw new Error("Invalid party type");
+        throw new Error("Invalid entity type for balance calculation");
     }
 
     // ===============================
-    // POST TRANSACTION (UPDATED WITH GOODS & BILL NO)
+    // POST TRANSACTION
     // ===============================
     async postTransaction(data, session = null) {
         try {
@@ -68,8 +70,8 @@ class LedgerService {
                 referenceId,
                 performedBy,
                 date,
-                billNo,      // ✅ Added for invoice tracking
-                goods        // ✅ Added for product details in ledger
+                billNo,      // Invoice tracking 
+                goods        // Product-wise details (Name, Qty, Rate) 
             } = data;
 
             let { debit, credit } = data;
@@ -77,17 +79,17 @@ class LedgerService {
             const model = partyId ? Party : Staff;
             const entityId = partyId || staffId;
 
-            if (!entityId) throw new Error("partyId or staffId required");
+            if (!entityId) throw new Error("partyId or staffId is required");
 
             const entity = await model.findById(entityId).session(session);
-            if (!entity) throw new Error("Entity not found");
+            if (!entity) throw new Error("Entity master record not found");
 
             // NORMALIZE
             const { debit: d, credit: c } = this.normalizeAmounts(type, debit, credit);
 
-            // ❌ BLOCK ZERO TRANSACTION
+            // ❌ BLOCK ZERO TRANSACTIONS
             if (d === 0 && c === 0) {
-                throw new Error("Zero transaction blocked");
+                throw new Error("Cannot post a zero-value transaction");
             }
 
             const lastBalance = Number(entity.currentBalance || 0);
@@ -99,9 +101,9 @@ class LedgerService {
             const txn = new Transaction({
                 partyId: partyId || null,
                 staffId: staffId || null,
-                billNo: billNo || "-", // ✅ Mapping bill number 
+                billNo: billNo || "-", 
                 type,
-                description: description?.toUpperCase() || "NO DESCRIPTION",
+                description: description?.toUpperCase() || "TRANSACTION RECORDED",
                 debit: d,
                 credit: c,
                 runningBalance: newBalance,
@@ -109,19 +111,19 @@ class LedgerService {
                 referenceId: referenceId || null,
                 performedBy,
                 date: date ? new Date(date) : new Date(),
-                goods: goods || [] // ✅ Storing product info (Name, Qty, Rate)
+                goods: goods || [] 
             });
 
             await txn.save({ session });
 
-            // Update Entity Balance
+            // Update Master Balance
             entity.currentBalance = newBalance;
             await entity.save({ session });
 
             return txn;
 
         } catch (err) {
-            console.error("❌ Ledger Error:", err.message);
+            console.error("❌ Ledger POST Error:", err.message);
             throw err;
         }
     }
@@ -139,18 +141,18 @@ class LedgerService {
 
             await Transaction.deleteMany({ referenceId }).session(session);
 
-            // Re-sync balance after deletion
+            // Trigger re-sync to fix running balances of all subsequent entries
             await this.reSyncBalance(entityId, isStaff, session);
             return true;
 
         } catch (error) {
-            console.error("❌ Delete Error:", error.message);
+            console.error("❌ Ledger DELETE Error:", error.message);
             throw error;
         }
     }
 
     // ===============================
-    // FULL RESYNC (CRITICAL FOR ACCURACY)
+    // FULL RESYNC (THE BRAIN OF ACCURACY)
     // ===============================
     async reSyncBalance(id, isStaff = false, session = null) {
         try {
@@ -158,18 +160,19 @@ class LedgerService {
             const query = isStaff ? { staffId: id } : { partyId: id };
 
             const master = await model.findById(id).session(session);
-            if (!master) throw new Error("Master not found");
+            if (!master) throw new Error("Master record not found for resync");
 
             const entityType = this.getEntityType(master);
 
-            // Date aur Creation order dono se sort karna zaroori hai
+            // ✅ CRITICAL FIX: Sort by Date AND createdAt to handle multiple entries on same day
             const txns = await Transaction.find(query)
-                .sort({ date: 1, createdAt: 1 })
+                .sort({ date: 1, createdAt: 1 }) 
                 .session(session);
 
             let balance = Number(master.openingBalance || 0);
 
             for (const txn of txns) {
+                // Skip broken or zero entries
                 if (txn.debit === 0 && txn.credit === 0) continue;
 
                 balance = this.calculateBalance(
@@ -181,23 +184,24 @@ class LedgerService {
 
                 balance = Math.round(balance * 100) / 100;
 
-                // Agar DB balance match nahi karta to update karein
+                // Sync runningBalance if discrepancy found
                 if (txn.runningBalance !== balance) {
                     txn.runningBalance = balance;
                     await txn.save({ session });
                 }
             }
 
+            // Update final balance in master
             master.currentBalance = balance;
             await master.save({ session });
 
             return balance;
 
         } catch (error) {
-            console.error("❌ ReSync Error:", error.message);
+            console.error("❌ Ledger RESYNC Error:", error.message);
             throw error;
         }
     }
 }
 
-export default new LedgerService(); 
+export default new LedgerService();

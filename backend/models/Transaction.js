@@ -1,10 +1,25 @@
 import mongoose from 'mongoose';
 
+// --- Goods Schema for Ledger Detail ---
+// Isse Account Statement mein hi pata chal jayega ki kya product sell/buy hua tha
+const goodsSchema = new mongoose.Schema({
+    productName: { type: String, required: true },
+    quantity: { type: Number, required: true },
+    unit: { type: String, default: "KG" },
+    rate: { type: Number, required: true }
+}, { _id: false });
+
 const transactionSchema = new mongoose.Schema({
     date: {
         type: Date,
         default: Date.now,
         required: true
+    },
+    // --- Tracking (New v3) ---
+    billNo: { 
+        type: String, 
+        default: "-",
+        uppercase: true 
     },
     // --- Related Entity ---
     partyId: {
@@ -23,7 +38,7 @@ const transactionSchema = new mongoose.Schema({
         enum: [
             'SALE', 'PURCHASE', 'PAYMENT_IN', 'PAYMENT_OUT', 
             'EXPENSE', 'SALARY', 'OPENING_BALANCE', 'REVERSAL',
-            'ADJUSTMENT' // Added for Freight and manual corrections
+            'ADJUSTMENT' 
         ],
         required: true
     },
@@ -32,11 +47,14 @@ const transactionSchema = new mongoose.Schema({
         trim: true,
         uppercase: true 
     },
+    // --- Goods Detail (For Product-wise Ledger) ---
+    goods: [goodsSchema], // ✅ Added to store item details in ledger
+
     // --- Accounting Logic (Standard Debit/Credit) ---
     debit: {
         type: Number,
         default: 0,
-        set: v => Math.round(v * 100) / 100 // Decimal precision fix
+        set: v => Math.round(v * 100) / 100 
     },
     credit: {
         type: Number,
@@ -53,7 +71,6 @@ const transactionSchema = new mongoose.Schema({
         enum: ['CASH', 'UPI', 'BANK', 'CREDIT', 'ADJUSTMENT', 'CHEQUE'],
         default: 'CREDIT'
     },
-    // referenceId: Can link to Sale, Purchase, or Expense ID
     referenceId: {
         type: mongoose.Schema.Types.ObjectId,
         required: false
@@ -76,13 +93,12 @@ transactionSchema.virtual('nature').get(function() {
     return 'NEUTRAL';
 });
 
-// Indexing: Optimized for Ledger History and Audit Trails
-transactionSchema.index({ partyId: 1, date: -1 });
+// --- Indexes: Optimized for Fast Ledger Loading ---
+transactionSchema.index({ partyId: 1, date: -1, createdAt: -1 }); // Multi-level sort index
 transactionSchema.index({ staffId: 1, date: -1 });
 transactionSchema.index({ referenceId: 1 });
-transactionSchema.index({ type: 1, date: -1 });
+transactionSchema.index({ billNo: 1 }); // Search by bill number
 
-// Fix for Model Overwrite during Hot Reloading
 const Transaction = mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);
 
 export default Transaction;
