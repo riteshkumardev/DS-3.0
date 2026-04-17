@@ -103,9 +103,10 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-white dark:bg-zinc-950 font-sans border-r dark:border-zinc-900 overflow-hidden">
+    // 🔥 FIX 1: Parent height and overflow
+    <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans border-r dark:border-zinc-900 overflow-hidden select-none">
       
-      {/* 🚀 Top Brand */}
+      {/* 🚀 Top Brand - Header Fixed */}
       <div className="p-4 flex-shrink-0">
         <div 
           onClick={() => handleNavigate("/dashboard")}
@@ -120,8 +121,8 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
         </div>
       </div>
 
-      {/* 🛠 Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 scroll-smooth custom-sidebar-scroll">
+      {/* 🛠 Internal Scrollable Section - Only this will scroll */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 custom-sidebar-scroll">
         {menuItems.map((group) => (
           <div key={group.id} className="mb-4 text-left">
             <p className="px-3 text-[8px] font-black text-zinc-400 dark:text-zinc-600 tracking-[0.2em] uppercase mb-2">
@@ -139,7 +140,7 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
                   >
                     <div className="flex items-center gap-2.5">
                       <div className={`p-1.5 rounded-md transition-all ${
-                        openMenu === item.id ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
+                        openMenu === item.id ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                       }`}>
                         {item.icon}
                       </div>
@@ -183,9 +184,9 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
         {isAdmin && (
           <div 
             onClick={() => handleNavigate("/audit-trail")}
-            className="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 text-zinc-500 hover:text-amber-600 transition-all"
+            className="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 text-zinc-500 hover:text-amber-600 transition-all group"
           >
-            <Activity size={14} className="text-amber-500" />
+            <Activity size={14} className="text-amber-500 group-hover:rotate-12 transition-transform" />
             <span className="text-[9px] font-black uppercase tracking-widest text-left">Audit Activity</span>
           </div>
         )}
@@ -202,11 +203,28 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
         )}
       </div>
 
+      {/* 🔥 FIX 2: Global CSS to hide ANY other scrollbar in this component */}
       <style>{`
-        .custom-sidebar-scroll::-webkit-scrollbar { width: 3px; }
-        .custom-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-sidebar-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 10px; }
-        .dark .custom-sidebar-scroll::-webkit-scrollbar-thumb { background: #3f3f46; }
+        .custom-sidebar-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #d4d4d8 transparent;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar {
+            width: 3px;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #d4d4d8;
+            border-radius: 10px;
+        }
+        .dark .custom-sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+        }
+        /* Extra safety to ensure only the inner div scrolls */
+        .flex-col { overflow: hidden !important; }
+        .custom-sidebar-scroll { overflow-y: auto !important; }
       `}</style>
     </div>
   );
