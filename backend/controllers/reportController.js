@@ -10,26 +10,23 @@ const toDate = (d) => (d ? new Date(d) : null);
 const isValidDate = (d) => d instanceof Date && !isNaN(d);
 
 // ==========================================
-// 1. DASHBOARD OVERVIEW (FIXED)
+// 1. DASHBOARD OVERVIEW (NO CHANGE)
 // ==========================================
 export const getDashboardStats = async (req, res, next) => {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // ✅ Daily Sales
         const dailySales = await Sale.aggregate([
             { $match: { date: { $gte: today }, status: { $ne: "CANCELLED" } } },
             { $group: { _id: null, total: { $sum: "$grandTotal" } } }
         ]);
 
-        // ✅ Daily Purchase
         const dailyPurchases = await Purchase.aggregate([
             { $match: { purchaseDate: { $gte: today }, status: { $ne: "CANCELLED" } } },
             { $group: { _id: null, total: { $sum: "$grandTotal" } } }
         ]);
 
-        // 🔥 CORRECT RECEIVABLE/PAYABLE (Latest Balance per Party)
         const balances = await Transaction.aggregate([
             { $match: { partyId: { $ne: null } } },
             { $sort: { partyId: 1, date: -1, createdAt: -1 } },
@@ -72,7 +69,7 @@ export const getDashboardStats = async (req, res, next) => {
 };
 
 // ==========================================
-// 2. PROFIT & LOSS REPORT
+// 2. PROFIT & LOSS REPORT (NO CHANGE)
 // ==========================================
 export const getProfitLossReport = async (req, res, next) => {
     try {
@@ -98,7 +95,7 @@ export const getProfitLossReport = async (req, res, next) => {
 };
 
 // ==========================================
-// 3. EXPENSE SUMMARY
+// 3. EXPENSE SUMMARY (NO CHANGE)
 // ==========================================
 export const getExpenseSummary = async (req, res, next) => {
     try {
@@ -140,7 +137,7 @@ export const getExpenseSummary = async (req, res, next) => {
 };
 
 // ==========================================
-// 4. PARTY LEDGER STATEMENT (WITH PAGINATION)
+// 4. PARTY LEDGER STATEMENT (FULL FIXED)
 // ==========================================
 export const getPartyStatement = async (req, res, next) => {
     try {
@@ -175,45 +172,62 @@ export const getPartyStatement = async (req, res, next) => {
             .populate("performedBy", "name")
             .lean();
 
-        // 🔥 IMPORTANT: Attach Sale/Purchase Data
-        const formatted = await Promise.all(
-            transactions.map(async (txn) => {
-                let goods = [];
-                let billNo = "-";
+  // 🔥 OPTIMIZED & SAFE VERSION
+const formatted = await Promise.all(
+    transactions.map(async (txn) => {
+        let goods = [];
+        let billNo = "-";
 
-                // ✅ SALE
-                if (txn.referenceType === "SALE" && txn.referenceId) {
-                    const sale = await Sale.findById(txn.referenceId)
-                        .select("billNo goods")
-                        .lean();
+        // ✅ SAFE TYPE (future-proof)
+        const txnType = txn.type || txn.referenceType;
 
-                    if (sale) {
-                        goods = sale.goods || [];
-                        billNo = sale.billNo;
-                    }
+        // ❗ अगर referenceId ही नहीं है तो skip
+        if (!txn.referenceId) {
+            return {
+                ...txn,
+                billNo,
+                goods
+            };
+        }
+
+        try {
+            // ✅ SALE
+            if (txnType === "SALE") {
+                const sale = await Sale.findById(txn.referenceId)
+                    .select("billNo goods")
+                    .lean();
+
+                if (sale) {
+                    goods = sale.goods || [];
+                    billNo = sale.billNo || "-";
                 }
+            }
 
-                // ✅ PURCHASE (optional future)
-                if (txn.referenceType === "PURCHASE" && txn.referenceId) {
-                    const purchase = await Purchase.findById(txn.referenceId)
-                        .select("billNo goods")
-                        .lean();
+            // ✅ PURCHASE
+            else if (txnType === "PURCHASE") {
+                const purchase = await Purchase.findById(txn.referenceId)
+                    .select("billNo goods")
+                    .lean();
 
-                    if (purchase) {
-                        goods = purchase.goods || [];
-                        billNo = purchase.billNo;
-                    }
+                if (purchase) {
+                    goods = purchase.goods || [];
+                    billNo = purchase.billNo || "-";
                 }
+            }
 
-                return {
-                    ...txn,
-                    billNo,
-                    goods
-                };
-            })
-        );
+        } catch (err) {
+            console.error("❌ Mapping Error:", err.message);
+        }
 
-        // ✅ PAGINATION MANUAL (after mapping)
+        return {
+            ...txn,
+            billNo,
+            goods
+        };
+    })
+);
+
+        // ✅ PAGINATION
         const total = formatted.length;
         const paginated = formatted.slice(skip, skip + Number(limit));
 
