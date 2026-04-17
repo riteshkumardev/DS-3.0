@@ -3,8 +3,8 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { 
   ChevronDown, ChevronUp, LayoutDashboard, 
   ShoppingCart, Package, Users, 
-  Wallet, ShieldCheck, ArrowRight,
-  TrendingUp, Activity, Boxes, ReceiptIndianRupee
+  Wallet, ShieldCheck, 
+  TrendingUp, Activity
 } from "lucide-react";
 
 const DashboardSidebar = ({ closeSidebar, user }) => {
@@ -26,23 +26,22 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
     setOpenMenu(openMenu === menuName ? null : menuName);
   };
 
-  // Grouped Menu Items
   const menuItems = [
     {
       id: "operations",
-      section: "CORE OPERATIONS",
+      section: "OPERATIONS",
       items: [
         {
           id: "sales",
           label: "Sales & Billing",
-          icon: <TrendingUp size={18} />,
+          icon: <TrendingUp size={16} />,
           visible: isBoss,
           subItems: [{ label: "Sales Manager", path: "/sales-table" }],
         },
         {
           id: "purchase",
           label: "Procurement",
-          icon: <ShoppingCart size={18} />,
+          icon: <ShoppingCart size={16} />,
           visible: isBoss,
           subItems: [{ label: "Purchase Manager", path: "/purchase-table" }],
         },
@@ -50,54 +49,53 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
     },
     {
       id: "logistics",
-      section: "INVENTORY & PARTIES",
+      section: "INVENTORY",
       items: [
         {
           id: "stock",
           label: "Inventory Master",
-          icon: <Package size={18} />,
+          icon: <Package size={16} />,
           visible: isBoss,
           subItems: [
-            { label: "Live Stock View", path: "/stock-management" },
-            { label: "Manual Stock Add", path: "/stock-add" },
-            { label: "Party/Supplier Manager", path: "/suppliers" },
+            { label: "Stock View", path: "/stock-management" },
+            { label: "Manual Add", path: "/stock-add" },
+            { label: "Parties", path: "/suppliers" },
           ],
         },
       ]
     },
     {
-      id: "human_resource",
+      id: "hr",
       section: "HUMAN RESOURCE",
       items: [
         {
           id: "staff",
           label: "Staff Control",
-          icon: <Users size={18} />,
+          icon: <Users size={16} />,
           visible: true,
           subItems: [
-            { label: "Employee Directory", path: "/employee-table", restricted: !isBoss },
-            { label: "Recruit Staff", path: "/employee-add", restricted: !isAdmin },
-            { label: "Daily Attendance", path: "/attendance", restricted: !isBoss },
-            { label: "Salary Ledger", path: "/staff-ledger", restricted: false },
+            { label: "Directory", path: "/employee-table", restricted: !isBoss },
+            { label: "Recruit", path: "/employee-add", restricted: !isAdmin },
+            { label: "Attendance", path: "/attendance", restricted: !isBoss },
+            { label: "Ledger", path: "/staff-ledger", restricted: false },
           ].filter(item => !item.restricted),
         },
       ]
     },
     {
       id: "accounts",
-      section: "ACCOUNTS & FINANCE",
+      section: "FINANCE",
       items: [
         {
           id: "finance",
           label: "Finance Hub",
-          icon: <Wallet size={18} />,
+          icon: <Wallet size={16} />,
           visible: isBoss,
           subItems: [
-            { label: "Business Expenses", path: "/expenses" },
-            { label: "Profit & Loss Account", path: "/profit-loss" },
-            { label: "Master Reports", path: "/Reports_Printing" },
+            { label: "Expenses", path: "/expenses" },
+            { label: "P & L", path: "/profit-loss" },
+            { label: "Reports", path: "/Reports_Printing" },
             { label: "Txn History", path: "/transaction-history", restricted: !isAdmin },
-            { label: "Data Analysis", path: "/analysis-page", restricted: !isAdmin },
           ].filter(item => !item.restricted),
         },
       ]
@@ -105,68 +103,66 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-zinc-950 px-4 py-6 font-sans border-r dark:border-zinc-900 overflow-hidden">
+    <div className="flex flex-col h-screen bg-white dark:bg-zinc-950 font-sans border-r dark:border-zinc-900 overflow-hidden">
       
-      {/* 🚀 Brand/Main Link */}
-      <div 
-        onClick={() => handleNavigate("/dashboard")}
-        className={`flex items-center gap-3 px-4 py-4 rounded-2xl cursor-pointer transition-all duration-300 group ${
-          location.pathname === "/dashboard" 
-          ? "bg-zinc-900 dark:bg-emerald-600 text-white shadow-xl shadow-zinc-500/20" 
-          : "hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500"
-        }`}
-      >
-        <LayoutDashboard size={20} className={location.pathname === "/dashboard" ? "animate-pulse" : "group-hover:scale-110 transition-transform"} />
-        <span className="font-black text-xs uppercase tracking-widest">Main Overview</span>
+      {/* 🚀 Top Brand */}
+      <div className="p-4 flex-shrink-0">
+        <div 
+          onClick={() => handleNavigate("/dashboard")}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-300 group ${
+            location.pathname === "/dashboard" 
+            ? "bg-zinc-900 dark:bg-emerald-600 text-white shadow-lg" 
+            : "hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500"
+          }`}
+        >
+          <LayoutDashboard size={18} />
+          <span className="font-black text-[10px] uppercase tracking-widest text-left">Main Overview</span>
+        </div>
       </div>
 
-      {/* 🛠 Dynamic Sections */}
-      <div className="flex-1 mt-8 space-y-8 overflow-y-auto custom-scrollbar pr-1">
+      {/* 🛠 Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 scroll-smooth custom-sidebar-scroll">
         {menuItems.map((group) => (
-          <div key={group.id} className="space-y-3">
-            {/* Section Label */}
-            <p className="px-4 text-[9px] font-black text-zinc-400 dark:text-zinc-600 tracking-[0.2em] uppercase">
+          <div key={group.id} className="mb-4 text-left">
+            <p className="px-3 text-[8px] font-black text-zinc-400 dark:text-zinc-600 tracking-[0.2em] uppercase mb-2">
               {group.section}
             </p>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {group.items.filter(i => i.visible).map((item) => (
-                <div key={item.id} className="sidebar-section">
+                <div key={item.id}>
                   <button
                     onClick={() => toggleMenu(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all ${
-                      openMenu === item.id 
-                        ? "bg-emerald-50/50 dark:bg-emerald-900/5" 
-                        : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
+                      openMenu === item.id ? "bg-emerald-50/50 dark:bg-emerald-900/5" : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-all ${
-                        openMenu === item.id ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-md transition-all ${
+                        openMenu === item.id ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                       }`}>
                         {item.icon}
                       </div>
-                      <span className={`text-[13px] font-bold tracking-tight ${
+                      <span className={`text-[12px] font-bold ${
                         openMenu === item.id ? "text-zinc-900 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"
                       }`}>
                         {item.label}
                       </span>
                     </div>
-                    {openMenu === item.id ? <ChevronUp size={14} className="text-emerald-500" /> : <ChevronDown size={14} className="text-zinc-300" />}
+                    {openMenu === item.id ? <ChevronUp size={12} className="text-emerald-500" /> : <ChevronDown size={12} className="text-zinc-300" />}
                   </button>
 
-                  {/* Sub-menu with connected line effect */}
-                  <div className={`transition-all duration-500 ease-in-out overflow-hidden ${
-                    openMenu === item.id ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"
+                  <div className={`transition-all duration-300 overflow-hidden ${
+                    openMenu === item.id ? "max-h-60 opacity-100 mt-0.5" : "max-h-0 opacity-0"
                   }`}>
-                    <ul className="ml-7 pl-4 border-l-2 border-zinc-100 dark:border-zinc-800 space-y-1">
+                    <ul className="ml-5 pl-3 border-l border-zinc-100 dark:border-zinc-800 space-y-0.5">
                       {item.subItems.map((sub, idx) => (
                         <li
                           key={idx}
                           onClick={() => handleNavigate(sub.path)}
-                          className={`flex items-center gap-3 py-2.5 px-4 text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                          className={`py-2 px-3 text-[10px] font-black uppercase tracking-wider rounded-md transition-all cursor-pointer text-left ${
                             location.pathname === sub.path
-                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/10"
+                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10"
                             : "text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                           }`}
                         >
@@ -182,15 +178,15 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
         ))}
       </div>
 
-      {/* 🔒 Footer Actions */}
-      <div className="pt-6 border-t dark:border-zinc-900 space-y-2">
+      {/* 🔒 Footer Actions - Fixed Bottom */}
+      <div className="p-4 border-t dark:border-zinc-900 bg-white dark:bg-zinc-950 flex-shrink-0 space-y-2">
         {isAdmin && (
           <div 
             onClick={() => handleNavigate("/audit-trail")}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 text-zinc-500 hover:text-amber-600 transition-all group"
+            className="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 text-zinc-500 hover:text-amber-600 transition-all"
           >
-            <Activity size={16} className="text-amber-500 group-hover:rotate-12 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Audit Activity</span>
+            <Activity size={14} className="text-amber-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-left">Audit Activity</span>
           </div>
         )}
 
@@ -198,18 +194,20 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
           <Link
             to="/master-panel"
             onClick={closeSidebar}
-            className="flex items-center gap-4 px-4 py-4 rounded-2xl bg-zinc-900 dark:bg-emerald-600 text-white shadow-2xl hover:scale-[1.02] active:scale-95 transition-all group"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900 dark:bg-emerald-600 text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
           >
-            <div className="p-2 bg-white/20 rounded-xl text-white">
-              <ShieldCheck size={18} />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">System Security</span>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white">Master Panel</span>
-            </div>
+            <div className="p-1.5 bg-white/20 rounded-lg"><ShieldCheck size={16} /></div>
+            <span className="text-[10px] font-black uppercase tracking-widest">Master Panel</span>
           </Link>
         )}
       </div>
+
+      <style>{`
+        .custom-sidebar-scroll::-webkit-scrollbar { width: 3px; }
+        .custom-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-sidebar-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 10px; }
+        .dark .custom-sidebar-scroll::-webkit-scrollbar-thumb { background: #3f3f46; }
+      `}</style>
     </div>
   );
 };
