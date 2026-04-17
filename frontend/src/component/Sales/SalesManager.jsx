@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import SalesTable from "./SalesTable";
-import SalesEntryForm from "./SalesEntryForm"; // Maan ke chal rahe hain aapka SalesForm ready hai
+import SalesEntry from "./SalesEntry"; // Maan ke chal rahe hain aapka SalesForm ready hai
 import { Plus, LayoutList } from "lucide-react";
 
 /**
@@ -59,7 +59,7 @@ const SalesManager = ({ user }) => {
         {/* Dynamic Content Rendering */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {view === "FORM" ? (
-            <SalesEntryForm 
+            <SalesEntry 
               user={user} 
               editData={editingSale} 
               onCancel={handleCloseForm} 

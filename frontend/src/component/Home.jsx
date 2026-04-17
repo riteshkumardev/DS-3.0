@@ -115,7 +115,7 @@ const Home = ({ user }) => {
         
         {/* ⚡ QUICK ACTIONS BAR */}
         <section className="mb-12 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <ActionButton label="New Sale" icon={<PlusCircle size={18}/>} onClick={() => navigate("/sales-entry")} color="emerald" />
+          <ActionButton label="New Sale" icon={<PlusCircle size={18}/>} onClick={() => navigate("/sales-table")} color="emerald" />
           <ActionButton label="Add Stock" icon={<Package size={18}/>} onClick={() => navigate("/stock-management")} color="sky" />
           <ActionButton label="Reports" icon={<History size={18}/>} onClick={() => navigate("/Reports_Printing")} color="zinc" />
           <ActionButton label="Insights" icon={<Zap size={18}/>} onClick={() => navigate("/analysis-page")} color="amber" />
