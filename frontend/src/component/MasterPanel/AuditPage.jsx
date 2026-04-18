@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   History, Search, Filter, Clock, User, 
-  ShieldCheck, FileDown, RefreshCcw, LayoutGrid
+  ShieldCheck, FileDown, RefreshCcw, LayoutGrid,
+  ChevronLeft, ChevronRight, Activity, Terminal
 } from "lucide-react";
+
+// ✅ API Import
+import { getSystemLogs } from "../../api/logApi"; 
+
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
@@ -12,35 +16,43 @@ const AuditPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const showMsg = (msg, type = "info") => setSnackbar({ open: true, message: msg, severity: type });
 
-  const fetchLogs = async () => {
+  // --- 🔄 FETCH LOGS (Paginated) ---
+  const fetchLogs = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/activity-logs`); 
-      if (res.data.success) setLogs(res.data.data);
+      const res = await getSystemLogs(page); 
+      if (res.data.success) {
+        setLogs(res.data.data);
+        setTotalPages(res.data.pagination?.pages || 1);
+        setCurrentPage(page);
+      }
     } catch (err) {
-      setSnackbar({ open: true, message: "डेटा लोड करने में विफल!", severity: "error" });
+      showMsg("Logs load karne mein samasya!", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchLogs(); }, []);
+  useEffect(() => { fetchLogs(1); }, [fetchLogs]);
 
-  // --- 📊 EXPORT CSV LOGIC ---
+  // --- 📊 EXPORT CSV ---
   const exportToCSV = () => {
-    if (filteredLogs.length === 0) return;
-    const headers = ["Timestamp", "Verified Admin", "Module", "Action Performed"];
+    if (logs.length === 0) return;
+    const headers = ["Timestamp", "User", "Module", "Action", "Status"];
     const csvRows = [
       headers.join(','),
-      ...filteredLogs.map(log => [
+      ...logs.map(log => [
         `"${new Date(log.createdAt).toLocaleString()}"`,
-        `"${log.adminName}"`,
+        `"${log.performedBy?.name || log.adminName || 'System'}"`,
         `"${log.module || 'SYSTEM'}"`,
-        `"${log.action.replace(/"/g, '""')}"`
+        `"${log.action.replace(/"/g, '""')}"`,
+        `"SECURE"`
       ].join(','))
     ].join('\n');
 
@@ -48,160 +60,186 @@ const AuditPage = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `DS_Audit_Report_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute('download', `Audit_Report_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // --- 🎨 DYNAMIC MODULE BADGE STYLES ---
+  // --- 🎨 DYNAMIC BADGE STYLES ---
   const getBadgeStyle = (mod) => {
-    const base = "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter border shadow-sm ";
-    switch (mod) {
-      case 'SALES': return base + "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
-      case 'PURCHASE': return base + "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800";
-      case 'STOCK': return base + "bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";
-      case 'ATTENDANCE': return base + "bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800";
-      case 'PAYROLL': return base + "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800";
-      case 'AUTH': return base + "bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800";
-      default: return base + "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700";
+    const base = "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ";
+    switch (mod?.toUpperCase()) {
+      case 'SALE': return base + "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      case 'PURCHASE': return base + "bg-amber-500/10 text-amber-500 border-amber-500/20";
+      case 'STOCK': return base + "bg-purple-500/10 text-purple-500 border-purple-500/20";
+      case 'STAFF': return base + "bg-rose-500/10 text-rose-500 border-rose-500/20";
+      case 'LEDGER': return base + "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      default: return base + "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
     }
   };
 
   const filteredLogs = logs.filter(log => {
-    const matchesSearch = 
-        String(log.adminName || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(log.action || "").toLowerCase().includes(search.toLowerCase());
+    const name = (log.performedBy?.name || log.adminName || "").toLowerCase();
+    const action = (log.action || "").toLowerCase();
+    const term = search.toLowerCase();
+    const matchesSearch = name.includes(term) || action.includes(term);
     const matchesModule = moduleFilter === "All" || log.module === moduleFilter;
     return matchesSearch && matchesModule;
   });
 
-  if (loading) return <Loader />;
+  if (loading && logs.length === 0) return <Loader />;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-10 font-sans text-left">
+      <div className="max-w-screen-2xl mx-auto space-y-6">
         
-        {/* --- HEADER --- */}
-        <div className="bg-zinc-900 p-8 flex flex-col lg:flex-row justify-between items-center gap-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/40 animate-pulse">
-               <History size={32} className="text-emerald-500" />
+        {/* --- HEADER COMMAND BAR --- */}
+        <div className="bg-white dark:bg-zinc-900 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
+          <div className="bg-zinc-900 p-8 flex flex-col xl:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-5">
+              <div className="p-4 bg-emerald-600 rounded-[1.5rem] text-white shadow-xl shadow-emerald-600/20 rotate-3 group hover:rotate-0 transition-transform cursor-pointer">
+                 <Terminal size={32} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Security Audit</h1>
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mt-3">Live System Integrity Logs</p>
+              </div>
             </div>
-            <div className="text-left">
-              <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">System Audit Trail</h1>
-              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">DHARA SHAKTI AGRO MANAGEMENT</p>
+
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-emerald-500" size={18} />
+                <input 
+                  placeholder="Search activity..." 
+                  className="pl-12 pr-6 py-4 bg-zinc-800 border-none rounded-2xl text-xs font-bold text-white outline-none w-64 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-zinc-600"
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center gap-3 bg-zinc-800 px-5 rounded-2xl border border-zinc-700">
+                 <Filter size={16} className="text-emerald-500" />
+                 <select 
+                   value={moduleFilter} 
+                   onChange={(e) => setModuleFilter(e.target.value)}
+                   className="bg-transparent text-zinc-400 text-[10px] font-black uppercase py-4 border-none outline-none cursor-pointer"
+                 >
+                   <option value="All">All Modules</option>
+                   <option value="SALE">Sales Engine</option>
+                   <option value="PURCHASE">Procurement</option>
+                   <option value="STOCK">Inventory</option>
+                   <option value="STAFF">Staffing</option>
+                   <option value="LEDGER">Financials</option>
+                 </select>
+              </div>
+              
+              <button onClick={() => fetchLogs(1)} className="p-4 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white hover:bg-zinc-700 transition-all border border-zinc-700">
+                <RefreshCcw size={20} className={loading ? "animate-spin" : ""} />
+              </button>
+
+              <button 
+                onClick={exportToCSV}
+                className="flex items-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-900/20 active:scale-95"
+              >
+                <FileDown size={18} /> Export Data
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-              <input 
-                placeholder="Search history..." 
-                className="pl-10 pr-4 py-3 bg-zinc-800 border-none rounded-xl text-xs font-bold text-white outline-none w-48 sm:w-64 focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                value={search} onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 bg-zinc-800 px-3 rounded-xl">
-               <Filter size={14} className="text-emerald-500" />
-               <select 
-                 value={moduleFilter} 
-                 onChange={(e) => setModuleFilter(e.target.value)}
-                 className="bg-transparent text-zinc-400 text-[10px] font-black uppercase py-3 border-none outline-none cursor-pointer"
-               >
-                 <option value="All">All Modules</option>
-                 <option value="SALES">Sales</option>
-                 <option value="PURCHASE">Purchase</option>
-                 <option value="STOCK">Inventory</option>
-                 <option value="ATTENDANCE">Attendance</option>
-                 <option value="PAYROLL">Payroll</option>
-                 <option value="SUPPLIER">Parties</option>
-                 <option value="AUTH">Login/Security</option>
-               </select>
-            </div>
-            
-            <button onClick={fetchLogs} className="p-3 bg-zinc-800 text-zinc-400 rounded-xl hover:text-white transition-colors">
-              <RefreshCcw size={16} />
-            </button>
-
-            <button 
-              onClick={exportToCSV}
-              disabled={filteredLogs.length === 0}
-              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-30"
-            >
-              <FileDown size={16} /> Export
-            </button>
-          </div>
-        </div>
-
-        {/* --- TABLE --- */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-400 text-[10px] font-black uppercase tracking-widest border-b dark:border-zinc-800">
-                <th className="px-8 py-5">Verified User</th>
-                <th className="px-8 py-5 text-center">Department</th>
-                <th className="px-8 py-5">Action Log</th>
-                <th className="px-8 py-5">Timestamp</th>
-                <th className="px-8 py-5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredLogs.map((log, i) => (
-                <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-all group">
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 font-black text-[11px] border border-zinc-200 dark:border-zinc-700 ring-2 ring-emerald-500/0 group-hover:ring-emerald-500/20 transition-all">
-                        {log.adminName?.charAt(0)}
-                      </div>
-                      <span className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter">{log.adminName}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-center">
-                    <span className={getBadgeStyle(log.module)}>
-                      {log.module || "SYSTEM"}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed italic group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
-                      {log.action}
-                    </p>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2.5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                      <Clock size={12} className="text-emerald-500" />
-                      {new Date(log.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 rounded-full text-[9px] font-black uppercase border border-emerald-100 dark:border-emerald-900/30">
-                      <ShieldCheck size={10} /> Secure
-                    </div>
-                  </td>
+          {/* --- TABLE AREA --- */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-[10px] font-black uppercase tracking-[0.3em] border-b dark:border-zinc-800">
+                  <th className="px-10 py-8">Operator Identity</th>
+                  <th className="px-10 py-8 text-center">Protocol</th>
+                  <th className="px-10 py-8">Activity Description</th>
+                  <th className="px-10 py-8">Execution Time</th>
+                  <th className="px-10 py-8 text-right">Verification</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {filteredLogs.map((log, i) => (
+                  <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all group">
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 font-black text-sm border border-zinc-200 dark:border-zinc-700 group-hover:border-emerald-500/50 transition-colors">
+                          {log.performedBy?.name?.charAt(0) || log.adminName?.charAt(0) || 'S'}
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-sm font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{log.performedBy?.name || log.adminName || 'System'}</span>
+                           <span className="text-[9px] font-bold text-zinc-400">ID: {log.performedBy?._id?.slice(-6) || '---'}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <span className={getBadgeStyle(log.module)}>
+                        {log.module || "SYSTEM"}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6">
+                      <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed italic group-hover:text-emerald-500 transition-colors">
+                        {log.action}
+                      </p>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-3 text-[11px] font-black text-zinc-400 uppercase tracking-tighter">
+                        <Clock size={14} className="text-emerald-500" />
+                        {new Date(log.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-right">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 rounded-xl text-[10px] font-black uppercase border border-emerald-100 dark:border-emerald-800 shadow-sm">
+                        <ShieldCheck size={12} /> Verified
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* --- PAGINATION FOOTER --- */}
+          <div className="p-8 border-t dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-center gap-6 bg-zinc-50/50 dark:bg-zinc-800/20">
+             <div className="flex items-center gap-4">
+                <Activity size={18} className="text-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                  Total Analysis: {filteredLogs.length} Records Detected
+                </span>
+             </div>
+             
+             <div className="flex items-center gap-3">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => fetchLogs(currentPage - 1)}
+                  className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-50 disabled:opacity-30 transition-all shadow-sm"
+                >
+                  <ChevronLeft size={20}/>
+                </button>
+                <div className="px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-black tracking-widest">
+                   {currentPage} / {totalPages}
+                </div>
+                <button 
+                  disabled={currentPage === totalPages}
+                  onClick={() => fetchLogs(currentPage + 1)}
+                  className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-50 disabled:opacity-30 transition-all shadow-sm"
+                >
+                  <ChevronRight size={20}/>
+                </button>
+             </div>
+          </div>
         </div>
 
-        {filteredLogs.length === 0 && (
-          <div className="py-24 text-center">
-            <LayoutGrid size={48} className="mx-auto text-zinc-200 dark:text-zinc-800 mb-4" />
-            <p className="text-zinc-400 font-black uppercase tracking-[0.3em] text-xs">No activity found for this filter</p>
+        {filteredLogs.length === 0 && !loading && (
+          <div className="py-32 text-center animate-in fade-in zoom-in duration-700">
+            <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <LayoutGrid size={40} className="text-zinc-300 dark:text-zinc-600" />
+            </div>
+            <p className="text-zinc-400 font-black uppercase tracking-[0.4em] text-[10px]">Zero records found in this sequence</p>
           </div>
         )}
       </div>
 
-      {/* --- FOOTER INFO --- */}
-      <div className="max-w-7xl mx-auto mt-6 flex justify-between items-center px-6">
-         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Powered by Dhara Shakti Security Engine</p>
-         <div className="flex gap-4 text-[10px] font-black text-emerald-500 uppercase italic">
-            <span>Total Records: {filteredLogs.length}</span>
-         </div>
-      </div>
-      
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({...snackbar, open: false})} />
     </div>
   );
