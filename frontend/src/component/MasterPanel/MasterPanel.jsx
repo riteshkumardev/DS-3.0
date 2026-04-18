@@ -7,7 +7,7 @@ import {
   CheckCircle2, RefreshCcw, Activity, ClipboardList
 } from "lucide-react"; 
 
-// ✅ API Imports Sync
+// ✅ New Backend API Services
 import { getAllStaff, updateStaff } from "../../api/staffApi"; 
 import { getSystemLogs } from "../../api/logApi"; 
 
@@ -161,14 +161,16 @@ const MasterPanel = ({ user }) => {
     setActionLoading(true);
     try {
       const payload = { [field]: value };
-      let customMsg = `Updated: ${field.toUpperCase()}`;
+      let customMsg = `System updated: ${field.toUpperCase()}`;
 
-      // ✅ DYNAMIC LOGIC: Block/Restore
+      // ✅ DYNAMIC SNACKBAR LOGIC
       if (field === 'isBlocked') {
         payload.status = value ? "LEFT" : "ACTIVE";
         customMsg = value 
           ? `⛔ ${staffName}'s access has been REVOKED!` 
           : `✅ ${staffName}'s access has been RESTORED!`;
+      } else if (field === 'role') {
+        customMsg = `🛡️ ${staffName} assigned as ${value}`;
       }
 
       await updateStaff(id, payload);
@@ -197,13 +199,15 @@ const MasterPanel = ({ user }) => {
       <div className="max-w-[1600px] mx-auto space-y-10">
         
         {/* --- HEADER --- */}
-        <div className="bg-white dark:bg-zinc-900 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
           <div className="bg-emerald-600 p-10 flex flex-col xl:flex-row justify-between items-center gap-8 text-white">
             <div className="flex items-center gap-6">
-               <ShieldCheck size={48} className="p-3 bg-white/20 rounded-[1.5rem] backdrop-blur-md" />
+               <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-md shadow-inner">
+                 <ShieldCheck size={40} />
+               </div>
                <div>
                   <h1 className="text-3xl font-black uppercase tracking-tighter italic">Command Center</h1>
-                  <p className="text-emerald-100 text-[10px] font-black uppercase tracking-[0.4em] mt-2 opacity-70">Unified Security & Integrity Control</p>
+                  <p className="text-emerald-100 text-[10px] font-black uppercase tracking-[0.4em] mt-2 opacity-70">Unified Security & Data Management Protocol</p>
                </div>
             </div>
 
@@ -216,7 +220,7 @@ const MasterPanel = ({ user }) => {
               </label>
 
               <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-white" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" size={18} />
                 <input 
                   type="text" 
                   placeholder="Search staff..." 
@@ -230,14 +234,16 @@ const MasterPanel = ({ user }) => {
           </div>
         </div>
 
-        {/* --- MAIN GRID --- */}
+        {/* --- MAIN CONTENT GRID --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
             {filteredStaff.map(s => {
-              const isBlocked = s.status === "LEFT" || s.status === "TERMINATED";
+              // ✅ FIXED Logic for Blocked State mapping with status
+              const isCurrentlyBlocked = s.status === "LEFT" || s.status === "TERMINATED";
+
               return (
-                <div key={s._id} className={`group bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-xl border-2 transition-all duration-500 ${isBlocked ? 'border-rose-500/20 opacity-60' : 'border-transparent hover:border-emerald-500/30'}`}>
+                <div key={s._id} className={`group bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-xl border-2 transition-all duration-500 ${isCurrentlyBlocked ? 'border-rose-500/20 opacity-60' : 'border-transparent hover:border-emerald-500/30'}`}>
                   <div className="p-8">
                     <div className="flex items-center justify-between mb-8">
                       <div className="flex items-center gap-4">
@@ -249,18 +255,18 @@ const MasterPanel = ({ user }) => {
                           <p className="text-[10px] font-bold text-zinc-400">UID: {s.employeeId}</p>
                         </div>
                       </div>
-                      <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${isBlocked ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-600'}`}>
-                        {isBlocked ? 'BLOCKED' : s.role}
+                      <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${isCurrentlyBlocked ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'}`}>
+                        {isCurrentlyBlocked ? 'BLOCKED' : s.role}
                       </span>
                     </div>
 
                     <div className="space-y-6">
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Access Authorization</label>
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Assign Authorization</label>
                         <select 
                           value={s.role} 
                           onChange={(e) => handleStatusUpdate(s._id, 'role', e.target.value, s.name)}
-                          className="w-full p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl text-xs font-bold outline-none dark:text-white appearance-none border-none cursor-pointer shadow-inner"
+                          className="w-full p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl text-xs font-bold outline-none dark:text-white appearance-none border-none cursor-pointer"
                         >
                           {['ADMIN', 'MANAGER', 'ACCOUNTANT', 'STAFF', 'WORKER'].map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
@@ -268,14 +274,18 @@ const MasterPanel = ({ user }) => {
 
                       <div className="flex gap-3">
                         <button 
-                          onClick={() => handleStatusUpdate(s._id, 'isBlocked', !isBlocked, s.name)} 
+                          onClick={() => handleStatusUpdate(s._id, 'isBlocked', !isCurrentlyBlocked, s.name)} 
                           className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
-                            isBlocked 
+                            isCurrentlyBlocked 
                             ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-500' 
                             : 'bg-rose-50 dark:bg-rose-900/10 text-rose-600 border border-rose-100 hover:bg-rose-100'
                           }`}
                         >
-                          {isBlocked ? <div className="flex items-center justify-center gap-2"><Unlock size={14}/> RESTORE ACCESS</div> : <div className="flex items-center justify-center gap-2"><Lock size={14}/> REVOKE ACCESS</div>}
+                          {isCurrentlyBlocked ? (
+                            <div className="flex items-center justify-center gap-2"><Unlock size={14} className="inline"/> RESTORE ACCESS</div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2"><Lock size={14} className="inline"/> REVOKE ACCESS</div>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -285,7 +295,7 @@ const MasterPanel = ({ user }) => {
             })}
           </div>
 
-          <div className="lg:col-span-4 space-y-8">
+          <div className="lg:col-span-4 space-y-8 text-left">
              <div className="bg-zinc-900 rounded-[3rem] shadow-2xl border border-zinc-800 overflow-hidden sticky top-10">
                 <div className="p-8 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40">
                   <div className="flex items-center gap-3">

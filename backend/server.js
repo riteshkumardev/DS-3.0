@@ -26,6 +26,7 @@ import stockRoutes from "./routes/stockRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import backupRoutes from "./routes/backupRoutes.js";
 
 // ===============================
 // 🔹 CONFIG
@@ -111,6 +112,10 @@ app.use("/api/stocks", stockRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/attendance", attendanceRoutes);
+
+
+// ... baki middlewares
+app.use("/api/backup", backupRoutes);
 
 // ===============================
 // 🔹 HEALTH CHECK

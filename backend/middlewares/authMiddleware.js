@@ -2,30 +2,25 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 /**
- * 🚀 Dharashakti ERP - Auth Middleware (Production Ready)
+ * 🚀 Dharashakti ERP - Auth Middleware (v3 Professional)
  */
 
 // ===============================
-// 🔹 TOKEN EXTRACTOR
+// 🔹 TOKEN EXTRACTOR (Helper)
 // ===============================
 const getTokenFromRequest = (req) => {
     let token = null;
-
-    // 1. Authorization Header
     if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
         token = req.headers.authorization.split(" ")[1];
     }
-
-    // 2. Cookies (Optional future support)
     if (!token && req.cookies?.token) {
         token = req.cookies.token;
     }
-
     return token;
 };
 
 // ===============================
-// 🔹 PROTECT ROUTES
+// 🔹 PROTECT MIDDLEWARE
 // ===============================
 export const protect = async (req, res, next) => {
     try {
@@ -36,10 +31,10 @@ export const protect = async (req, res, next) => {
             throw new Error("Not authorized, token missing");
         }
 
-        // ✅ Verify token (NO fallback secret)
+        // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // ✅ Fetch user
+        // Fetch user from DB
         const user = await User.findById(decoded.id).select("-password");
 
         if (!user) {
@@ -47,42 +42,50 @@ export const protect = async (req, res, next) => {
             throw new Error("User not found or deleted");
         }
 
-        if (!user.isActive) {
+        if (user.status === "LEFT" || user.status === "TERMINATED") {
             res.status(403);
-            throw new Error("User account is deactivated");
+            throw new Error("Your account has been blocked by Admin");
         }
 
-        // ✅ Attach to request
+        // Attach user to req object
         req.user = user;
-
         next();
 
     } catch (error) {
-        // ❗ Pass to global error handler (important)
         next(error);
     }
 };
 
 // ===============================
-// 🔹 ROLE BASED ACCESS CONTROL
+// 🔹 ADMIN MIDDLEWARE (Legacy Support for Routes)
+// ===============================
+// Isse aapka 'ERR_MODULE_NOT_FOUND' wala error fix ho jayega
+export const admin = (req, res, next) => {
+    if (req.user && req.user.role === "ADMIN") {
+        next();
+    } else {
+        res.status(403);
+        const error = new Error("Access denied: Admin privileges required");
+        next(error);
+    }
+};
+
+// ===============================
+// 🔹 DYNAMIC ROLE AUTHORIZATION
 // ===============================
 export const authorize = (...allowedRoles) => {
     return (req, res, next) => {
         try {
             if (!req.user) {
                 res.status(401);
-                throw new Error("Not authorized, user missing");
+                throw new Error("Not authorized, user data missing");
             }
 
             if (!allowedRoles.includes(req.user.role)) {
                 res.status(403);
-                throw new Error(
-                    `Access denied: Role '${req.user.role}' not allowed`
-                );
+                throw new Error(`Access denied: Role '${req.user.role}' is not authorized`);
             }
-
             next();
-
         } catch (error) {
             next(error);
         }
@@ -90,16 +93,16 @@ export const authorize = (...allowedRoles) => {
 };
 
 // ===============================
-// 🔹 OPTIONAL: ROLE HIERARCHY (ADVANCED)
+// 🔹 ROLE HIERARCHY LOGIC
 // ===============================
 const roleHierarchy = {
     ADMIN: 4,
     MANAGER: 3,
     ACCOUNTANT: 2,
-    STAFF: 1
+    STAFF: 1,
+    WORKER: 0
 };
 
-// Usage: authorizeLevel("MANAGER")
 export const authorizeLevel = (minRole) => {
     return (req, res, next) => {
         try {
@@ -113,13 +116,9 @@ export const authorizeLevel = (minRole) => {
 
             if (userLevel < requiredLevel) {
                 res.status(403);
-                throw new Error(
-                    `Access denied: Minimum role required is ${minRole}`
-                );
+                throw new Error(`Access denied: Minimum role required is ${minRole}`);
             }
-
             next();
-
         } catch (error) {
             next(error);
         }
