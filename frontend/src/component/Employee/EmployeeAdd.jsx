@@ -18,22 +18,24 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     severity: "success"
   });
 
-  const [formData, setFormData] = useState({
+  const initialState = {
     name: "",
     fatherName: "",
     phone: "",
     emergencyPhone: "",
     aadhar: "",
     address: "",
-    designation: "WORKER", // Default match with Enum
+    designation: "WORKER", 
     joiningDate: new Date().toISOString().split("T")[0],
     salary: "",
     bankName: "",
     accountNo: "",
     ifscCode: "",
     photo: null,
-    password: ""
-  });
+    password: "" // 🔑 Added explicitly in state
+  };
+
+  const [formData, setFormData] = useState(initialState);
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
@@ -45,7 +47,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Input Constraints
+    // Input Length Constraints
     if ((name === "phone" || name === "emergencyPhone") && value.length > 10) return;
     if (name === "aadhar" && value.length > 12) return;
     
@@ -65,198 +67,191 @@ const EmployeeAdd = ({ onEntrySaved }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validations
+    // 🛑 STRICT VALIDATIONS
     if (formData.phone.length !== 10) return showMsg("Mobile number must be 10 digits", "error");
     if (formData.aadhar.length !== 12) return showMsg("Aadhaar must be 12 digits", "error");
-    if (formData.password.length < 4) return showMsg("PIN must be at least 4 digits", "error");
+    if (!formData.password || formData.password.length < 4) {
+       return showMsg("Password (Access PIN) is mandatory and must be 4+ digits", "error");
+    }
 
     setLoading(true);
 
     try {
-      // 📦 Building Multipart Data for Backend Compatibility
+      // 📦 BUILDING MULTIPART DATA (For Photo Support)
       const data = new FormData();
       
-      // Mapping to Backend Schema structure
+      // ✅ Essential Backend Schema Mapping
       data.append("name", formData.name);
-      data.append("fatherName", formData.fatherName);
+      data.append("password", formData.password); // 🔥 Ensure this key matches Backend Model
+      data.append("role", formData.designation.toUpperCase());
       data.append("phone", formData.phone);
-      data.append("emergencyPhone", formData.emergencyPhone);
-      data.append("address", formData.address);
-      data.append("role", formData.designation); // Match enum: 'DRIVER', 'WORKER', etc.
-      data.append("salary", formData.salary); // Backend will map this to baseSalary
-      data.append("aadhar", formData.aadhar); // Backend will map this to kycDetails
-      data.append("password", formData.password);
-      data.append("bankName", formData.bankName);
-      data.append("accountNo", formData.accountNo);
-      data.append("ifscCode", formData.ifscCode);
+      data.append("aadhar", formData.aadhar);
+      data.append("salary", formData.salary);
       data.append("joiningDate", formData.joiningDate);
+      
+      // Secondary Fields
+      data.append("fatherName", formData.fatherName || "");
+      data.append("emergencyPhone", formData.emergencyPhone || "");
+      data.append("address", formData.address || "");
+      data.append("bankName", formData.bankName || "");
+      data.append("accountNo", formData.accountNo || "");
+      data.append("ifscCode", formData.ifscCode || "");
 
       if (formData.photo) {
-        data.append("image", formData.photo); 
+        data.append("photo", formData.photo); // Using 'photo' as standard key
       }
 
+      // API Call using imported staffApi
       const response = await addStaff(data);
 
-      // Show Success with Generated ID
-      const empId = response.data?.data?.employeeId || "Generated";
-      showMsg(`✅ Staff Registered! ID: ${empId}`, "success");
-
-      // Reset Form State
-      setFormData({
-        name: "", fatherName: "", phone: "", emergencyPhone: "",
-        aadhar: "", address: "", designation: "WORKER",
-        joiningDate: new Date().toISOString().split("T")[0],
-        salary: "", bankName: "", accountNo: "", ifscCode: "",
-        photo: null, password: ""
-      });
-      setPreview(null);
-      
-      if (onEntrySaved) onEntrySaved();
+      if (response.data.success) {
+        const empId = response.data?.data?.employeeId || "NEW";
+        showMsg(`✅ Staff Registered Successfully! ID: ${empId}`, "success");
+        
+        // Full Reset
+        setFormData(initialState);
+        setPreview(null);
+        if (onEntrySaved) onEntrySaved();
+      }
     } catch (error) {
-      showMsg(error.response?.data?.message || "Registration failed. Check server connection.", "error");
+      console.error("Staff Save Error:", error.response?.data);
+      const errorMsg = error.response?.data?.message || "Registration failed. Path `password` error.";
+      showMsg(errorMsg, "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-10 font-sans text-left">
       {loading && <Loader />}
       
-      <div className="max-w-5xl mx-auto bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="max-w-6xl mx-auto bg-white dark:bg-zinc-900 rounded-[3.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         
-        {/* Header Section */}
-        <div className="bg-emerald-600 p-8 flex flex-col md:flex-row justify-between items-center text-white gap-4">
-          <div className="flex items-center gap-4">
+        {/* --- HEADER COMMAND --- */}
+        <div className="bg-emerald-600 p-10 flex flex-col md:flex-row justify-between items-center text-white gap-6">
+          <div className="flex items-center gap-6">
             {preview ? (
-               <img src={preview} className="w-16 h-16 rounded-2xl object-cover border-2 border-white/50 shadow-lg" alt="Preview" />
+               <img src={preview} className="w-20 h-20 rounded-3xl object-cover border-4 border-white/20 shadow-2xl" alt="P" />
             ) : (
-               <div className="bg-white/20 p-4 rounded-2xl"><Rocket size={32} /></div>
+               <div className="bg-white/20 p-5 rounded-[2rem] backdrop-blur-md shadow-inner"><Rocket size={40} /></div>
             )}
             <div>
-              <h2 className="text-2xl font-black tracking-tight uppercase">Staff Enrollment</h2>
-              <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest opacity-80">Dharashakti Agro Products</p>
+              <h2 className="text-3xl font-black tracking-tighter uppercase italic">Recruit Force</h2>
+              <p className="text-emerald-100 text-[10px] font-black uppercase tracking-[0.4em] opacity-70">Staff Master Deployment</p>
             </div>
           </div>
-          <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest">
-            {formData.designation || "SELECT"} MODE
+          <div className="bg-zinc-900/30 backdrop-blur-xl px-8 py-3 rounded-2xl border border-white/10 text-[11px] font-black uppercase tracking-widest">
+             {formData.designation} PROFILE
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-12">
+        <form onSubmit={handleSubmit} className="p-10 md:p-14 space-y-14">
           
-          {/* Section 1: Personal Data */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <User size={18} className="text-emerald-500" /> Identity Details
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Full Name *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input-zinc" placeholder="Ex: Rahul Kumar" />
+          {/* Section 1: Identification */}
+          <div className="space-y-8">
+            <div className="flex items-center gap-4">
+               <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+               <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3">
+                 <User size={18} className="text-emerald-500" /> Primary Identity
+               </h3>
+               <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="space-y-2">
+                <label className="form-label">Full Name *</label>
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input-zinc font-bold" placeholder="RAHUL MISHRA" />
               </div>
               
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CreditCard size={12}/> Aadhaar (12 Digits) *</label>
-                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required className="form-input-zinc font-bold tracking-widest" placeholder="0000 0000 0000" />
+              <div className="space-y-2">
+                <label className="form-label flex items-center gap-1.5"><CreditCard size={14} className="text-emerald-500"/> Aadhaar Number *</label>
+                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required className="form-input-zinc font-black tracking-[0.2em]" placeholder="XXXX XXXX XXXX" />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Camera size={12}/> Profile Photo</label>
+              <div className="space-y-2">
+                <label className="form-label flex items-center gap-1.5"><Camera size={14} className="text-emerald-500"/> Profile Image</label>
                 <div className="relative group">
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                  <div className={`form-input-zinc flex items-center justify-between ${formData.photo ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-zinc-50 dark:bg-zinc-800/50'}`}>
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+                  <div className={`form-input-zinc flex items-center justify-between transition-all ${formData.photo ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10' : ''}`}>
                     <span className="text-zinc-500 text-xs truncate font-bold">
-                      {formData.photo ? formData.photo.name : "Upload Photo..."}
+                      {formData.photo ? formData.photo.name : "Attach Photo (Max 2MB)"}
                     </span>
-                    {formData.photo ? <X size={14} className="text-red-500 cursor-pointer" onClick={(e) => { e.preventDefault(); setFormData({...formData, photo: null}); setPreview(null); }}/> : <Camera size={14} className="text-zinc-400" />}
+                    {formData.photo ? <X size={16} className="text-rose-500 cursor-pointer z-30" onClick={(e) => { e.preventDefault(); setFormData({...formData, photo: null}); setPreview(null); }}/> : <Camera size={16} className="text-zinc-400" />}
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Phone size={12}/> Mobile *</label>
-                <input type="number" name="phone" value={formData.phone} onChange={handleChange} required className="form-input-zinc font-bold" placeholder="9999900000" />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Father's Name</label>
-                <input type="text" name="fatherName" value={formData.fatherName} onChange={handleChange} className="form-input-zinc" placeholder="Guardian Name" />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Emergency Phone</label>
-                <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} className="form-input-zinc" placeholder="Family Number" />
-              </div>
             </div>
           </div>
 
-          {/* Section 2: Salary & Security */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <Briefcase size={18} className="text-emerald-500" /> Employment Config
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Designation</label>
-                <select name="designation" value={formData.designation} onChange={handleChange} className="form-input-zinc appearance-none cursor-pointer">
-                  <option value="MANAGER">Manager</option>
-                  <option value="ACCOUNTANT">Accountant</option>
-                  <option value="OPERATOR">Operator</option>
-                  <option value="DRIVER">Driver</option>
-                  <option value="LOADER">Loader</option>
-                  <option value="SALES_MAN">Sales Man</option>
-                  <option value="WORKER">Worker</option>
-                  <option value="OTHER">Other</option>
+          {/* Section 2: Security & Pay */}
+          <div className="space-y-8">
+            <div className="flex items-center gap-4">
+               <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+               <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3">
+                 <Briefcase size={18} className="text-emerald-500" /> Operational Config
+               </h3>
+               <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="space-y-2">
+                <label className="form-label">Designation</label>
+                <select name="designation" value={formData.designation} onChange={handleChange} className="form-input-zinc font-bold cursor-pointer appearance-none">
+                  <option value="MANAGER">MANAGER</option>
+                  <option value="ACCOUNTANT">ACCOUNTANT</option>
+                  <option value="OPERATOR">OPERATOR</option>
+                  <option value="DRIVER">DRIVER</option>
+                  <option value="LOADER">LOADER</option>
+                  <option value="WORKER">WORKER</option>
                 </select>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><CalendarDays size={12}/> Joining Date</label>
-                <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} className="form-input-zinc" />
+              
+              <div className="space-y-2">
+                <label className="form-label flex items-center gap-1.5"><Lock size={14} className="text-amber-500"/> Access PIN *</label>
+                <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 dark:border-amber-900/50 focus:border-amber-500 font-black text-center text-lg" placeholder="0000" />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><Banknote size={12}/> Monthly Salary *</label>
-                <input type="number" name="salary" value={formData.salary} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600" placeholder="₹ Amount" />
+
+              <div className="space-y-2">
+                <label className="form-label flex items-center gap-1.5"><Banknote size={14} className="text-emerald-500"/> Fixed Salary *</label>
+                <input type="number" name="salary" value={formData.salary} onChange={handleChange} required className="form-input-zinc font-black text-emerald-600 text-xl" placeholder="₹ 0.00" />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-amber-600 uppercase ml-1 flex items-center gap-1.5"><Lock size={12}/> Access PIN *</label>
-                <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-input-zinc border-amber-200 focus:border-amber-500 font-bold" placeholder="For Login" />
+
+              <div className="space-y-2">
+                <label className="form-label flex items-center gap-1.5"><CalendarDays size={14}/> Effective Date</label>
+                <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} className="form-input-zinc font-bold" />
               </div>
             </div>
           </div>
 
-          {/* Section 3: Bank Details */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-3">
-              <Landmark size={18} className="text-emerald-500" /> Payment & Address
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Bank Name</label>
-                <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} className="form-input-zinc" placeholder="Ex: SBI / HDFC" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">Account Number</label>
-                <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} className="form-input-zinc font-bold tracking-wider" placeholder="Digits Only" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1">IFSC Code</label>
-                <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} className="form-input-zinc uppercase tracking-widest" placeholder="SBIN000XXXX" />
-              </div>
-              <div className="space-y-1 lg:col-span-3">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 flex items-center gap-1.5"><MapPin size={12}/> Current Address</label>
-                <input type="text" name="address" value={formData.address} onChange={handleChange} className="form-input-zinc" placeholder="Village, Block, District..." />
-              </div>
-            </div>
+          {/* Section 3: Contact & Bank */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+             <div className="lg:col-span-1 space-y-6 bg-zinc-50 dark:bg-zinc-800/40 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
+                <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b pb-3">Contact Nodes</h4>
+                <div className="space-y-4">
+                  <input type="number" name="phone" value={formData.phone} onChange={handleChange} required className="form-input-zinc" placeholder="Primary Mobile" />
+                  <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} className="form-input-zinc" placeholder="Emergency Mobile" />
+                  <input type="text" name="address" value={formData.address} onChange={handleChange} className="form-input-zinc" placeholder="Current Address" />
+                </div>
+             </div>
+
+             <div className="lg:col-span-2 space-y-6 bg-emerald-500/5 p-8 rounded-[2.5rem] border border-emerald-500/10">
+                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-500/10 pb-3">Financial Settlement (Bank)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} className="form-input-zinc" placeholder="BANK NAME (SBI/HDFC)" />
+                   <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} className="form-input-zinc uppercase" placeholder="IFSC CODE" />
+                   <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} className="form-input-zinc md:col-span-2 font-black tracking-widest" placeholder="ACCOUNT NUMBER" />
+                </div>
+             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center pt-8">
+          <div className="flex justify-center pt-6">
             <button 
               type="submit" 
               disabled={loading}
-              className="group relative flex items-center gap-4 px-20 py-5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+              className="group relative flex items-center gap-4 px-24 py-6 bg-zinc-900 dark:bg-emerald-600 text-white rounded-[2.5rem] font-black text-xs uppercase tracking-[0.3em] shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
             >
-              {loading ? "Registering..." : <><Rocket size={20} className="group-hover:animate-bounce" /> Complete Registration</>}
+              {loading ? "PROCESSING..." : <><Rocket size={20} className="group-hover:animate-bounce" /> Dispatch Staff Data</>}
             </button>
           </div>
         </form>
@@ -270,26 +265,10 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       />
 
       <style>{`
-        .form-input-zinc {
-          width: 100%;
-          background: #f4f4f5;
-          border: 1px solid #e4e4e7;
-          border-radius: 1.25rem;
-          padding: 0.85rem 1.25rem;
-          font-size: 0.875rem;
-          outline: none;
-          transition: all 0.2s ease;
-        }
-        .dark .form-input-zinc {
-          background: #18181b;
-          border-color: #27272a;
-          color: #f4f4f5;
-        }
-        .form-input-zinc:focus {
-          border-color: #10b981;
-          background: #ffffff;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
-        }
+        .form-label { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #71717a; margin-left: 0.5rem; display: block; margin-bottom: 4px; letter-spacing: 0.05em; }
+        .form-input-zinc { width: 100%; background: #f8fafc; border: 2px solid transparent; border-radius: 1.5rem; padding: 1.1rem 1.5rem; font-size: 0.9rem; outline: none; transition: all 0.3s ease; color: #1e293b; }
+        .dark .form-input-zinc { background: #18181b; color: white; border-color: #27272a; }
+        .form-input-zinc:focus { border-color: #10b981; background: white; box-shadow: 0 15px 30px -10px rgba(16, 185, 129, 0.2); }
         .dark .form-input-zinc:focus { background: #09090b; }
       `}</style>
     </div>
