@@ -1,11 +1,17 @@
 import express from "express";
 const router = express.Router();
 
-// Controller aur Middleware ke paths aur .js extension verify karein
+// Controllers Import (Sahi path aur extension ke saath)
 import { getSalaryPaymentByBill } from "../controllers/salaryController.js";
-import { protect } from "../middlewares/authMiddleware.js"; // 'middlewares' with S as per your server.js
 
-// GET request for: /api/salary-payments/DS-2026-001
-router.get("/:billNo", protect, getSalaryPaymentByBill);
+// Middlewares Import (Aapke auth routes ke style mein)
+import { protect, authorize } from "../middlewares/authMiddleware.js";
+
+/**
+ * Salary Payment Routes - Dharashakti ERP
+ */
+
+// Sirf Admin aur Accountant hi salary records dekh sakte hain
+router.get("/:billNo", protect, authorize('ADMIN', 'ACCOUNTANT'), getSalaryPaymentByBill);
 
 export default router;
