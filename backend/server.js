@@ -27,7 +27,6 @@ import partyRoutes from "./routes/partyRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
-import salaryPaymentRoutes from "./routes/salaryPaymentRoutes.js";
 
 // ===============================
 // 🔹 CONFIG
@@ -100,11 +99,6 @@ app.use(activityLogger);
 // ===============================
 // 🔹 ROUTES
 // ===============================
-// server.js mein upar import karein
-
-
-// Routes middleware section mein add karein
-app.use("/api/salary-payments", salaryPaymentRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/ledger", ledgerRoutes);
