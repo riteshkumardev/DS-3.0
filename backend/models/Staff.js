@@ -7,7 +7,7 @@ const staffSchema = new mongoose.Schema({
         unique: true,
         uppercase: true,
         trim: true
-        // 'required' hata diya hai kyunki hum ise save hone se pehle backend me generate karenge
+        // Frontend Controller automation ke liye required hata diya gaya hai
     },
     name: { 
         type: String, 
@@ -15,11 +15,11 @@ const staffSchema = new mongoose.Schema({
         trim: true, 
         uppercase: true 
     },
-    fatherName: { type: String, trim: true, uppercase: true }, // Added from your JSON
+    fatherName: { type: String, trim: true, uppercase: true }, 
     role: { 
         type: String, 
-        enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR',"WORKER" ,'OTHER'],
-        default: 'OPERATOR'
+        enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR', 'WORKER', 'OTHER'],
+        default: 'WORKER' // Fallback to WORKER to match dropdown
     },
     
     // --- Contact & Personal Details ---
@@ -29,8 +29,8 @@ const staffSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    emergencyPhone: { type: String, trim: true }, // Added from your JSON
-    address: { type: String, trim: true }, // Simplified to match your input
+    emergencyPhone: { type: String, trim: true }, 
+    address: { type: String, trim: true }, 
     
     // --- Employment & Salary Config ---
     joiningDate: { type: Date, default: Date.now },
@@ -44,7 +44,10 @@ const staffSchema = new mongoose.Schema({
         required: [true, "Base salary is required"],
         min: 0
     },
-    password: { type: String, required: true }, // Added for Login/Ledger access
+    password: { 
+        type: String, 
+        required: [true, "Access PIN/Password is required"] 
+    },
 
     // --- Banking & KYC ---
     kycDetails: {
@@ -52,32 +55,41 @@ const staffSchema = new mongoose.Schema({
         panNumber: { type: String, trim: true, uppercase: true }
     },
     bankDetails: {
-        accountNumber: { type: String },
-        ifscCode: { type: String, uppercase: true },
-        bankName: { type: String }
+        accountNumber: { type: String, trim: true },
+        ifscCode: { type: String, uppercase: true, trim: true },
+        bankName: { type: String, trim: true }
     },
 
     // --- Performance & Ledger Link ---
     currentBalance: {
         type: Number,
         default: 0,
-        comment: "Negative means advance, Positive means payable salary"
+        comment: "Tracks real-time transactional offset (Negative: Advance, Positive: Payable)"
     }
 }, { 
     timestamps: true 
 });
 
-// --- Middleware: Auto-generate Employee ID before saving ---
+// Fast indexing for lookups and credentials verification
+staffSchema.index({ employeeId: 1, phone: 1 });
+staffSchema.index({ status: 1 });
+
+/**
+ * 🚀 CRITICAL FIX: Safe auto-generation mechanism to avoid compilation error.
+ * Use 'this.constructor' instead of calling mongoose.model('Staff') directly.
+ */
 staffSchema.pre('save', async function (next) {
     if (!this.employeeId) {
-        // Logic: DS-2026-001 (Example)
-        const year = new Date().getFullYear();
-        const count = await mongoose.model('Staff').countDocuments();
-        this.employeeId = `DS-${year}-${(count + 1).toString().padStart(3, '0')}`;
+        try {
+            const year = new Date().getFullYear();
+            // this.constructor dynamic target model ko reference karta hai bina execution circular loops ke
+            const count = await this.constructor.countDocuments();
+            this.employeeId = `DS-${year}-${(count + 1).toString().padStart(3, '0')}`;
+        } catch (err) {
+            return next(err);
+        }
     }
     next();
 });
-
-staffSchema.index({ employeeId: 1, phone: 1 });
 
 export default mongoose.model('Staff', staffSchema);

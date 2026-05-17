@@ -7,11 +7,10 @@ import {
   FileText, Users
 } from "lucide-react";
 
-// API Imports
+// 🚀 Centralized API Imports (No Raw Axios Bypasses)
 import { getAllStaff } from '../../../api/staffApi'; 
 import { getStaffMonthlyReport } from '../../../api/attendanceApi';
-// Note: Agar salaryApi nahi banayi hai toh yahan direct axios use kar sakte hain
-import axios from 'axios'; 
+import { getSalaryPaymentsByEmployee, recordSalaryPayment } from '../../../api/staffApi'; // API config wrapper linked
 
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
@@ -48,11 +47,17 @@ const EmployeeLedger = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0,7));
 
-  const API_URL = process.env.REACT_APP_API_URL || "https://dharashakti30backend.vercel.app";
+  const API_BASE_URL = "https://dharashakti30backend.vercel.app";
 
   const getPhotoURL = (photoPath) => {
     if (!photoPath || photoPath === "null") return "https://i.imgur.com/6VBx3io.png";
-    return photoPath.startsWith('http') ? photoPath : `${API_URL}/${photoPath.replace(/\\/g, '/')}`;
+    return photoPath.startsWith('http') ? photoPath : `${API_BASE_URL}/${photoPath.replace(/\\/g, '/')}`;
+  };
+
+  const maskID = (id) => {
+    if (!id) return "---";
+    const strID = id.toString();
+    return strID.startsWith("DS-") ? strID : `EMP-${strID.slice(-4)}`;
   };
 
   const availableMonths = useMemo(() => {
@@ -73,7 +78,7 @@ const EmployeeLedger = ({ user }) => {
     return Array.from(monthsSet).sort((a,b)=> new Date(b) - new Date(a));
   }, [selectedEmp]);
 
-  // Fetch all staff using staffApi
+  // Fetch all staff using centralized API instance
   const fetchEmployees = async () => {
     try {
       setLoading(true);
@@ -95,9 +100,9 @@ const EmployeeLedger = ({ user }) => {
     const [year, monthNum] = month.split('-');
 
     try {
-      // Parallel API calls: one for payments, one for attendance (using attendanceApi)
+      // 🚀 Fixed token issue by swapping raw axios with secure interceptor-driven wrapper calls
       const [payRes, attRes] = await Promise.all([
-        axios.get(`${API_URL}/salary-payments/${emp.employeeId}`),
+        getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
       ]);
 
@@ -130,7 +135,7 @@ const EmployeeLedger = ({ user }) => {
     if (selectedEmp) viewLedger(selectedEmp, selectedMonth);
   }, [selectedMonth]);
 
-  // Calculations
+  // Financial Computations
   const baseSal = selectedEmp ? Number(selectedEmp.baseSalary || 0) : 0;
   const daysInCurrentMonth = getDaysInMonth(selectedMonth);
   const dayRate = baseSal / daysInCurrentMonth;
@@ -145,20 +150,25 @@ const EmployeeLedger = ({ user }) => {
     e.preventDefault();
     if(!isAuthorized || !advanceAmount) return;
     try {
-      const res = await axios.post(`${API_URL}/salary-payments`, {
+      const payload = {
         employeeId: selectedEmp.employeeId,
         amount: Number(advanceAmount),
         date: selectedMonth === new Date().toISOString().slice(0,7) 
               ? new Date().toISOString().split('T')[0] 
               : `${selectedMonth}-01`,
         type: 'ADVANCE'
-      });
+      };
+
+      // 🚀 Token persistence verified call
+      const res = await recordSalaryPayment(payload);
       if(res.data.success) {
         setAdvanceAmount('');
-        alert("✅ Payment Recorded Successfully");
+        alert("✅ Advance Voucher Recorded Successfully");
         viewLedger(selectedEmp, selectedMonth);
       }
-    } catch { alert("Error saving payment."); }
+    } catch (err) {
+        alert(err.response?.data?.message || "Error processing advance registration.");
+    }
   };
 
   if(loading) return <Loader />;
@@ -167,7 +177,7 @@ const EmployeeLedger = ({ user }) => {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header */}
+        {/* Portal Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-2xl font-black text-zinc-800 dark:text-zinc-100 flex items-center gap-3 uppercase tracking-tighter">
@@ -178,7 +188,7 @@ const EmployeeLedger = ({ user }) => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Side Staff List */}
+          {/* Side Staff List Section */}
           {isBoss && (
             <div className="lg:col-span-3 bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden h-fit sticky top-8">
               <div className="p-6 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/30">
@@ -190,7 +200,7 @@ const EmployeeLedger = ({ user }) => {
                     <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20 shadow-sm"><img src={getPhotoURL(emp.photo)} className="w-full h-full object-cover" alt="p" /></div>
                     <div className="flex-1 truncate">
                       <p className="text-xs font-black uppercase truncate tracking-tighter">{emp.name}</p>
-                      <p className="text-[9px] font-bold opacity-70 uppercase tracking-widest">{emp.employeeId}</p>
+                      <p className="text-[9px] font-bold opacity-70 uppercase tracking-widest">{maskID(emp.employeeId)}</p>
                     </div>
                     <ChevronRight size={14} className={selectedEmp?.employeeId === emp.employeeId ? "opacity-100" : "opacity-0"} />
                   </div>
@@ -199,11 +209,11 @@ const EmployeeLedger = ({ user }) => {
             </div>
           )}
 
-          {/* Main Ledger Content */}
+          {/* Core Dashboard View */}
           {selectedEmp ? (
             <div className="lg:col-span-9 space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
               
-              {/* Profile Card */}
+              {/* Profile Card Banner */}
               <div className="bg-white dark:bg-zinc-900 p-8 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-5"><Banknote size={120} /></div>
                 <div className="flex items-center gap-6 relative z-10">
@@ -224,7 +234,7 @@ const EmployeeLedger = ({ user }) => {
                 </div>
               </div>
 
-              {/* Attendance Summary */}
+              {/* Attendance Statistics Summary Blocks */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  <div className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border dark:border-zinc-800 shadow-sm text-center"><p className="text-[9px] font-black text-zinc-400 uppercase mb-1">Billable Days</p><p className="text-xl font-black text-zinc-800 dark:text-zinc-200">{effectiveDaysWorked}</p></div>
                  <div className="bg-emerald-50 dark:bg-emerald-900/20 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-900/50 text-center"><p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Present</p><p className="text-xl font-black text-emerald-600">{attendanceStats.present}</p></div>
@@ -232,7 +242,7 @@ const EmployeeLedger = ({ user }) => {
                  <div className="bg-red-50 dark:bg-red-900/20 p-5 rounded-3xl border border-red-100 dark:border-red-900/50 text-center"><p className="text-[9px] font-black text-red-600 uppercase mb-1">Absent</p><p className="text-xl font-black text-red-600">{attendanceStats.absent}</p></div>
               </div>
 
-              {/* Actions Toolbar */}
+              {/* Action Toolbar */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button onClick={() => setShowCalendar(true)} className="flex items-center justify-center gap-3 py-4 bg-zinc-100 dark:bg-zinc-800 rounded-3xl text-[10px] font-black uppercase transition-all hover:bg-zinc-200"><History size={18}/> Attendance</button>
                 <button onClick={() => { setShowPassbook(!showPassbook); setShowPayslip(false); }} className={`flex items-center justify-center gap-3 py-4 rounded-3xl text-[10px] font-black uppercase transition-all ${showPassbook ? 'bg-zinc-800 text-white' : 'bg-emerald-50 text-emerald-600'}`}><BookOpen size={18}/> Passbook</button>
@@ -244,7 +254,7 @@ const EmployeeLedger = ({ user }) => {
                 <EmployeePassbook selectedEmp={selectedEmp} availableMonths={availableMonths} fullAttendanceData={fullAttendanceData} allPayments={allPayments} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Earnings */}
+                  {/* Earnings Calculation Breakdown */}
                   <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6">
                     <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 border-b dark:border-zinc-800 pb-4"><TrendingUp size={18}/> Earnings Structure</h4>
                     <div className="space-y-4 text-sm font-bold">
@@ -264,7 +274,7 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Net Pay */}
+                  {/* Net Take-Home & Debit Ledger */}
                   <div className="bg-zinc-900 p-8 rounded-[2.5rem] flex flex-col justify-between shadow-2xl relative overflow-hidden">
                     <div className="absolute -bottom-10 -left-10 opacity-10"><DollarSign size={200} className="text-white" /></div>
                     <div className="relative z-10">
@@ -281,7 +291,7 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Payment Recording */}
+                  {/* Voucher Payment Registration Trigger */}
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-4 rounded-[2rem] flex flex-col md:flex-row items-center gap-4 shadow-xl shadow-emerald-600/20">
                        <div className="flex-1 relative w-full">
