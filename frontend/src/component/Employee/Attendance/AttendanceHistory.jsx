@@ -10,6 +10,8 @@ export default function AttendanceHistory({
   setSelectedMonth,
   fullAttendanceData = {}
 }) {
+  console.log(fullAttendanceData,"fullAttendanceData");
+  
   
   // 💡 Local Date formatting to ensure perfect alignment with system expectations
   const formatDate = (date) => {
