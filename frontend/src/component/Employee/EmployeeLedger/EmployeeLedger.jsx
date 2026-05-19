@@ -35,6 +35,8 @@ const EmployeeLedger = ({ user }) => {
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, halfDay: 0 });
 
   const [advanceAmount, setAdvanceAmount] = useState('');
+  const [remark, setRemark] = useState(''); // 🚀 NEW STATE: Remark/Description ke liye
+
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
 
@@ -45,6 +47,7 @@ const EmployeeLedger = ({ user }) => {
 
   const [fullAttendanceData, setFullAttendanceData] = useState({}); 
   const [loading, setLoading] = useState(true);
+  const [ledgerLoading, setLedgerLoading] = useState(false); // 🚀 NEW STATE: Month change loader ke liye
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0,7));
 
   const API_BASE_URL = "https://dharashakti30backend.vercel.app";
@@ -60,34 +63,27 @@ const EmployeeLedger = ({ user }) => {
     return strID.startsWith("DS-") ? strID : `EMP-${strID.slice(-4)}`;
   };
 
-const availableMonths = useMemo(() => {
-  const monthsSet = new Set();
-  const now = new Date();
-  
-  // 1. Sabse pehle current month ko fix add karein (Format: "2026-05")
-  const currentMonthStr = now.toISOString().slice(0, 7);
-  monthsSet.add(currentMonthStr);
-  
-  if (selectedEmp?.joiningDate) {
-    const start = new Date(selectedEmp.joiningDate);
-    if (!isNaN(start)) {
-      // 2. Joining date ke saal aur mahine se 1st date par set karein
-      let temp = new Date(start.getFullYear(), start.getMonth(), 1);
-      
-      // 3. Current year aur month ki boundary banayein midnight zero standard par
-      const endThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
-      
-      // 4. Strict loop checks jab tak temp current month tak na pahunch jaye
-      while (temp <= endThreshold) {
-        monthsSet.add(temp.toISOString().slice(0, 7));
-        temp.setMonth(temp.getMonth() + 1);
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set();
+    const now = new Date();
+    
+    const currentMonthStr = now.toISOString().slice(0, 7);
+    monthsSet.add(currentMonthStr);
+    
+    if (selectedEmp?.joiningDate) {
+      const start = new Date(selectedEmp.joiningDate);
+      if (!isNaN(start)) {
+        let temp = new Date(start.getFullYear(), start.getMonth(), 1);
+        const endThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        while (temp <= endThreshold) {
+          monthsSet.add(temp.toISOString().slice(0, 7));
+          temp.setMonth(temp.getMonth() + 1);
+        }
       }
     }
-  }
-  
-  // 5. Latest month sabse upar dikhane ke liye reverse sort (Descending order)
-  return Array.from(monthsSet).sort((a, b) => new Date(b + "-01") - new Date(a + "-01"));
-}, [selectedEmp]);
+    return Array.from(monthsSet).sort((a, b) => new Date(b + "-01") - new Date(a + "-01"));
+  }, [selectedEmp]);
 
   const fetchEmployees = async () => {
     try {
@@ -105,13 +101,14 @@ const availableMonths = useMemo(() => {
     if (isBoss) fetchEmployees();
   }, [isBoss]);
 
-  // 🚀 Core calculation fetch processor with absolute targetMonth parameters overrides
+  // 🚀 CORE LEDGER FETCH ENGINE WITH INDEPENDENT LOADER
   const viewLedger = async (emp, targetMonth) => {
     if (!emp || !targetMonth) return;
     
     const [year, monthNum] = targetMonth.split('-');
 
     try {
+      setLedgerLoading(true); // 🚀 Month badalne par ledger loader ON
       const [payRes, attRes] = await Promise.all([
         getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
@@ -159,10 +156,11 @@ const availableMonths = useMemo(() => {
       }
     } catch(err) {
       console.error("Ledger structural extraction failure", err);
+    } finally {
+      setLedgerLoading(false); // 🚀 Data aane ke baad loader OFF
     }
   };
 
-  // 🚀 Trigger view refresh on selectedMonth changes smoothly
   useEffect(() => {
     if (selectedEmp) {
       viewLedger(selectedEmp, selectedMonth);
@@ -171,16 +169,13 @@ const availableMonths = useMemo(() => {
 
   const handleEmpSelection = (emp) => {
     setSelectedEmp(emp);
-    viewLedger(emp, selectedMonth);
+    const currentMonthStr = new Date().toISOString().slice(0,7);
+    setSelectedMonth(currentMonthStr);
+    viewLedger(emp, currentMonthStr);
   };
 
-  // 🚀 DROPDOWN INTERCEPTOR FUNCTION: Manual state propagation and instant background pipeline refresh
   const handleDropdownMonthChange = (e) => {
-    const nextSelectedMonth = e.target.value;
-    setSelectedMonth(nextSelectedMonth);
-    if (selectedEmp) {
-      viewLedger(selectedEmp, nextSelectedMonth);
-    }
+    setSelectedMonth(e.target.value);
   };
 
   // Financial Standard Computations
@@ -189,36 +184,40 @@ const availableMonths = useMemo(() => {
   const dayRate = baseSal / daysInCurrentMonth;
   const effectiveDaysWorked = attendanceStats.present + (attendanceStats.halfDay * 0.5);
   const grossEarned = Math.round(dayRate * effectiveDaysWorked);
-  const totalAdvance = paymentHistory.reduce((sum,p)=> sum + Number(p.amount), 0);
-  const otEarning = (Number(overtimeHours)||0)*(dayRate/8);
-  const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive)||0));
+  const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
+  const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
+  const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
   const netPayable = totalEarnings - totalAdvance;
 
   const handlePayment = async (e) => {
     e.preventDefault();
-    if(!isAuthorized || !advanceAmount) return;
+    if (!isAuthorized || !advanceAmount) return;
     try {
+      setLedgerLoading(true);
       const payload = {
         employeeId: selectedEmp.employeeId,
         amount: Number(advanceAmount),
         date: selectedMonth === new Date().toISOString().slice(0,7) 
               ? new Date().toISOString().split('T')[0] 
               : `${selectedMonth}-01`,
-        type: 'ADVANCE'
+        type: 'ADVANCE',
+        description: remark // 🚀 REMARK PASSED HERE TO API
       };
 
       const res = await recordSalaryPayment(payload);
-      if(res.data.success) {
+      if (res.data.success) {
         setAdvanceAmount('');
+        setRemark(''); // Form clear hone par remark reset
         alert("✅ Advance Payment Voucher Recorded Safely!");
         viewLedger(selectedEmp, selectedMonth);
       }
     } catch (err) { 
         alert(err.response?.data?.message || "Error processing advance transaction registration."); 
+        setLedgerLoading(false);
     }
   };
 
-  if(loading) return <Loader />;
+  if (loading) return <Loader />;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
@@ -258,8 +257,15 @@ const availableMonths = useMemo(() => {
 
           {/* Detailed Statement Ledger View */}
           {selectedEmp ? (
-            <div className="lg:col-span-9 space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="lg:col-span-9 space-y-6 relative">
               
+              {/* 🚀 SUB-LOADER OVERLAY FOR MONTH SWITCHING */}
+              {ledgerLoading && (
+                <div className="absolute inset-0 bg-white/60 dark:bg-zinc-950/60 z-50 rounded-[3rem] flex items-center justify-center backdrop-blur-sm">
+                  <Loader />
+                </div>
+              )}
+
               {/* Profile Overview Banner */}
               <div className="bg-white dark:bg-zinc-900 p-8 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-5"><Banknote size={120} /></div>
@@ -273,23 +279,21 @@ const availableMonths = useMemo(() => {
                     </div>
                   </div>
                 </div>
-               {/* 🚀 DROPDOWN CONTAINER WITH CSS FIX */}
-<div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl border dark:border-zinc-700 shadow-inner relative z-40">
-  <CalendarDays size={18} className="text-emerald-600 shrink-0" />
-  
-  <select 
-    value={selectedMonth} 
-    onChange={handleDropdownMonthChange} 
-    className="bg-transparent text-xs font-black outline-none dark:text-white cursor-pointer uppercase relative z-50 appearance-none pr-6"
-    style={{ pointerEvents: 'auto' }} // Forces clicking capability even if layout overlaps
-  >
-    {availableMonths.map(m => (
-      <option key={m} value={m} className="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
-        {new Date(m + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
-      </option>
-    ))}
-  </select>
-</div>
+                <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl border dark:border-zinc-700 shadow-inner relative z-40">
+                  <CalendarDays size={18} className="text-emerald-600 shrink-0" />
+                  <select 
+                    value={selectedMonth} 
+                    onChange={handleDropdownMonthChange} 
+                    className="bg-transparent text-xs font-black outline-none dark:text-white cursor-pointer uppercase relative z-50 appearance-none pr-2"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    {availableMonths.map(m => (
+                      <option key={m} value={m} className="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
+                        {new Date(m + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Attendance Block Summary */}
@@ -349,14 +353,36 @@ const availableMonths = useMemo(() => {
                     </div>
                   </div>
                   
-                  {/* Voucher Payment Registration Input Form */}
+                  {/* Voucher Payment Registration Input Form (WITH REMARK FIELD) */}
                   {isAuthorized && (
-                    <div className="md:col-span-2 bg-emerald-600 p-4 rounded-[2rem] flex flex-col md:flex-row items-center gap-4 shadow-xl shadow-emerald-600/20">
-                       <div className="flex-1 relative w-full">
+                    <div className="md:col-span-2 bg-emerald-600 p-6 rounded-[2.5rem] space-y-4 shadow-xl shadow-emerald-600/20">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Field 1: Amount */}
+                        <div className="relative w-full">
                           <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
-                          <input type="number" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} placeholder="Enter amount to record payment/advance..." className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-300" />
-                       </div>
-                       <button onClick={handlePayment} className="w-full md:w-auto px-10 py-4 bg-zinc-900 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all active:scale-95">Confirm Payment</button>
+                          <input 
+                            type="number" 
+                            value={advanceAmount} 
+                            onChange={(e)=>setAdvanceAmount(e.target.value)} 
+                            placeholder="Enter amount..." 
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                          />
+                        </div>
+                        {/* Field 2: Remark/Description */}
+                        <div className="relative w-full">
+                          <input 
+                            type="text" 
+                            value={remark} 
+                            onChange={(e)=>setRemark(e.target.value)} 
+                            placeholder="Enter Remark/Description (e.g., Trip Advance, Medical)..." 
+                            className="w-full px-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                          />
+                        </div>
+                      </div>
+                      {/* Submit Button */}
+                      <div className="flex justify-end">
+                        <button onClick={handlePayment} className="w-full md:w-auto px-12 py-4 bg-zinc-900 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all active:scale-95">Confirm Payment</button>
+                      </div>
                     </div>
                   )}
                 </div>
