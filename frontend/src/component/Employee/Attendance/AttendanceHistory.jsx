@@ -22,37 +22,35 @@ export default function AttendanceHistory({
   const getTileClassName = ({ date, view }) => {
     if (view !== "month") return;
 
-    const currentTileDateStr = formatDate(date); // Output: "2026-05-18"
-
+    const currentTileDateStr = formatDate(date); // Format: "2026-05-18"
     let status = null;
 
-    // 🚀 CRITICAL FIX: Loop through backend data keys to safely catch full UTC string representations
-    // Handles matches like "Mon May 18 2026..." or raw strings "2026-05-18" cleanly
+    // 🚀 FIXED STRING MATCH PIPELINE: Explicit object key arrays mapping parsing fallback loops
     Object.keys(fullAttendanceData || {}).forEach((key) => {
+      // Direct string evaluation matching raw format keys
       if (key.includes(currentTileDateStr)) {
         status = fullAttendanceData[key];
       } else {
-        // Fallback parser loop if key is a native Date string format object instantiation
+        // Strict ISO translation fallback matching full UTC response sequences
         try {
           const parsedKeyStr = new Date(key).toISOString().split('T')[0];
           if (parsedKeyStr === currentTileDateStr) {
             status = fullAttendanceData[key];
           }
         } catch (e) {
-          // Silent catch to handle malformed legacy string formats
+          // Fallback bypass handler
         }
       }
     });
 
-    // Explicit upper casing standardization check block
     const finalStatus = status ? String(status).toUpperCase().trim() : "";
 
-    // Status css class assignments dynamically matching active system configurations
+    // Dynamic color rendering mapping structures matching system design enums
     if (finalStatus === "PRESENT") return "present-day";
     if (finalStatus === "HALF_DAY" || finalStatus === "HALF-DAY") return "half-day";
     if (finalStatus === "ABSENT") return "absent-day";
     
-    // Highlight Sundays safely without overriding active statuses
+    // Highlight Sundays safely without overriding system logs
     if (date.getDay() === 0) return "sunday-tile";
 
     return "";
@@ -70,78 +68,85 @@ export default function AttendanceHistory({
           font-family: inherit !important;
         }
 
-        /* Tile Styling Configuration Framework */
+        /* 🚀 COMPACT HEIGHT FIX: Tile cells dimensions reduced safely to minimize workspace clutter */
         .attendance-calendar .react-calendar__tile {
-          height: 48px;
+          height: 38px !important; /* Scaled down from 48px for compact height design */
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          border-radius: 12px;
-          margin: 3px 0;
-          font-size: 0.85rem;
-          font-weight: 700;
+          border-radius: 10px;
+          margin: 1.5px 0;
+          font-size: 0.75rem;
+          font-weight: 800;
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        /* Compact spacing rules configuration */
         .attendance-calendar .react-calendar__month-view__weekdays__weekday {
-          padding: 0.5rem;
-          font-size: 0.65rem;
+          padding: 0.25rem !important;
+          font-size: 0.6rem;
           font-weight: 900;
           text-transform: uppercase;
           color: #a1a1aa;
           text-decoration: none !important;
         }
 
-        /* Status Rendering Colors Panels */
-        .present-day { background: #10b981 !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
-        .half-day { background: #f59e0b !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.2); }
-        .absent-day { background: #ef4444 !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); }
+        /* Status Rendering Colors Panels (Highly Vibrant UI Controls) */
+        .present-day { background: #10b981 !important; color: white !important; font-weight: 900; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25); }
+        .half-day { background: #f59e0b !important; color: white !important; font-weight: 900; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.25); }
+        .absent-day { background: #ef4444 !important; color: white !important; font-weight: 900; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25); }
         .sunday-tile { color: #ef4444; font-weight: bold; }
 
-        /* Navigation Mechanics UI Wrapper */
+        /* Navigation Buttons Framework adjustments */
+        .react-calendar__navigation {
+          margin-bottom: 0.5rem !important;
+          height: 32px !important;
+        }
         .react-calendar__navigation button {
           font-weight: 900;
           text-transform: uppercase;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           color: #10b981;
+          min-width: 32px !important;
+          background: transparent !important;
         }
 
         .dark .react-calendar__tile:hover { background: #27272a !important; }
-        .react-calendar__tile--now { border: 2px dashed #10b981 !important; background: transparent !important; color: inherit; }
+        .react-calendar__tile--now { border: 1.5px dashed #10b981 !important; background: transparent !important; color: inherit; }
         .dark .react-calendar__month-view__days__day { color: #e4e4e7; }
         
-        /* Neighboring months safety layout overrides */
-        .react-calendar__month-view__days__day--neighboringMonth { opacity: 0.15; pointer-events: none; }
+        /* Neighboring months parameters validation */
+        .react-calendar__month-view__days__day--neighboringMonth { opacity: 0.12; pointer-events: none; }
       `}</style>
 
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
-        <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-[2rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200 overflow-hidden">
           
-          {/* Header */}
-          <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/30 rounded-t-[2.5rem]">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20">
-                <CalendarIcon size={18} />
+          {/* Header Dashboard section */}
+          <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/30">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20">
+                <CalendarIcon size={16} />
               </div>
               <div>
-                <h3 className="font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter text-sm">
-                  Staff Attendance Calendar
+                <h3 className="font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter text-xs leading-none mb-1">
+                  Attendance Grid
                 </h3>
-                <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Monthly History Tracker</p>
+                <p className="text-[8px] text-zinc-400 font-black uppercase tracking-widest leading-none">History Sync Module</p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:text-red-500 text-zinc-500 rounded-full transition-all active:scale-90"
+              className="p-1.5 bg-zinc-100 dark:bg-zinc-800 hover:text-red-500 text-zinc-500 rounded-full transition-all active:scale-90"
             >
-              <X size={18}/>
+              <X size={16}/>
             </button>
           </div>
 
-          {/* Calendar Body */}
-          <div className="p-6">
+          {/* Calendar Rendering Canvas Body */}
+          <div className="p-4">
             <Calendar
               activeStartDate={new Date(selectedMonth + "-01")}
               onActiveStartDateChange={({ activeStartDate }) => {
@@ -157,29 +162,23 @@ export default function AttendanceHistory({
               prev2Label={null}
             />
 
-            {/* Legend Indicators Panels */}
-            <div className="mt-8 grid grid-cols-3 gap-4 border-t border-zinc-100 dark:border-zinc-800 pt-6">
-              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
-                <div className="w-6 h-1.5 bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/30"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Present</span>
+            {/* Compact Legends Markers indicators panels */}
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-zinc-100 dark:border-zinc-800 pt-4">
+              <div className="flex flex-col items-center gap-1 bg-zinc-50 dark:bg-zinc-800/10 py-1 rounded-lg border dark:border-zinc-800/30">
+                <div className="w-4 h-1 bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20"></div>
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wide">Present</span>
               </div>
-              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
-                <div className="w-6 h-1.5 bg-amber-500 rounded-full shadow-sm shadow-amber-500/30"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Half Day</span>
+              <div className="flex flex-col items-center gap-1 bg-zinc-50 dark:bg-zinc-800/10 py-1 rounded-lg border dark:border-zinc-800/30">
+                <div className="w-4 h-1 bg-amber-500 rounded-full shadow-sm shadow-amber-500/20"></div>
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wide">Half Day</span>
               </div>
-              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
-                <div className="w-6 h-1.5 bg-red-500 rounded-full shadow-sm shadow-red-500/30"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Absent</span>
+              <div className="flex flex-col items-center gap-1 bg-zinc-50 dark:bg-zinc-800/10 py-1 rounded-lg border dark:border-zinc-800/30">
+                <div className="w-4 h-1 bg-red-500 rounded-full shadow-sm shadow-red-500/20"></div>
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wide">Absent</span>
               </div>
             </div>
           </div>
           
-          {/* Footer Navigation Hints */}
-          <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/10 border-t border-zinc-100 dark:border-zinc-800 rounded-b-[2.5rem] flex justify-center">
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider italic">
-              * Click control arrows to browse different months
-            </p>
-          </div>
         </div>
       </div>
     </>
