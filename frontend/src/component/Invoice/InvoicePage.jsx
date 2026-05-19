@@ -6,9 +6,10 @@ import {
   Wallet, CreditCard, AlertCircle, CheckCircle2, X 
 } from "lucide-react";
 import EWayBillContainer from "../EWayBill/EWayBillContainer";
+import { getAllSales } from "../../api/saleApi";
 
 const InvoicePage = () => {
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+ 
   const navigate = useNavigate();
   
   const [allSales, setAllSales] = useState([]); 
@@ -20,7 +21,7 @@ const InvoicePage = () => {
   useEffect(() => {
     const loadSales = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/sales`);
+  const res = await getAllSales(); 
         if (res.data.success) setAllSales(res.data.data);
       } catch (err) {
         console.error("Sales load error", err);
@@ -29,7 +30,7 @@ const InvoicePage = () => {
       }
     };
     loadSales();
-  }, [API_URL]);
+  }, []);
 
   const customerHistory = useMemo(() => {
     if (!searchTerm) return allSales; // Default: show all or latest
