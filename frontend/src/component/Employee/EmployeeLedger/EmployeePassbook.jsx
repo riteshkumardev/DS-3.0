@@ -200,7 +200,7 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
                 <td className="px-6 py-5 dark:text-zinc-300 border-t border-zinc-50 dark:border-zinc-800">
                   <span className={`flex items-center gap-2 ${row.type === 'EARNING' ? 'text-emerald-600' : 'text-zinc-600 dark:text-zinc-300'}`}>
                     {row.type === 'EARNING' ? <PlusCircle size={14}/> : <FileText size={14} className="text-red-500/70" />}
-                    {row.description}
+                    {row.remark ? row.remark : row.description}
                   </span>
                 </td>
                 <td className={`px-6 py-5 border-t border-zinc-50 dark:border-zinc-800 ${row.type === 'EARNING' ? 'text-emerald-600' : 'text-red-500'}`}>
