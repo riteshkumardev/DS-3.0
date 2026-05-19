@@ -94,35 +94,45 @@ const EmployeeLedger = ({ user }) => {
     if (isBoss) fetchEmployees();
   }, [isBoss]);
 
-  const viewLedger = async (emp, month = selectedMonth) => {
-    setSelectedEmp(emp);
-    const [year, monthNum] = month.split('-');
+  // 🚀 CRITICAL FIX: Month parameters explicitly matched to handle back-month selections dynamically
+  const viewLedger = async (emp, targetMonth) => {
+    if (!emp || !targetMonth) return;
+    
+    const [year, monthNum] = targetMonth.split('-');
 
     try {
-      // API call mappings directly referencing centralized configurations
+      // API call mappings directly referencing centralized configurations with specific month parameters
       const [payRes, attRes] = await Promise.all([
         getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
       ]);
 
       if (payRes.data.success) {
-        setAllPayments(payRes.data.data);
-        setPaymentHistory(payRes.data.data.filter(p => p.date.substring(0,7) === month).reverse());
+        const rawPayments = payRes.data.data || [];
+        setAllPayments(rawPayments);
+        
+        // 🚀 BUG FIX: Clean slice string mapping to handle deep ISO strings and manual entries
+        const filteredHistory = rawPayments.filter(p => {
+          if (!p.date) return false;
+          const cleanDateString = String(p.date).substring(0, 7); // Result: "2026-05"
+          return cleanDateString === targetMonth;
+        }).reverse();
+
+        setPaymentHistory(filteredHistory);
       }
 
       if (attRes.data.success) {
-        const historyArray = attRes.data.data;
+        const historyArray = attRes.data.data || [];
         const attendanceMap = {};
         
-        // 🚀 BUG FIX: Fallback pipeline injection pattern matching explicit object array logic
         let p = attRes.data.summary?.PRESENT ?? attRes.data.summary?.Present ?? 0;
         let a = attRes.data.summary?.ABSENT ?? attRes.data.summary?.Absent ?? 0;
         let h = attRes.data.summary?.HALF_DAY ?? attRes.data.summary?.['Half-Day'] ?? 0;
 
-        // Double check runtime validation step fallback loop calculations if summary extraction has anomalies
+        // Fallback calculations sync if server aggregation summary has key variations
         if (p === 0 && a === 0 && h === 0 && historyArray.length > 0) {
           historyArray.forEach(record => {
-            const statusUpper = String(record.status).toUpperCase();
+            const statusUpper = String(record.status).toUpperCase().trim();
             if (statusUpper === "PRESENT") p++;
             else if (statusUpper === "ABSENT") a++;
             else if (statusUpper === "HALF_DAY" || statusUpper === "HALF-DAY") h++;
@@ -130,7 +140,10 @@ const EmployeeLedger = ({ user }) => {
         }
 
         historyArray.forEach(record => {
-          attendanceMap[record.date] = record.status;
+          if (record.date) {
+            const cleanKey = String(record.date).split('T')[0]; // Extract "YYYY-MM-DD" safely
+            attendanceMap[cleanKey] = record.status;
+          }
         });
 
         setAttendanceStats({ present: p, absent: a, halfDay: h });
@@ -141,9 +154,18 @@ const EmployeeLedger = ({ user }) => {
     }
   };
 
+  // 🚀 CRITICAL FIX: Effect trigger completely forces re-fetching when selected month alters
   useEffect(() => {
-    if (selectedEmp) viewLedger(selectedEmp, selectedMonth);
+    if (selectedEmp) {
+      viewLedger(selectedEmp, selectedMonth);
+    }
   }, [selectedMonth]);
+
+  // Handler for manual workforce item change click triggers
+  const handleEmpSelection = (emp) => {
+    setSelectedEmp(emp);
+    viewLedger(emp, selectedMonth);
+  };
 
   // Financial Standard Computations
   const baseSal = selectedEmp ? Number(selectedEmp.baseSalary || 0) : 0;
@@ -205,7 +227,7 @@ const EmployeeLedger = ({ user }) => {
               </div>
               <div className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
                 {employees.map(emp => (
-                  <div key={emp._id} onClick={() => viewLedger(emp)} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${selectedEmp?.employeeId === emp.employeeId ? 'bg-emerald-600 text-white shadow-lg scale-105' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
+                  <div key={emp._id} onClick={() => handleEmpSelection(emp)} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${selectedEmp?.employeeId === emp.employeeId ? 'bg-emerald-600 text-white shadow-lg scale-105' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
                     <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20 shadow-sm"><img src={getPhotoURL(emp.photo)} className="w-full h-full object-cover" alt="p" /></div>
                     <div className="flex-1 truncate">
                       <p className="text-xs font-black uppercase truncate tracking-tighter">{emp.name}</p>
