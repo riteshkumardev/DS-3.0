@@ -7,10 +7,10 @@ import {
   FileText, Users
 } from "lucide-react";
 
-// 🚀 Centralized API Imports (No Raw Axios Bypasses)
+// 🚀 Centralized API Imports (Strict Token Instance Synchronized)
 import { getAllStaff } from '../../../api/staffApi'; 
 import { getStaffMonthlyReport } from '../../../api/attendanceApi';
-import { getSalaryPaymentsByEmployee, recordSalaryPayment } from '../../../api/staffApi'; // API config wrapper linked
+import { getSalaryPaymentsByEmployee, recordSalaryPayment } from '../../../api/staffApi'; 
 
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
@@ -78,7 +78,6 @@ const EmployeeLedger = ({ user }) => {
     return Array.from(monthsSet).sort((a,b)=> new Date(b) - new Date(a));
   }, [selectedEmp]);
 
-  // Fetch all staff using centralized API instance
   const fetchEmployees = async () => {
     try {
       setLoading(true);
@@ -100,7 +99,7 @@ const EmployeeLedger = ({ user }) => {
     const [year, monthNum] = month.split('-');
 
     try {
-      // 🚀 Fixed token issue by swapping raw axios with secure interceptor-driven wrapper calls
+      // API call mappings directly referencing centralized configurations
       const [payRes, attRes] = await Promise.all([
         getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
@@ -115,9 +114,20 @@ const EmployeeLedger = ({ user }) => {
         const historyArray = attRes.data.data;
         const attendanceMap = {};
         
-        let p = attRes.data.summary?.PRESENT || 0;
-        let a = attRes.data.summary?.ABSENT || 0;
-        let h = attRes.data.summary?.HALF_DAY || 0;
+        // 🚀 BUG FIX: Fallback pipeline injection pattern matching explicit object array logic
+        let p = attRes.data.summary?.PRESENT ?? attRes.data.summary?.Present ?? 0;
+        let a = attRes.data.summary?.ABSENT ?? attRes.data.summary?.Absent ?? 0;
+        let h = attRes.data.summary?.HALF_DAY ?? attRes.data.summary?.['Half-Day'] ?? 0;
+
+        // Double check runtime validation step fallback loop calculations if summary extraction has anomalies
+        if (p === 0 && a === 0 && h === 0 && historyArray.length > 0) {
+          historyArray.forEach(record => {
+            const statusUpper = String(record.status).toUpperCase();
+            if (statusUpper === "PRESENT") p++;
+            else if (statusUpper === "ABSENT") a++;
+            else if (statusUpper === "HALF_DAY" || statusUpper === "HALF-DAY") h++;
+          });
+        }
 
         historyArray.forEach(record => {
           attendanceMap[record.date] = record.status;
@@ -127,7 +137,7 @@ const EmployeeLedger = ({ user }) => {
         setFullAttendanceData(attendanceMap);
       }
     } catch(err) {
-      console.error("Ledger fetch error", err);
+      console.error("Ledger structural extraction failure", err);
     }
   };
 
@@ -135,7 +145,7 @@ const EmployeeLedger = ({ user }) => {
     if (selectedEmp) viewLedger(selectedEmp, selectedMonth);
   }, [selectedMonth]);
 
-  // Financial Computations
+  // Financial Standard Computations
   const baseSal = selectedEmp ? Number(selectedEmp.baseSalary || 0) : 0;
   const daysInCurrentMonth = getDaysInMonth(selectedMonth);
   const dayRate = baseSal / daysInCurrentMonth;
@@ -159,15 +169,14 @@ const EmployeeLedger = ({ user }) => {
         type: 'ADVANCE'
       };
 
-      // 🚀 Token persistence verified call
       const res = await recordSalaryPayment(payload);
       if(res.data.success) {
         setAdvanceAmount('');
-        alert("✅ Advance Voucher Recorded Successfully");
+        alert("✅ Advance Payment Voucher Recorded Safely!");
         viewLedger(selectedEmp, selectedMonth);
       }
-    } catch (err) {
-        alert(err.response?.data?.message || "Error processing advance registration.");
+    } catch (err) { 
+        alert(err.response?.data?.message || "Error processing advance transaction registration."); 
     }
   };
 
@@ -188,7 +197,7 @@ const EmployeeLedger = ({ user }) => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Side Staff List Section */}
+          {/* Side Workforce Selector */}
           {isBoss && (
             <div className="lg:col-span-3 bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden h-fit sticky top-8">
               <div className="p-6 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/30">
@@ -209,11 +218,11 @@ const EmployeeLedger = ({ user }) => {
             </div>
           )}
 
-          {/* Core Dashboard View */}
+          {/* Detailed Statement Ledger View */}
           {selectedEmp ? (
             <div className="lg:col-span-9 space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
               
-              {/* Profile Card Banner */}
+              {/* Profile Overview Banner */}
               <div className="bg-white dark:bg-zinc-900 p-8 rounded-[3rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-5"><Banknote size={120} /></div>
                 <div className="flex items-center gap-6 relative z-10">
@@ -234,7 +243,7 @@ const EmployeeLedger = ({ user }) => {
                 </div>
               </div>
 
-              {/* Attendance Statistics Summary Blocks */}
+              {/* Attendance Block Summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  <div className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border dark:border-zinc-800 shadow-sm text-center"><p className="text-[9px] font-black text-zinc-400 uppercase mb-1">Billable Days</p><p className="text-xl font-black text-zinc-800 dark:text-zinc-200">{effectiveDaysWorked}</p></div>
                  <div className="bg-emerald-50 dark:bg-emerald-900/20 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-900/50 text-center"><p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Present</p><p className="text-xl font-black text-emerald-600">{attendanceStats.present}</p></div>
@@ -274,7 +283,7 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Net Take-Home & Debit Ledger */}
+                  {/* Net Take-Home & Deductions Dashboard */}
                   <div className="bg-zinc-900 p-8 rounded-[2.5rem] flex flex-col justify-between shadow-2xl relative overflow-hidden">
                     <div className="absolute -bottom-10 -left-10 opacity-10"><DollarSign size={200} className="text-white" /></div>
                     <div className="relative z-10">
@@ -291,7 +300,7 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Voucher Payment Registration Trigger */}
+                  {/* Voucher Payment Registration Input Form */}
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-4 rounded-[2rem] flex flex-col md:flex-row items-center gap-4 shadow-xl shadow-emerald-600/20">
                        <div className="flex-1 relative w-full">
