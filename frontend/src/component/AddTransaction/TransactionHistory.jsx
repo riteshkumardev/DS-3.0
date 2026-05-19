@@ -24,15 +24,19 @@ const TransactionHistory = () => {
       if (res.data?.success) setParties(res.data.data);
     } catch (err) { 
       console.error("Auth Error:", err.message);
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   }, []);
 
-  useEffect(() => { loadParties(); }, [loadParties]);
+  useEffect(() => { 
+    loadParties(); 
+  }, [loadParties]);
 
   const fetchLedger = useCallback(async (partyId = selectedParty) => {
     if (!partyId) return;
     try {
-      setLoading(true);
+      setLoading(true); // 🚀 LOADER IS TRIGGERED IMMEDIATELY ON VALUE CHANGES
       const res = await getPartyStatement(partyId, startDate, endDate);
       if (res.data?.success) {
         const rawData = res.data.data || [];
@@ -52,46 +56,98 @@ const TransactionHistory = () => {
           balance: latestEntry?.runningBalance || 0 
         });
       }
-    } catch (err) { console.error("Sync Error:", err); }
-    finally { setLoading(false); }
+    } catch (err) { 
+      console.error("Sync Error:", err); 
+    } finally { 
+      setLoading(false); // 🚀 LOADER OFF ONLY AFTER CALCULATIONS SYNC
+    }
   }, [selectedParty, startDate, endDate]);
 
   useEffect(() => {
     if (selectedParty) fetchLedger();
   }, [selectedParty, fetchLedger]);
 
+  // Handle manual range reset button updates
+  const handleRangeRefresh = () => {
+    if (selectedParty) fetchLedger();
+  };
+
   const handlePrint = () => {
-    const tableContent = document.getElementById("printable-area").innerHTML;
     const partyName = parties.find(p => p._id === selectedParty)?.name || "Party";
     
+    // 🚀 PRINT PIPELINE REFIX: Generate complete native rows including inner products cleanly
+    let rowsHtml = "";
+    history.forEach(item => {
+      let goodsHtml = "";
+      if (item.goods && item.goods.length > 0) {
+        goodsHtml += `<div style="margin-top:5px; border:1px solid #eee; padding:5px; background:#fafafa;">
+          <table style="margin:0; width:100%;">
+            <tr style="background:#eee; font-weight:bold;">
+              <td style="padding:3px;">Product</td>
+              <td style="padding:3px;text-align:center;">Qty</td>
+              <td style="padding:3px;text-align:right;">Rate</td>
+            </tr>`;
+        item.goods.forEach(g => {
+          goodsHtml += `<tr>
+            <td style="padding:3px;">${g.productName.toUpperCase()}</td>
+            <td style="padding:3px;text-align:center;">${g.quantity} ${g.unit || ''}</td>
+            <td style="padding:3px;text-align:right;">₹${g.rate}</td>
+          </tr>`;
+        });
+        goodsHtml += `</table></div>`;
+      }
+
+      rowsHtml += `
+        <tr class="${item.type === 'REVERSAL' ? 'grayscale' : ''}">
+          <td>${new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}<br><small>${item.type}</small></td>
+          <td><strong>${item.description.toUpperCase()}</strong><br><small>${item.paymentMode || ''}</small>${goodsHtml}</td>
+          <td style="text-align:right;color:#ef4444;font-weight:bold;">${item.debit > 0 ? '₹' + item.debit.toLocaleString() : '—'}</td>
+          <td style="text-align:right;color:#10b981;font-weight:bold;">${item.credit > 0 ? '₹' + item.credit.toLocaleString() : '—'}</td>
+          <td style="text-align:right;font-weight:bold;">₹${Math.abs(item.runningBalance).toLocaleString()} ${item.runningBalance >= 0 ? 'Cr' : 'Dr'}</td>
+        </tr>
+      `;
+    });
+
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     printWindow.document.write(`
       <html>
         <head>
           <title>Statement - ${partyName}</title>
           <style>
-            body { font-family: sans-serif; padding: 20px; color: #111; }
+            body { font-family: sans-serif; padding: 30px; color: #1c1917; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 10px; font-size: 10px; text-align: left; vertical-align: top; }
-            th { background-color: #f4f4f4; text-transform: uppercase; font-weight: bold; }
-            .product-row { font-size: 9px; color: #555; background: #fafafa; margin-top: 5px; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .summary-box { display: flex; justify-content: space-between; margin-bottom: 20px; border: 1px solid #000; padding: 10px; font-size: 12px; font-weight: bold; }
-            @media print { .no-print { display: none; } }
+            th, td { border: 1px solid #e7e5e4; padding: 10px; font-size: 11px; text-align: left; vertical-align: top; }
+            th { background-color: #f5f5f4; text-transform: uppercase; font-weight: bold; font-size: 10px; }
+            .header { text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 15px; margin-bottom: 20px; }
+            .summary-box { display: flex; justify-content: space-between; margin-bottom: 25px; border: 1px dashed #10b981; background:#f0fdf4; padding: 15px; font-size: 13px; font-weight: bold; border-radius:10px; }
+            .grayscale { opacity: 0.4; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1 style="margin:0">DHARA SHAKTI AGRO PRODUCTS</h1>
-            <p style="margin:5px 0">Ledger Account: <strong>${partyName.toUpperCase()}</strong></p>
-            <p style="font-size:10px">Period: ${startDate || 'Start'} to ${endDate || 'Today'}</p>
+            <h1 style="margin:0;color:#059669;font-size:24px;font-weight:900;">DHARA SHAKTI AGRO PRODUCTS</h1>
+            <p style="margin:5px 0;font-size:14px;">Ledger Statement: <strong>${partyName.toUpperCase()}</strong></p>
+            <p style="font-size:11px;color:#666;">Period: ${startDate || 'Opening'} to ${endDate || 'Today'}</p>
           </div>
           <div class="summary-box">
-             <span>Debit: ₹${summary.totalDr.toLocaleString()}</span>
-             <span>Credit: ₹${summary.totalCr.toLocaleString()}</span>
-             <span>Balance: ₹${Math.abs(summary.balance).toLocaleString()} ${summary.balance >= 0 ? 'Cr' : 'Dr'}</span>
+             <span style="color:#dc2626;">Total Bills/Debit (Dr): ₹${summary.totalDr.toLocaleString()}</span>
+             <span style="color:#059669;">Total Received/Credit (Cr): ₹${summary.totalCr.toLocaleString()}</span>
+             <span>Closing Balance: ₹${Math.abs(summary.balance).toLocaleString()} ${summary.balance >= 0 ? 'Cr' : 'Dr'}</span>
           </div>
-          ${tableContent}
+          <table>
+            <thead>
+              <tr>
+                <th>Date / Type</th>
+                <th>Particulars & Item Details</th>
+                <th style="text-align:right;">Debit (Dr)</th>
+                <th style="text-align:right;">Credit (Cr)</th>
+                <th style="text-align:right;">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
         </body>
       </html>
     `);
@@ -100,14 +156,19 @@ const TransactionHistory = () => {
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
-    }, 500);
+    }, 400);
   };
-
-  if (loading && parties.length === 0) return <Loader />;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8 relative">
+        
+        {/* 🚀 SUB-LOADER ACTION BLOCK OVERLAY FOR STATEMENT RELOADING */}
+        {loading && (
+          <div className="fixed inset-0 bg-white/40 dark:bg-zinc-950/40 z-50 flex items-center justify-center backdrop-blur-sm transition-all duration-200">
+            <Loader />
+          </div>
+        )}
         
         <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden no-print">
           <div className="p-8 space-y-6">
@@ -126,18 +187,24 @@ const TransactionHistory = () => {
                     >
                       <option value="">-- Select Party / Ledger --</option>
                       {parties.map(p => (
-                        <option key={p._id} value={p._id}>{p.name.toUpperCase()} (Bal: ₹{p.currentBalance || 0})</option>
+                        <option key={p._id} value={p._id}>{p.name.toUpperCase()} (Bal: ₹{(p.currentBalance || 0).toLocaleString()})</option>
                       ))}
                     </select>
                 </div>
-                <button onClick={handlePrint} disabled={!selectedParty} className="p-4 bg-zinc-900 text-white rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50"><Printer size={20}/></button>
+                <button 
+                  onClick={handlePrint} 
+                  disabled={!selectedParty || history.length === 0} 
+                  className="p-4 bg-zinc-900 text-white dark:bg-emerald-600 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-40"
+                >
+                  <Printer size={20}/>
+                </button>
               </div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6 border-t dark:border-zinc-800 pt-6">
-                <div className="grid grid-cols-2 gap-4 w-full lg:w-1/3">
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl border border-zinc-100 dark:border-zinc-700 text-xs font-bold" />
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl border border-zinc-100 dark:border-zinc-700 text-xs font-bold" />
+                <div className="grid grid-cols-2 gap-4 w-full lg:w-1/3 items-center">
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-3 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl border border-zinc-100 dark:border-zinc-700 text-xs font-bold outline-none focus:border-emerald-500" />
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-3 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl border border-zinc-100 dark:border-zinc-700 text-xs font-bold outline-none focus:border-emerald-500" />
                 </div>
                 {selectedParty && (
                     <div className="flex-1 grid grid-cols-3 gap-4">
@@ -162,7 +229,7 @@ const TransactionHistory = () => {
         </div>
 
         {selectedParty ? (
-          <div id="printable-area" className="bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -171,41 +238,41 @@ const TransactionHistory = () => {
                       <th className="px-8 py-6">Particulars & Item Details</th>
                       <th className="px-8 py-6 text-right">Debit (Dr)</th>
                       <th className="px-8 py-6 text-right">Credit (Cr)</th>
-                      <th className="px-8 py-6 text-right bg-zinc-100/30">Balance</th>
+                      <th className="px-8 py-6 text-right bg-zinc-100/10 dark:bg-zinc-800/30">Balance</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800 text-[11px]">
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-[11px]">
                     {history.map((item) => (
-                      <tr key={item._id} className={`hover:bg-zinc-50/50 transition-colors ${item.type === 'REVERSAL' ? 'reversal grayscale opacity-50' : ''}`}>
+                      <tr key={item._id} className={`hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors ${item.type === 'REVERSAL' ? 'reversal grayscale opacity-40' : ''}`}>
                         <td className="px-8 py-5 align-top">
                             <p className="font-black text-zinc-800 dark:text-zinc-200">
                                 {new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
-                            <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 uppercase">{item.type}</span>
+                            <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{item.type}</span>
                         </td>
                         <td className="px-8 py-5">
                             <div className="mb-2">
                               <p className="font-bold text-zinc-700 dark:text-zinc-300 uppercase leading-tight">{item.description}</p>
-                              <span className="text-[9px] text-zinc-400 font-bold tracking-widest">{item.paymentMode}</span>
+                              <span className="text-[9px] text-zinc-400 font-bold tracking-widest uppercase">{item.paymentMode || 'INVOICE'}</span>
                             </div>
 
-                            {/* ✅ NEW PRODUCT TABLE INSIDE ROW */}
+                            {/* ITEM DETAILS NESTED INSIDE ROW */}
                             {item.goods && item.goods.length > 0 && (
-                              <div className="mt-3 overflow-hidden rounded-lg border border-zinc-100 dark:border-zinc-800">
+                              <div className="mt-3 overflow-hidden rounded-xl border border-zinc-100 dark:border-zinc-800 max-w-xl">
                                 <table className="w-full text-[9px] text-zinc-500">
-                                  <thead className="bg-zinc-50 dark:bg-zinc-800/50">
-                                    <tr>
-                                      <th className="px-3 py-1 font-bold">PRODUCT</th>
-                                      <th className="px-3 py-1 text-center font-bold">QTY</th>
-                                      <th className="px-3 py-1 text-right font-bold">RATE</th>
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800/40">
+                                    <tr className="text-zinc-400 border-b dark:border-zinc-800">
+                                      <th className="px-3 py-1.5 font-bold">PRODUCT</th>
+                                      <th className="px-3 py-1.5 text-center font-bold">QTY</th>
+                                      <th className="px-3 py-1.5 text-right font-bold">RATE</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
                                     {item.goods.map((prod, idx) => (
-                                      <tr key={idx}>
-                                        <td className="px-3 py-1.5 font-bold uppercase text-zinc-600 dark:text-zinc-400">{prod.productName}</td>
-                                        <td className="px-3 py-1.5 text-center font-medium">{prod.quantity} {prod.unit}</td>
-                                        <td className="px-3 py-1.5 text-right font-medium">₹{prod.rate}</td>
+                                      <tr key={idx} className="dark:text-zinc-400">
+                                        <td className="px-3 py-1.5 font-black uppercase text-zinc-600 dark:text-zinc-300">{prod.productName}</td>
+                                        <td className="px-3 py-1.5 text-center font-bold text-zinc-700 dark:text-zinc-400">{prod.quantity} {prod.unit || ''}</td>
+                                        <td className="px-3 py-1.5 text-right font-bold">₹{(prod.rate || 0).toLocaleString()}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -213,13 +280,13 @@ const TransactionHistory = () => {
                               </div>
                             )}
                         </td>
-                        <td className="px-8 py-5 text-right font-black text-rose-500 align-top">
+                        <td className="px-8 py-5 text-right font-black text-rose-500 align-top text-xs">
                             {item.debit > 0 ? `₹${item.debit.toLocaleString()}` : '—'}
                         </td>
-                        <td className="px-8 py-5 text-right font-black text-emerald-600 align-top">
+                        <td className="px-8 py-5 text-right font-black text-emerald-600 align-top text-xs">
                             {item.credit > 0 ? `₹${item.credit.toLocaleString()}` : '—'}
                         </td>
-                        <td className="px-8 py-5 text-right font-black bg-zinc-50/30 align-top">
+                        <td className="px-8 py-5 text-right font-black bg-zinc-50/10 dark:bg-zinc-800/10 align-top text-xs">
                             ₹{Math.abs(item.runningBalance).toLocaleString()} 
                             <span className="ml-1 text-[8px] opacity-40 uppercase">{item.runningBalance >= 0 ? 'Cr' : 'Dr'}</span>
                         </td>
@@ -227,12 +294,12 @@ const TransactionHistory = () => {
                     ))}
                   </tbody>
                 </table>
-             </div>
+              </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center p-32 border-4 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[3rem] opacity-30">
-              <Layers size={64} className="mb-6 text-zinc-300" />
-              <p className="text-lg font-black text-zinc-400 uppercase tracking-widest italic text-center">Select party to sync ledger</p>
+          <div className="flex flex-col items-center justify-center p-32 border-4 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[3rem] opacity-40">
+              <Layers size={64} className="mb-6 text-zinc-300 animate-pulse" />
+              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest text-center">Select party to sync ledger statement</p>
           </div>
         )}
       </div>

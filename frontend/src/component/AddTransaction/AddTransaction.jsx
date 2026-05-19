@@ -2,20 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Calendar, User, Info, 
   ArrowUpRight, ArrowDownLeft, ShieldCheck, 
-  Save, RotateCcw, Landmark, Search, CreditCard
+  Save, RotateCcw, Landmark, CreditCard
 } from "lucide-react";
 
 // API Imports
 import { postTransaction } from '../../api/ledgerApi';
-import axios from 'axios';
 import { fetchParties } from '../../api/partyApi'; 
 
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const AddTransaction = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_URL || "https://dharashakti30backend.vercel.app";
-  
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -26,18 +23,17 @@ const AddTransaction = () => {
     partyId: '',
     amount: '',
     description: '',
-    type: 'PAYMENT_IN', // Changed to match ledgerApi format
+    type: 'PAYMENT_IN', 
     paymentMode: 'CASH',
     date: today 
   };
 
   const [formData, setFormData] = useState(initialForm);
 
-// 1. Fetch all Parties (Customers/Suppliers) using partyApi
+  // 1. Fetch all Parties (Customers/Suppliers) using partyApi
   const loadParties = useCallback(async () => {
     try {
       setLoading(true);
-      // fetchParties import ka use karke call
       const res = await fetchParties(); 
       if (res.data?.success) {
         setParties(res.data.data);
@@ -59,7 +55,7 @@ const AddTransaction = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 2. Submit Transaction using ledgerApi
+  // 2. Submit Transaction using ledgerApi (With Strict State Synchronized Refresh)
   const handleSubmit = async (e) => {
     e.preventDefault();
     const amt = Number(formData.amount);
@@ -70,23 +66,26 @@ const AddTransaction = () => {
     }
 
     try {
-      setLoading(true);
-      // Using your new ledgerApi helper
+      setLoading(true); // 🚀 LOADER TRIGGERS INSTANTLY
+      
       const response = await postTransaction({
         ...formData,
         amount: amt
       });
 
-      if (response.data.success) {
+      if (response.data?.success) {
         setSnackbar({ open: true, message: "ट्रांजैक्शन सफलतापूर्वक सिंक हो गया!", severity: "success" });
-        setFormData(initialForm);
-        fetchParties(); // Refresh balances
+        setFormData(initialForm); // Reset fields
+        
+        // 🚀 CRITICAL FIX: Forces immediate fresh state reload from network pipeline
+        await loadParties(); 
       }
     } catch (err) {
+      console.error("Transaction posting error:", err);
       const errMsg = err.response?.data?.message || "सिंकिंग विफल रही";
       setSnackbar({ open: true, message: errMsg, severity: "error" });
     } finally {
-      setLoading(false);
+      setLoading(false); // 🚀 LOADER CLOSES ONLY AFTER FRESH BALANCES ARE RENDERED
     }
   };
 
@@ -119,7 +118,7 @@ const AddTransaction = () => {
           {selectedPartyData && (
             <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700 flex justify-between items-center animate-in fade-in zoom-in duration-300">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-black text-zinc-500">{selectedPartyData.name[0]}</div>
+                    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-black text-zinc-500">{selectedPartyData.name ? selectedPartyData.name[0].toUpperCase() : 'P'}</div>
                     <div>
                         <p className="text-[10px] font-black text-zinc-400 uppercase">Selected Party</p>
                         <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 uppercase">{selectedPartyData.name}</p>
@@ -174,7 +173,7 @@ const AddTransaction = () => {
             </label>
             <select 
               name="partyId"
-              className="form-input-zinc font-bold cursor-pointer"
+              className="form-input-zinc font-bold cursor-pointer uppercase"
               value={formData.partyId}
               onChange={handleInputChange}
               required
@@ -182,7 +181,7 @@ const AddTransaction = () => {
               <option value="">-- Choose Party --</option>
               {parties.map(p => (
                 <option key={p._id} value={p._id}>
-                  {p.name.toUpperCase()} (Bal: ₹{p.currentBalance || 0})
+                  {p.name.toUpperCase()} (Bal: ₹{(p.currentBalance || 0).toLocaleString()})
                 </option>
               ))}
             </select>
@@ -256,7 +255,7 @@ const AddTransaction = () => {
               className="group relative flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
             >
               <Save size={18} />
-              {loading ? 'POSTING...' : 'SAVE TRANSACTION'}
+              {loading ? 'POSTING SYSTEM...' : 'SAVE TRANSACTION'}
             </button>
             <button 
                 type="button"
