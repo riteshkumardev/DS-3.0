@@ -201,7 +201,7 @@ const EmployeeLedger = ({ user }) => {
               ? new Date().toISOString().split('T')[0] 
               : `${selectedMonth}-01`,
         type: 'ADVANCE',
-        description: remark // 🚀 REMARK PASSED HERE TO API
+        remark: remark // 🚀 REMARK PASSED HERE TO API
       };
 
       const res = await recordSalaryPayment(payload);
