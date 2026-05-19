@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Printer, Calendar, ArrowRightCircle, PlusCircle, MinusCircle } from "lucide-react";
+import { BookOpen, Printer, Calendar, ArrowRightCircle, PlusCircle, MinusCircle, FileText } from "lucide-react";
 
 const getDaysInMonth = (month) => {
   const [year, m] = month.split('-').map(Number);
@@ -12,8 +12,8 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
     let rows = [];
     let cumulativeBalance = 0;
 
-    // 1. Months ko purane se naye (Ascending) sort karein taaki balance sahi calculation suru ho
-    const sortedMonths = [...availableMonths].sort((a, b) => new Date(a) - new Date(b));
+    // 1. Months ko purane se naye (Ascending) sort karein taaki balance correctly calculate ho
+    const sortedMonths = [...availableMonths].sort((a, b) => new Date(a + "-01") - new Date(b + "-01"));
 
     sortedMonths.forEach(month => {
       // --- A. Monthly Salary Credit Logic ---
@@ -24,9 +24,9 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
       let p = 0, h = 0;
       Object.keys(fullAttendanceData || {}).forEach(date => {
         if (date.startsWith(month)) {
-          // Backend Enum Check: PRESENT / HALF_DAY
-          if (fullAttendanceData[date] === "PRESENT") p++;
-          else if (fullAttendanceData[date] === "HALF_DAY") h++;
+          const statusUpper = String(fullAttendanceData[date]).toUpperCase().trim();
+          if (statusUpper === "PRESENT") p++;
+          else if (statusUpper === "HALF_DAY" || statusUpper === "HALF-DAY") h++;
         }
       });
 
@@ -37,9 +37,10 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
       if (workedDays > 0) {
         cumulativeBalance += grossEarned;
         rows.push({
-          date: `${month}-28`, // Logic: Salary usually credited at month end
+          date: `${month}-28`, 
           displayDate: new Date(month + "-01").toLocaleString('default', { month: 'long', year: 'numeric' }),
           description: `Salary Credited (${workedDays} Days)`,
+          voucherNo: "SYS-AUTO",
           type: 'EARNING',
           amount: grossEarned,
           balance: cumulativeBalance
@@ -48,15 +49,23 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
 
       // --- B. Advance/Payments Debit Logic ---
       const monthlyAdvances = (allPayments || [])
-        .filter(pay => pay.date?.substring(0, 7) === month)
+        .filter(pay => {
+          if (!pay.date) return false;
+          return String(pay.date).substring(0, 7) === month;
+        })
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 
       monthlyAdvances.forEach(adv => {
         cumulativeBalance -= Number(adv.amount || 0);
+        
+        // 🚀 BUG FIX: Agar backend se dynamically updated remark/description aaya hai to vahi use karein
+        const dynamicDescription = adv.remark || adv.description || "Advance / Payment Taken";
+
         rows.push({
           date: adv.date,
           displayDate: new Date(adv.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-          description: `Advance / Payment Taken`,
+          description: dynamicDescription.toUpperCase(), // Text standardization inside ledger
+          voucherNo: adv.billNo || "VCH-N/A", // 🚀 NEW FIELD: Voucher/Bill number extraction
           type: 'ADVANCE',
           amount: adv.amount,
           balance: cumulativeBalance
@@ -70,38 +79,73 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
 
   const passbookRows = generatePassbookRows();
 
+  // 🚀 PRINT SYSTEM OPTIMIZATION (Bina styles collapse kiye clean output data print karega)
   const handlePrint = () => {
-    const printContent = document.getElementById("passbook-content").innerHTML;
+    const sortedForPrint = [...passbookRows].reverse(); // Print hamesha oldest to newest standard passbook ki tarah hona chahiye
+    
+    let tableHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Voucher No</th>
+            <th>Description / Remarks</th>
+            <th>Debit (Paid)</th>
+            <th>Credit (Earned)</th>
+            <th>Running Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    sortedForPrint.forEach(row => {
+      tableHtml += `
+        <tr>
+          <td>${row.displayDate}</td>
+          <td><strong>${row.voucherNo}</strong></td>
+          <td>${row.description}</td>
+          <td class="${row.type === 'ADVANCE' ? 'text-red' : ''}">${row.type === 'ADVANCE' ? '- ₹' + row.amount.toLocaleString() : '—'}</td>
+          <td class="${row.type === 'EARNING' ? 'text-emerald' : ''}">${row.type === 'EARNING' ? '+ ₹' + row.amount.toLocaleString() : '—'}</td>
+          <td style="font-weight: 900; background: #fbfbfb;">₹${row.balance.toLocaleString()}</td>
+        </tr>
+      `;
+    });
+
+    tableHtml += `</tbody></table>`;
+
     const win = window.open('', '', 'height=700,width=900');
     win.document.write(`
       <html>
         <head>
-          <title>Dharashakti_Passbook_${selectedEmp.employeeId}</title>
+          <title>Passbook_${selectedEmp.employeeId}</title>
           <style>
-            body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #18181b; }
-            .header { border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #e4e4e7; padding: 12px; font-size: 11px; text-align: left; }
-            th { background: #f8fafc; text-transform: uppercase; color: #64748b; }
-            .text-emerald { color: #10b981; font-weight: bold; }
-            .text-red { color: #ef4444; font-weight: bold; }
-            .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e4e4e7; padding-top: 10px; }
+            body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1c1917; }
+            .header { border-bottom: 3px solid #059669; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+            .company-name { font-size: 24px; font-weight: 900; color: #059669; text-transform: uppercase; margin: 0; }
+            .profile-block { text-align: right; font-size: 13px; line-height: 1.4; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #e7e5e4; padding: 10px 12px; font-size: 12px; text-align: left; }
+            th { background: #f5f5f4; text-transform: uppercase; color: #44403c; font-weight: 800; font-size: 11px; tracking: 0.05em; }
+            .text-emerald { color: #059669; font-weight: bold; }
+            .text-red { color: #dc2626; font-weight: bold; }
+            .footer { margin-top: 40px; font-size: 10px; color: #a8a29e; border-top: 1px solid #e7e5e4; padding-top: 10px; text-align: center; font-weight: bold; }
           </style>
         </head>
         <body>
           <div class="header">
             <div>
-              <h1 style="margin:0; color:#10b981;">Staff Passbook</h1>
-              <p style="margin:4px 0; font-weight:bold;">Dhara Shakti Agro Products</p>
+              <h1 class="company-name">Dhara Shakti Agro Products</h1>
+              <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 700; color: #44403c;">OFFICIAL EMPLOYEE PASSBOOK</p>
             </div>
-            <div style="text-align:right">
-              <p style="margin:0; font-size:16px; font-weight:900;">${selectedEmp.name.toUpperCase()}</p>
-              <p style="margin:4px 0;">ID: ${selectedEmp.employeeId}</p>
+            <div class="profile-block">
+              <p style="margin: 0; font-size: 16px; font-weight: 900; color: #1c1917;">${selectedEmp.name.toUpperCase()}</p>
+              <p style="margin: 2px 0;"><strong>ID:</strong> ${selectedEmp.employeeId}</p>
+              <p style="margin: 0; font-size: 11px; color: #78716c;">DESIGNATION: ${selectedEmp.role || 'STAFF'}</p>
             </div>
           </div>
-          ${printContent}
+          ${tableHtml}
           <div class="footer">
-            Generated on ${new Date().toLocaleString()} | System Authenticated Ledger
+            Generated on ${new Date().toLocaleString()} | Dharashakti ERP Internal Audit Ledger Statement
           </div>
         </body>
       </html>
@@ -135,7 +179,8 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
           <thead>
             <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
               <th className="px-6 py-4">Transaction Date</th>
-              <th className="px-6 py-4">Description</th>
+              <th className="px-6 py-4">Voucher No</th>
+              <th className="px-6 py-4">Description / Remark</th>
               <th className="px-6 py-4">Debit / Credit</th>
               <th className="px-6 py-4 text-right">Running Balance</th>
             </tr>
@@ -149,9 +194,12 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
                     {row.displayDate}
                   </div>
                 </td>
+                <td className="px-6 py-5 border-t border-zinc-50 dark:border-zinc-800 text-zinc-700 dark:text-zinc-400 font-mono text-[11px]">
+                  {row.voucherNo}
+                </td>
                 <td className="px-6 py-5 dark:text-zinc-300 border-t border-zinc-50 dark:border-zinc-800">
-                  <span className={`flex items-center gap-2 ${row.type === 'EARNING' ? 'text-emerald-600' : 'text-zinc-500'}`}>
-                    {row.type === 'EARNING' ? <PlusCircle size={14}/> : <MinusCircle size={14}/>}
+                  <span className={`flex items-center gap-2 ${row.type === 'EARNING' ? 'text-emerald-600' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                    {row.type === 'EARNING' ? <PlusCircle size={14}/> : <FileText size={14} className="text-red-500/70" />}
                     {row.description}
                   </span>
                 </td>
