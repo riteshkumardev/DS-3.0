@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, FileText, Plus, ArrowLeft, Printer, 
@@ -7,9 +6,9 @@ import {
 } from "lucide-react";
 import EWayBillContainer from "../EWayBill/EWayBillContainer";
 import { getAllSales } from "../../api/saleApi";
+import Loader from "../Core_Component/Loader/Loader";
 
 const InvoicePage = () => {
- 
   const navigate = useNavigate();
   
   const [allSales, setAllSales] = useState([]); 
@@ -21,10 +20,13 @@ const InvoicePage = () => {
   useEffect(() => {
     const loadSales = async () => {
       try {
-  const res = await getAllSales(); 
-        if (res.data.success) setAllSales(res.data.data);
+        setLoading(true); // 🚀 Loader status synchronized
+        const res = await getAllSales(); 
+        if (res.data?.success) {
+          setAllSales(res.data.data || []);
+        }
       } catch (err) {
-        console.error("Sales load error", err);
+        console.error("Sales load error inside ledger container:", err);
       } finally {
         setLoading(false);
       }
@@ -33,12 +35,21 @@ const InvoicePage = () => {
   }, []);
 
   const customerHistory = useMemo(() => {
-    if (!searchTerm) return allSales; // Default: show all or latest
-    return allSales.filter(s => {
-      const nameMatch = s.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
-      const billMatch = String(s.billNo).toLowerCase().includes(searchTerm.toLowerCase());
-      return nameMatch || billMatch;
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (!allSales || allSales.length === 0) return [];
+    
+    let filtered = [...allSales];
+
+    if (searchTerm.trim() !== "") {
+      const lowerSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(s => {
+        const nameMatch = s.customerName ? String(s.customerName).toLowerCase().includes(lowerSearch) : false;
+        const billMatch = s.billNo ? String(s.billNo).toLowerCase().includes(lowerSearch) : false;
+        return nameMatch || billMatch;
+      });
+    }
+
+    // 🚀 Sort by absolute date sequence (Latest on top)
+    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [searchTerm, allSales]);
 
   const handleSelectSale = (sale) => {
@@ -47,9 +58,20 @@ const InvoicePage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const totalInvoiced = customerHistory.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
-  const totalReceived = customerHistory.reduce((sum, s) => sum + (Number(s.amountReceived) || 0), 0);
-  const totalPending = totalInvoiced - totalReceived;
+  // 🚀 VARIABLE CORRECTION REFIX: Matched strictly to backend data layout keys 'grandTotal' & 'amountPaid'
+  const totalInvoiced = useMemo(() => {
+    return customerHistory.reduce((sum, s) => sum + (Number(s.grandTotal || s.totalAmount || 0)), 0);
+  }, [customerHistory]);
+
+  const totalReceived = useMemo(() => {
+    return customerHistory.reduce((sum, s) => sum + (Number(s.amountPaid || s.amountReceived || 0)), 0);
+  }, [customerHistory]);
+
+  const totalPending = useMemo(() => {
+    return totalInvoiced - totalReceived;
+  }, [totalInvoiced, totalReceived]);
+
+  if (loading) return <Loader />;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-zinc-950 p-3 md:p-8 font-sans transition-colors duration-300">
@@ -105,12 +127,12 @@ const InvoicePage = () => {
           </div>
 
           {/* --- TABLE SECTION --- */}
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800">
-                    <th className="px-6 py-5">Date / Bill</th>
+                    <th className="px-6 py-5">Date / Bill No</th>
                     <th className="px-6 py-5">Party Details</th>
                     <th className="px-6 py-5">Product Info</th>
                     <th className="px-6 py-5 text-right">Bill Value</th>
@@ -120,51 +142,67 @@ const InvoicePage = () => {
                 </thead>
                 <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
                   {customerHistory.length > 0 ? (
-                    customerHistory.map((s) => (
-                      <tr key={s._id} className="hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all group cursor-default">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-bold text-zinc-400">{s.date}</span>
-                            <span className="text-sm font-black text-zinc-900 dark:text-white tracking-tight">#{s.billNo}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter italic">{s.customerName}</span>
-                            <span className="text-[10px] text-zinc-400 font-bold">{s.gstin || 'NO GSTIN'}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-[10px] font-black text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                            {s.productName || (s.goods && s.goods[0]?.product) || "Agro Goods"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-sm font-black text-zinc-900 dark:text-white tracking-tighter">₹{Number(s.totalAmount).toLocaleString()}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {Number(s.totalAmount) - Number(s.amountReceived || 0) <= 0 ? (
-                            <StatusBadge type="paid" text="Cleared" />
-                          ) : (
-                            <StatusBadge type="due" text="Pending" />
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button 
-                            onClick={() => handleSelectSale(s)}
-                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:text-white transition-all shadow-md active:scale-90"
-                          >
-                            <Printer size={14} strokeWidth={2.5} /> View
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    customerHistory.map((s) => {
+                      // 🚀 BUG FIX: Dynamic safe conversion format matching ISO dates splits
+                      const cleanDate = s.date ? String(s.date).split('T')[0] : '—';
+                      
+                      // Extracting strings from nested products array format
+                      const aggregatedProdNames = s.goods && s.goods.length > 0 
+                        ? s.goods.map(g => g.productName || g.product).join(", ") 
+                        : "Agro Goods";
+
+                      const billValue = Number(s.grandTotal || s.totalAmount || 0);
+                      const receivedValue = Number(s.amountPaid || s.amountReceived || 0);
+                      const isCleared = (billValue - receivedValue) <= 0;
+
+                      return (
+                        <tr key={s._id} className="hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all group cursor-default text-xs font-bold">
+                          <td className="px-6 py-5">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-bold text-zinc-400">
+                                {cleanDate !== '—' ? new Date(cleanDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                              </span>
+                              <span className="text-sm font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">#{s.billNo}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter italic">{s.customerName || 'UNKNOWN PARTY'}</span>
+                              <span className="text-[10px] text-zinc-400 font-bold mt-0.5">{s.partyId?.phone || 'NO PHONE'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className="text-[10px] font-black text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 max-w-[200px] truncate block uppercase tracking-wide">
+                              {aggregatedProdNames}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 text-right">
+                            <span className="text-sm font-black text-zinc-900 dark:text-white tracking-tighter">₹{billValue.toLocaleString()}</span>
+                          </td>
+                          <td className="px-6 py-5">
+                            {isCleared ? (
+                              <StatusBadge type="paid" text="Cleared" />
+                            ) : (
+                              <StatusBadge type="due" text="Pending" />
+                            )}
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <button 
+                              onClick={() => handleSelectSale(s)}
+                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:text-white transition-all shadow-md active:scale-90"
+                            >
+                              <Printer size={14} strokeWidth={2.5} /> View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan="6" className="py-20 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <Search size={48} className="text-zinc-200 dark:text-zinc-800" />
-                          <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-widest">No matching records found</p>
+                        <div className="flex flex-col items-center justify-center gap-3 opacity-60">
+                          <Search size={48} className="text-zinc-300 dark:text-zinc-700" />
+                          <p className="text-zinc-400 font-black uppercase text-[10px] tracking-widest">No matching records found</p>
                         </div>
                       </td>
                     </tr>
@@ -206,17 +244,17 @@ const InvoicePage = () => {
 // Reusable Components to keep code clean
 const StatCard = ({ label, value, color, icon }) => {
   const colors = {
-    zinc: "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:bg-zinc-900",
+    zinc: "border-zinc-400 dark:border-zinc-700 text-zinc-600 dark:bg-zinc-900",
     emerald: "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600",
     red: "border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-500"
   };
 
   return (
-    <div className={`bg-white p-6 rounded-[2rem] shadow-xl border-l-8 flex items-center gap-5 transition-transform hover:-translate-y-1 ${colors[color]}`}>
-      <div className={`p-3 rounded-2xl ${color === 'zinc' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}>{icon}</div>
+    <div className={`bg-white dark:bg-zinc-900 p-6 rounded-[2rem] shadow-xl border-l-8 flex items-center gap-5 transition-transform hover:-translate-y-1 ${colors[color]}`}>
+      <div className={`p-3 rounded-2xl ${color === 'zinc' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500' : ''}`}>{icon}</div>
       <div>
-        <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{label}</p>
-        <h4 className="text-2xl font-black tracking-tighter text-zinc-900 dark:text-white">₹{value.toLocaleString()}</h4>
+        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 dark:text-zinc-400">{label}</p>
+        <h4 className="text-2xl font-black tracking-tighter text-zinc-900 dark:text-white mt-1">₹{value.toLocaleString()}</h4>
       </div>
     </div>
   );
