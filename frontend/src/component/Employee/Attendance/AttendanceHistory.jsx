@@ -11,7 +11,7 @@ export default function AttendanceHistory({
   fullAttendanceData = {}
 }) {
   
-  // 💡 Local Date formatting to avoid Timezone shifts
+  // 💡 Local Date formatting to ensure perfect alignment with system expectations
   const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -22,15 +22,37 @@ export default function AttendanceHistory({
   const getTileClassName = ({ date, view }) => {
     if (view !== "month") return;
 
-    const formatted = formatDate(date);
-    const status = fullAttendanceData[formatted];
+    const currentTileDateStr = formatDate(date); // Output: "2026-05-18"
 
-    // Status mapping with backend Enums
-    if (status === "PRESENT") return "present-day";
-    if (status === "HALF_DAY") return "half-day";
-    if (status === "ABSENT") return "absent-day";
+    let status = null;
+
+    // 🚀 CRITICAL FIX: Loop through backend data keys to safely catch full UTC string representations
+    // Handles matches like "Mon May 18 2026..." or raw strings "2026-05-18" cleanly
+    Object.keys(fullAttendanceData || {}).forEach((key) => {
+      if (key.includes(currentTileDateStr)) {
+        status = fullAttendanceData[key];
+      } else {
+        // Fallback parser loop if key is a native Date string format object instantiation
+        try {
+          const parsedKeyStr = new Date(key).toISOString().split('T')[0];
+          if (parsedKeyStr === currentTileDateStr) {
+            status = fullAttendanceData[key];
+          }
+        } catch (e) {
+          // Silent catch to handle malformed legacy string formats
+        }
+      }
+    });
+
+    // Explicit upper casing standardization check block
+    const finalStatus = status ? String(status).toUpperCase().trim() : "";
+
+    // Status css class assignments dynamically matching active system configurations
+    if (finalStatus === "PRESENT") return "present-day";
+    if (finalStatus === "HALF_DAY" || finalStatus === "HALF-DAY") return "half-day";
+    if (finalStatus === "ABSENT") return "absent-day";
     
-    // Highlight Sundays
+    // Highlight Sundays safely without overriding active statuses
     if (date.getDay() === 0) return "sunday-tile";
 
     return "";
@@ -48,17 +70,18 @@ export default function AttendanceHistory({
           font-family: inherit !important;
         }
 
-        /* Tile Styling */
+        /* Tile Styling Configuration Framework */
         .attendance-calendar .react-calendar__tile {
-          height: 50px;
+          height: 48px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           border-radius: 12px;
-          margin: 2px 0;
+          margin: 3px 0;
           font-size: 0.85rem;
-          transition: all 0.2s ease;
+          font-weight: 700;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .attendance-calendar .react-calendar__month-view__weekdays__weekday {
@@ -70,13 +93,13 @@ export default function AttendanceHistory({
           text-decoration: none !important;
         }
 
-        /* Status Colors */
-        .present-day { background: #10b981 !important; color: white !important; font-weight: 900; }
-        .half-day { background: #f59e0b !important; color: white !important; font-weight: 900; }
-        .absent-day { background: #ef4444 !important; color: white !important; font-weight: 900; }
+        /* Status Rendering Colors Panels */
+        .present-day { background: #10b981 !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
+        .half-day { background: #f59e0b !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.2); }
+        .absent-day { background: #ef4444 !important; color: white !important; font-weight: 900; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); }
         .sunday-tile { color: #ef4444; font-weight: bold; }
 
-        /* Navigation */
+        /* Navigation Mechanics UI Wrapper */
         .react-calendar__navigation button {
           font-weight: 900;
           text-transform: uppercase;
@@ -85,24 +108,25 @@ export default function AttendanceHistory({
         }
 
         .dark .react-calendar__tile:hover { background: #27272a !important; }
-        .react-calendar__tile--now { border: 2px solid #10b981 !important; background: transparent !important; }
+        .react-calendar__tile--now { border: 2px dashed #10b981 !important; background: transparent !important; color: inherit; }
+        .dark .react-calendar__month-view__days__day { color: #e4e4e7; }
         
-        /* Neighboring months */
-        .react-calendar__month-view__days__day--neighboringMonth { opacity: 0.2; }
+        /* Neighboring months safety layout overrides */
+        .react-calendar__month-view__days__day--neighboringMonth { opacity: 0.15; pointer-events: none; }
       `}</style>
 
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
         <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200">
           
           {/* Header */}
-          <div className="p-6 border-b dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/50 rounded-t-[2.5rem]">
+          <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/30 rounded-t-[2.5rem]">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+              <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20">
                 <CalendarIcon size={18} />
               </div>
               <div>
                 <h3 className="font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter text-sm">
-                  Staff Attendance
+                  Staff Attendance Calendar
                 </h3>
                 <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Monthly History Tracker</p>
               </div>
@@ -110,7 +134,7 @@ export default function AttendanceHistory({
 
             <button
               onClick={onClose}
-              className="p-2 bg-zinc-200 dark:bg-zinc-800 hover:text-red-500 rounded-full transition-all"
+              className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:text-red-500 text-zinc-500 rounded-full transition-all active:scale-90"
             >
               <X size={18}/>
             </button>
@@ -121,9 +145,11 @@ export default function AttendanceHistory({
             <Calendar
               activeStartDate={new Date(selectedMonth + "-01")}
               onActiveStartDateChange={({ activeStartDate }) => {
-                const year = activeStartDate.getFullYear();
-                const month = String(activeStartDate.getMonth() + 1).padStart(2, "0");
-                setSelectedMonth(`${year}-${month}`);
+                if (activeStartDate) {
+                  const year = activeStartDate.getFullYear();
+                  const month = String(activeStartDate.getMonth() + 1).padStart(2, "0");
+                  setSelectedMonth(`${year}-${month}`);
+                }
               }}
               tileClassName={getTileClassName}
               className="attendance-calendar"
@@ -131,27 +157,27 @@ export default function AttendanceHistory({
               prev2Label={null}
             />
 
-            {/* Legend / Key */}
-            <div className="mt-8 grid grid-cols-3 gap-3">
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-full h-1.5 bg-emerald-500 rounded-full"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase">Present</span>
+            {/* Legend Indicators Panels */}
+            <div className="mt-8 grid grid-cols-3 gap-4 border-t border-zinc-100 dark:border-zinc-800 pt-6">
+              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
+                <div className="w-6 h-1.5 bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/30"></div>
+                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Present</span>
               </div>
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-full h-1.5 bg-amber-500 rounded-full"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase">Half Day</span>
+              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
+                <div className="w-6 h-1.5 bg-amber-500 rounded-full shadow-sm shadow-amber-500/30"></div>
+                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Half Day</span>
               </div>
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-full h-1.5 bg-red-500 rounded-full"></div>
-                <span className="text-[9px] font-black text-zinc-400 uppercase">Absent</span>
+              <div className="flex flex-col items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/20 py-2 rounded-xl border dark:border-zinc-800/40">
+                <div className="w-6 h-1.5 bg-red-500 rounded-full shadow-sm shadow-red-500/30"></div>
+                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">Absent</span>
               </div>
             </div>
           </div>
           
-          {/* Footer Info */}
-          <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/30 border-t dark:border-zinc-800 rounded-b-[2.5rem] flex justify-center">
-            <p className="text-[10px] text-zinc-400 font-bold uppercase italic">
-              * Click arrows to switch months
+          {/* Footer Navigation Hints */}
+          <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/10 border-t border-zinc-100 dark:border-zinc-800 rounded-b-[2.5rem] flex justify-center">
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider italic">
+              * Click control arrows to browse different months
             </p>
           </div>
         </div>
