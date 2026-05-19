@@ -10,9 +10,13 @@ export default function AttendanceHistory({
   setSelectedMonth,
   fullAttendanceData = {}
 }) {
-  console.log(fullAttendanceData,"fullAttendanceData");
   
-  
+  // 🚀 MONTH MAP FOR STRING STRING PARSING PANELS
+  const monthMap = {
+    Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+    Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12"
+  };
+
   // 💡 Local Date formatting to ensure perfect alignment with system expectations
   const formatDate = (date) => {
     const year = date.getFullYear();
@@ -27,19 +31,28 @@ export default function AttendanceHistory({
     const currentTileDateStr = formatDate(date); // Format: "2026-05-18"
     let status = null;
 
-    // 🚀 FIXED KEY EVALUATION LOGIC FOR BOTH UTC STRINGS AND ISO KEYSTAMPS
+    // 🚀 FOOLPROOF STRING INTERCEPTOR PARSER
     Object.keys(fullAttendanceData || {}).forEach((key) => {
+      // Condition 1: Agar key standard format me hi ho "2026-05-18"
       if (key.includes(currentTileDateStr)) {
         status = fullAttendanceData[key];
       } else {
+        // Condition 2: Parse truncated format like "Mon May 18 2026 00:00:00 GM"
         try {
-          // Fallback parsing for full string keys like "Mon May 18 2026..."
-          const parsedKeyStr = new Date(key).toISOString().split('T')[0];
-          if (parsedKeyStr === currentTileDateStr) {
-            status = fullAttendanceData[key];
+          const parts = key.split(" "); // ["Mon", "May", "18", "2026", ...]
+          if (parts.length >= 4) {
+            const backendMonth = monthMap[parts[1]]; // "05"
+            const backendDay = String(parts[2]).padStart(2, "0"); // "18"
+            const backendYear = parts[3]; // "2026"
+
+            const normalizedBackendDate = `${backendYear}-${backendMonth}-${backendDay}`; // Result: "2026-05-18"
+            
+            if (normalizedBackendDate === currentTileDateStr) {
+              status = fullAttendanceData[key];
+            }
           }
         } catch (e) {
-          // Bypass format mismatch errors smoothly
+          // Fallback handling if string parsing glitches
         }
       }
     });
@@ -69,19 +82,19 @@ export default function AttendanceHistory({
           font-family: inherit !important;
         }
 
-        /* 🚀 CALENDAR COMPACT HEIGHT & PADDING OPTIMIZATION */
+        /* 🚀 COMPACT HEIGHT & PADDING OPTIMIZATION */
         .attendance-calendar .react-calendar__viewContainer {
           padding: 0 !important;
           margin: 0 !important;
         }
         
         .attendance-calendar .react-calendar__month-view__days {
-          row-gap: 2px !important; /* Row spacing minimized safely */
+          row-gap: 2px !important;
         }
 
-        /* 🚀 COMPACT TILE CONFIGURATION: Grid cell heights heavily minimized to shrink container */
+        /* 🚀 COMPACT TILE CONFIGURATION */
         .attendance-calendar .react-calendar__tile {
-          height: 32px !important; /* Reduced dramatically from 38px/48px for tight packing */
+          height: 32px !important; 
           padding: 0 !important;
           display: flex !important;
           align-items: center !important;
@@ -93,7 +106,6 @@ export default function AttendanceHistory({
           transition: all 0.15s ease-in-out;
         }
 
-        /* Spacing rules for active week labels text fields */
         .attendance-calendar .react-calendar__month-view__weekdays {
           padding: 0 !important;
           margin-bottom: 4px !important;
@@ -108,14 +120,14 @@ export default function AttendanceHistory({
           text-decoration: none !important;
         }
 
-        /* 🚀 STRICT CSS OVERRIDE Panels: Forces text & button backgrounds to render bright colors */
-        .present-day-tile { background: #10b981 !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; }
+        /* 🚀 STRICT CSS OVERRIDE PANEL MATRIX */
+        .present-day-tile { background: #10b981 !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); }
         .present-day-tile abbr { color: white !important; font-weight: 900 !important; }
 
-        .half-day-tile { background: #f59e0b !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; }
+        .half-day-tile { background: #f59e0b !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3); }
         .half-day-tile abbr { color: white !important; font-weight: 900 !important; }
 
-        .absent-day-tile { background: #ef4444 !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; }
+        .absent-day-tile { background: #ef4444 !important; color: white !important; font-weight: 900 !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
         .absent-day-tile abbr { color: white !important; font-weight: 900 !important; }
 
         .sunday-tile { color: #ef4444 !important; font-weight: bold; }
@@ -139,15 +151,11 @@ export default function AttendanceHistory({
         .dark .react-calendar__tile { color: #e4e4e7; }
         .dark .react-calendar__tile:hover { background: #27272a !important; color: white !important; }
         
-        /* Today item focus dashed rings styles */
         .react-calendar__tile--now { border: 1.5px dashed #10b981 !important; background: transparent !important; }
-        
-        /* Disable non-active month visibility parameters */
         .react-calendar__month-view__days__day--neighboringMonth { opacity: 0.12; pointer-events: none; }
       `}</style>
 
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
-        {/* max-w-xs to force ultra compact width along with scaled down elements */}
         <div className="bg-white dark:bg-zinc-900 w-full max-w-xs rounded-[2rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200 overflow-hidden">
           
           {/* Header Dashboard section */}
@@ -189,7 +197,7 @@ export default function AttendanceHistory({
               prev2Label={null}
             />
 
-            {/* Compact Legends Indicators Panels */}
+            {/* Compact Legends Markers indicators panels */}
             <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-zinc-100 dark:border-zinc-800 pt-3">
               <div className="flex flex-col items-center gap-1 bg-zinc-50 dark:bg-zinc-800/10 py-1 rounded-lg border dark:border-zinc-800/30">
                 <div className="w-4 h-1 bg-emerald-500 rounded-full shadow-sm"></div>
