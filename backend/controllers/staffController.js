@@ -1,11 +1,15 @@
 import Staff from "../models/Staff.js";
 import { ROLES } from "../utils/constants.js";
 import logger from "../utils/logger.js";
-import bcrypt from "bcryptjs"; // Password hashing ke liye zaroori hai
+import bcrypt from "bcryptjs"; 
+import mongoose from "mongoose";
 
-// 🔧 Helpers
-const safeUpper = (v) => String(v || "").toUpperCase();
+// 🔧 Core Helpers
+const safeUpper = (v) => String(v || "").toUpperCase().trim();
 const isValidPhone = (phone) => /^[6-9]\d{9}$/.test(phone);
+
+// Helper function to check if input is a valid MongoDB ObjectId
+const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // ==========================================
 // 1. CREATE STAFF (v3 Robust & Secure)
@@ -42,28 +46,29 @@ export const createStaff = async (req, res, next) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 🔥 5. Build Object
+        // 🔥 5. Build Object Mapping
         const staffData = {
             name: safeUpper(name),
             password: hashedPassword, 
-            phone,
+            phone: phone.trim(),
             fatherName: safeUpper(fatherName),
-            emergencyPhone,
-            address,
-            role: (role || ROLES.WORKER).toUpperCase(),
+            emergencyPhone: emergencyPhone ? emergencyPhone.trim() : null,
+            address: address ? address.trim() : null,
+            role: (role || ROLES?.WORKER || "WORKER").toUpperCase(),
             baseSalary: finalSalary,
             joiningDate: joiningDate || new Date(),
             status: "ACTIVE",
 
-            // Mapping nested objects from FormData fallback keys
+            // Mapping nested objects with fallback parameters Safely
             kycDetails: {
-                aadharNumber: req.body["kycDetails[aadharNumber]"] || kycDetails?.aadharNumber || req.body.aadhar || "[Aadhaar Redacted]"
+                aadharNumber: req.body["kycDetails[aadharNumber]"] || kycDetails?.aadharNumber || req.body.aadhar || "[Aadhaar Redacted]",
+                panNumber: safeUpper(req.body["kycDetails[panNumber]"] || kycDetails?.panNumber || req.body.panNumber || "")
             },
 
             bankDetails: {
-                bankName: safeUpper(req.body["bankDetails[bankName]"] || bankDetails?.bankName || req.body.bankName),
-                accountNumber: req.body["bankDetails[accountNumber]"] || bankDetails?.accountNumber || req.body.accountNo,
-                ifscCode: safeUpper(req.body["bankDetails[ifscCode]"] || bankDetails?.ifscCode || req.body.ifscCode)
+                bankName: safeUpper(req.body["bankDetails[bankName]"] || bankDetails?.bankName || req.body.bankName || ""),
+                accountNumber: req.body["bankDetails[accountNumber]"] || bankDetails?.accountNumber || req.body.accountNo || "",
+                ifscCode: safeUpper(req.body["bankDetails[ifscCode]"] || bankDetails?.ifscCode || req.body.ifscCode || "")
             },
 
             // Multer Image path handling
@@ -118,7 +123,7 @@ export const getAllStaff = async (req, res, next) => {
 
         const [staffList, total] = await Promise.all([
             Staff.find(query)
-                .select("-password") // 🔒 Never expose hashed passwords
+                .select("-password") // 🔒 Never expose passwords
                 .sort({ name: 1 })
                 .skip(skip)
                 .limit(Number(limit)),
@@ -139,13 +144,18 @@ export const getAllStaff = async (req, res, next) => {
 };
 
 // ==========================================
-// 3. GET STAFF BY ID
+// 3. GET STAFF BY ID / EMPLOYEE_ID
 // ==========================================
 export const getStaffById = async (req, res, next) => {
     try {
-        const staff = await Staff.findById(req.params.id).select("-password");
+        const { id } = req.params;
+        
+        // 🚀 Fix: ObjectId aur Custom EmployeeId string dono formats ko match karega
+        const criteria = isObjectId(id) ? { _id: id } : { employeeId: id.toUpperCase() };
+        
+        const staff = await Staff.findOne(criteria).select("-password");
 
-        if (!staff) return res.status(404).json({ success: false, message: "Staff not found." });
+        if (!staff) return res.status(404).json({ success: false, message: "Staff record missing." });
 
         res.status(200).json({
             success: true,
@@ -161,41 +171,63 @@ export const getStaffById = async (req, res, next) => {
 // ==========================================
 export const updateStaff = async (req, res, next) => {
     try {
-        const { salary, baseSalary, role, isBlocked, password, name } = req.body;
-        let updateData = { ...req.body };
+        const { id } = req.params;
+        const { salary, baseSalary, role, isBlocked, password, name, fatherName, bankDetails, kycDetails } = req.body;
+        
+        // Dynamic payload target determination
+        const criteria = isObjectId(id) ? { _id: id } : { employeeId: id.toUpperCase() };
+        
+        let updateFields = {};
 
-        // Normalize specific fields
-        if (name) updateData.name = safeUpper(name);
-        if (salary || baseSalary) updateData.baseSalary = Number(salary || baseSalary);
-        if (role) updateData.role = role.toUpperCase();
+        // Flat mapping to prevent Mongoose nested object clearing crashes
+        if (name) updateFields.name = safeUpper(name);
+        if (fatherName) updateFields.fatherName = safeUpper(fatherName);
+        if (salary || baseSalary) updateFields.baseSalary = Number(salary || baseSalary);
+        if (role) updateFields.role = role.toUpperCase();
 
-        // 🔒 If password update requested, re-hash it
+        // 🔒 Password update logic checks
         if (password && password.trim().length >= 4) {
             const salt = await bcrypt.genSalt(10);
-            updateData.password = await bcrypt.hash(password, salt);
+            updateFields.password = await bcrypt.hash(password, salt);
         }
 
-        // 🛡️ Security Block logic from MasterPanel
+        // 🛡️ Lock Security Logic via System Master Control Panel
         if (isBlocked !== undefined) {
-            updateData.status = isBlocked ? "LEFT" : "ACTIVE";
-            updateData.isBlocked = isBlocked; // Track explicitly
+            updateFields.status = isBlocked ? "LEFT" : "ACTIVE";
+            updateFields.isBlocked = isBlocked; 
         }
 
-        // Nested mapping for nested schema fields
-        if (req.body.aadhar) updateData["kycDetails.aadharNumber"] = req.body.aadhar;
-        if (req.body.bankName) updateData["bankDetails.bankName"] = safeUpper(req.body.bankName);
-        if (req.body.accountNo) updateData["bankDetails.accountNumber"] = req.body.accountNo;
-        if (req.body.ifscCode) updateData["bankDetails.ifscCode"] = safeUpper(req.body.ifscCode);
+        // Direct FormData mappings handling
+        if (req.body.phone && isValidPhone(req.body.phone)) updateFields.phone = req.body.phone.trim();
+        if (req.body.emergencyPhone) updateFields.emergencyPhone = req.body.emergencyPhone.trim();
+        if (req.body.address) updateFields.address = req.body.address.trim();
 
-        const staff = await Staff.findByIdAndUpdate(
-            req.params.id,
-            { $set: updateData },
+        // Nested Data Structures Flat Patching Injection 
+        if (req.body.aadhar) updateFields["kycDetails.aadharNumber"] = req.body.aadhar;
+        if (kycDetails?.aadharNumber) updateFields["kycDetails.aadharNumber"] = kycDetails.aadharNumber;
+        if (kycDetails?.panNumber) updateFields["kycDetails.panNumber"] = safeUpper(kycDetails.panNumber);
+
+        if (req.body.bankName) updateFields["bankDetails.bankName"] = safeUpper(req.body.bankName);
+        if (bankDetails?.bankName) updateFields["bankDetails.bankName"] = safeUpper(bankDetails.bankName);
+
+        if (req.body.accountNo) updateFields["bankDetails.accountNumber"] = req.body.accountNo;
+        if (bankDetails?.accountNumber) updateFields["bankDetails.accountNumber"] = bankDetails.accountNumber;
+
+        if (req.body.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(req.body.ifscCode);
+        if (bankDetails?.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(bankDetails.ifscCode);
+
+        // Upload picture update execution if file stream exists
+        if (req.file) updateFields.photo = `/uploads/staff/${req.file.filename}`;
+
+        const staff = await Staff.findOneAndUpdate(
+            criteria,
+            { $set: updateFields },
             { new: true, runValidators: true }
         ).select("-password");
 
         if (!staff) return res.status(404).json({ success: false, message: "Staff record missing." });
 
-        logger.info(`✏️ Staff Sync: ${staff.employeeId} updated by ${req.user?._id}`);
+        logger.info(`✏️ Staff Sync: ${staff.employeeId} updated successfully.`);
 
         res.status(200).json({
             success: true,
@@ -213,7 +245,10 @@ export const updateStaff = async (req, res, next) => {
 // ==========================================
 export const deleteStaff = async (req, res, next) => {
     try {
-        const staff = await Staff.findById(req.params.id);
+        const { id } = req.params;
+        const criteria = isObjectId(id) ? { _id: id } : { employeeId: id.toUpperCase() };
+
+        const staff = await Staff.findOne(criteria);
         if (!staff) return res.status(404).json({ success: false, message: "Staff not found." });
 
         staff.status = "LEFT";
@@ -225,7 +260,7 @@ export const deleteStaff = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: `Staff ${staff.name} access revoked.`
+            message: `Staff ${staff.name} access revoked from ERP panel system.`
         });
     } catch (error) {
         next(error);
