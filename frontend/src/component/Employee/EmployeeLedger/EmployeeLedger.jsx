@@ -60,23 +60,34 @@ const EmployeeLedger = ({ user }) => {
     return strID.startsWith("DS-") ? strID : `EMP-${strID.slice(-4)}`;
   };
 
-  const availableMonths = useMemo(() => {
-    const monthsSet = new Set();
-    const now = new Date();
-    monthsSet.add(now.toISOString().slice(0,7));
-    
-    if (selectedEmp?.joiningDate) {
-      const start = new Date(selectedEmp.joiningDate);
-      if (!isNaN(start)) {
-        let temp = new Date(start.getFullYear(), start.getMonth(), 1);
-        while (temp <= now) {
-          monthsSet.add(temp.toISOString().slice(0,7));
-          temp.setMonth(temp.getMonth() + 1);
-        }
+const availableMonths = useMemo(() => {
+  const monthsSet = new Set();
+  const now = new Date();
+  
+  // 1. Sabse pehle current month ko fix add karein (Format: "2026-05")
+  const currentMonthStr = now.toISOString().slice(0, 7);
+  monthsSet.add(currentMonthStr);
+  
+  if (selectedEmp?.joiningDate) {
+    const start = new Date(selectedEmp.joiningDate);
+    if (!isNaN(start)) {
+      // 2. Joining date ke saal aur mahine se 1st date par set karein
+      let temp = new Date(start.getFullYear(), start.getMonth(), 1);
+      
+      // 3. Current year aur month ki boundary banayein midnight zero standard par
+      const endThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      // 4. Strict loop checks jab tak temp current month tak na pahunch jaye
+      while (temp <= endThreshold) {
+        monthsSet.add(temp.toISOString().slice(0, 7));
+        temp.setMonth(temp.getMonth() + 1);
       }
     }
-    return Array.from(monthsSet).sort((a,b)=> new Date(b) - new Date(a));
-  }, [selectedEmp]);
+  }
+  
+  // 5. Latest month sabse upar dikhane ke liye reverse sort (Descending order)
+  return Array.from(monthsSet).sort((a, b) => new Date(b + "-01") - new Date(a + "-01"));
+}, [selectedEmp]);
 
   const fetchEmployees = async () => {
     try {
@@ -94,14 +105,13 @@ const EmployeeLedger = ({ user }) => {
     if (isBoss) fetchEmployees();
   }, [isBoss]);
 
-  // 🚀 CRITICAL FIX: Month parameters explicitly matched to handle back-month selections dynamically
+  // 🚀 Core calculation fetch processor with absolute targetMonth parameters overrides
   const viewLedger = async (emp, targetMonth) => {
     if (!emp || !targetMonth) return;
     
     const [year, monthNum] = targetMonth.split('-');
 
     try {
-      // API call mappings directly referencing centralized configurations with specific month parameters
       const [payRes, attRes] = await Promise.all([
         getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
@@ -111,10 +121,9 @@ const EmployeeLedger = ({ user }) => {
         const rawPayments = payRes.data.data || [];
         setAllPayments(rawPayments);
         
-        // 🚀 BUG FIX: Clean slice string mapping to handle deep ISO strings and manual entries
         const filteredHistory = rawPayments.filter(p => {
           if (!p.date) return false;
-          const cleanDateString = String(p.date).substring(0, 7); // Result: "2026-05"
+          const cleanDateString = String(p.date).substring(0, 7); 
           return cleanDateString === targetMonth;
         }).reverse();
 
@@ -129,7 +138,6 @@ const EmployeeLedger = ({ user }) => {
         let a = attRes.data.summary?.ABSENT ?? attRes.data.summary?.Absent ?? 0;
         let h = attRes.data.summary?.HALF_DAY ?? attRes.data.summary?.['Half-Day'] ?? 0;
 
-        // Fallback calculations sync if server aggregation summary has key variations
         if (p === 0 && a === 0 && h === 0 && historyArray.length > 0) {
           historyArray.forEach(record => {
             const statusUpper = String(record.status).toUpperCase().trim();
@@ -141,7 +149,7 @@ const EmployeeLedger = ({ user }) => {
 
         historyArray.forEach(record => {
           if (record.date) {
-            const cleanKey = String(record.date).split('T')[0]; // Extract "YYYY-MM-DD" safely
+            const cleanKey = String(record.date).split('T')[0]; 
             attendanceMap[cleanKey] = record.status;
           }
         });
@@ -154,17 +162,25 @@ const EmployeeLedger = ({ user }) => {
     }
   };
 
-  // 🚀 CRITICAL FIX: Effect trigger completely forces re-fetching when selected month alters
+  // 🚀 Trigger view refresh on selectedMonth changes smoothly
   useEffect(() => {
     if (selectedEmp) {
       viewLedger(selectedEmp, selectedMonth);
     }
   }, [selectedMonth]);
 
-  // Handler for manual workforce item change click triggers
   const handleEmpSelection = (emp) => {
     setSelectedEmp(emp);
     viewLedger(emp, selectedMonth);
+  };
+
+  // 🚀 DROPDOWN INTERCEPTOR FUNCTION: Manual state propagation and instant background pipeline refresh
+  const handleDropdownMonthChange = (e) => {
+    const nextSelectedMonth = e.target.value;
+    setSelectedMonth(nextSelectedMonth);
+    if (selectedEmp) {
+      viewLedger(selectedEmp, nextSelectedMonth);
+    }
   };
 
   // Financial Standard Computations
@@ -257,12 +273,23 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl border dark:border-zinc-700 shadow-inner">
-                  <CalendarDays size={18} className="text-emerald-600" />
-                  <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent text-xs font-black outline-none dark:text-white cursor-pointer uppercase">
-                    {availableMonths.map(m => <option key={m} value={m}>{new Date(m + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}</option>)}
-                  </select>
-                </div>
+               {/* 🚀 DROPDOWN CONTAINER WITH CSS FIX */}
+<div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl border dark:border-zinc-700 shadow-inner relative z-40">
+  <CalendarDays size={18} className="text-emerald-600 shrink-0" />
+  
+  <select 
+    value={selectedMonth} 
+    onChange={handleDropdownMonthChange} 
+    className="bg-transparent text-xs font-black outline-none dark:text-white cursor-pointer uppercase relative z-50 appearance-none pr-6"
+    style={{ pointerEvents: 'auto' }} // Forces clicking capability even if layout overlaps
+  >
+    {availableMonths.map(m => (
+      <option key={m} value={m} className="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
+        {new Date(m + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
+      </option>
+    ))}
+  </select>
+</div>
               </div>
 
               {/* Attendance Block Summary */}
