@@ -380,7 +380,7 @@ const EmployeeLedger = ({ user }) => {
                           <select 
                             value={paymentType} 
                             onChange={(e)=>setPaymentType(e.target.value)} 
-                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer appearance-none text-zinc-700"
+                              className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400"
                           >
                             <option value="ADVANCE">Advance</option>
                             <option value="SALARY">Full Salary</option>
