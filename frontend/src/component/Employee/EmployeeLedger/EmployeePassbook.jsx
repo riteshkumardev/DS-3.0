@@ -58,15 +58,15 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
       monthlyAdvances.forEach(adv => {
         cumulativeBalance -= Number(adv.amount || 0);
         
-        // 🚀 BUG FIX: Agar backend se dynamically updated remark/description aaya hai to vahi use karein
+        // Backend se dynamically updated remark/description aaya hai to vahi use karein
         const dynamicDescription = adv.remark || adv.description || "Advance / Payment Taken";
 
         rows.push({
           date: adv.date,
           displayDate: new Date(adv.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
           description: dynamicDescription.toUpperCase(), // Text standardization inside ledger
-          voucherNo: adv.billNo || "VCH-N/A", // 🚀 NEW FIELD: Voucher/Bill number extraction
-          type: 'ADVANCE',
+          voucherNo: adv.billNo || "VCH-N/A", // Voucher/Bill number extraction
+          type: adv.type || 'ADVANCE', // Handles dynamic payment types safely
           amount: adv.amount,
           balance: cumulativeBalance
         });
@@ -79,7 +79,7 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
 
   const passbookRows = generatePassbookRows();
 
-  // 🚀 PRINT SYSTEM OPTIMIZATION (Bina styles collapse kiye clean output data print karega)
+  // 🚀 PRINT SYSTEM OPTIMIZATION (Fixing missing Type column)
   const handlePrint = () => {
     const sortedForPrint = [...passbookRows].reverse(); // Print hamesha oldest to newest standard passbook ki tarah hona chahiye
     
@@ -88,6 +88,7 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
         <thead>
           <tr>
             <th>Date</th>
+            <th>Type</th>
             <th>Voucher No</th>
             <th>Description / Remarks</th>
             <th>Debit (Paid)</th>
@@ -102,9 +103,10 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
       tableHtml += `
         <tr>
           <td>${row.displayDate}</td>
+          <td style="font-family: monospace; font-size: 11px;">${row.type}</td>
           <td><strong>${row.voucherNo}</strong></td>
           <td>${row.description}</td>
-          <td class="${row.type === 'ADVANCE' ? 'text-red' : ''}">${row.type === 'ADVANCE' ? '- ₹' + row.amount.toLocaleString() : '—'}</td>
+          <td class="${row.type !== 'EARNING' ? 'text-red' : ''}">${row.type !== 'EARNING' ? '- ₹' + row.amount.toLocaleString() : '—'}</td>
           <td class="${row.type === 'EARNING' ? 'text-emerald' : ''}">${row.type === 'EARNING' ? '+ ₹' + row.amount.toLocaleString() : '—'}</td>
           <td style="font-weight: 900; background: #fbfbfb;">₹${row.balance.toLocaleString()}</td>
         </tr>
@@ -179,6 +181,7 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
           <thead>
             <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
               <th className="px-6 py-4">Transaction Date</th>
+              <th className="px-6 py-4">Type</th>
               <th className="px-6 py-4">Voucher No</th>
               <th className="px-6 py-4">Description / Remark</th>
               <th className="px-6 py-4">Debit / Credit</th>
@@ -193,6 +196,9 @@ const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, al
                     <Calendar size={14} className="text-zinc-400" />
                     {row.displayDate}
                   </div>
+                </td>
+                <td className="px-6 py-5 border-t border-zinc-50 dark:border-zinc-800 text-zinc-700 dark:text-zinc-400 font-mono text-[11px]">
+                  {row.type}
                 </td>
                 <td className="px-6 py-5 border-t border-zinc-50 dark:border-zinc-800 text-zinc-700 dark:text-zinc-400 font-mono text-[11px]">
                   {row.voucherNo}
