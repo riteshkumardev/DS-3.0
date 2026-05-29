@@ -4,7 +4,7 @@ import {
   User, CreditCard, Landmark, Banknote, CalendarDays, 
   History, BookOpen, ChevronRight,
   TrendingUp, TrendingDown, ShieldCheck, DollarSign,
-  FileText, Users, Hash
+  FileText, Users, Hash, Wallet
 } from "lucide-react";
 
 // 🚀 Centralized API Imports (Strict Token Instance Synchronized)
@@ -36,7 +36,8 @@ const EmployeeLedger = ({ user }) => {
 
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [remark, setRemark] = useState(''); // 🚀 Remark/Description State
-  const [billNo, setBillNo] = useState(''); // 🚀 NEW STATE: Bill No ke liye
+  const [billNo, setBillNo] = useState(''); // 🚀 Bill No State
+  const [paymentType, setPaymentType] = useState('ADVANCE'); // 🚀 NEW STATE: Default 'ADVANCE'
 
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
@@ -201,21 +202,22 @@ const EmployeeLedger = ({ user }) => {
         date: selectedMonth === new Date().toISOString().slice(0,7) 
               ? new Date().toISOString().split('T')[0] 
               : `${selectedMonth}-01`,
-        type: 'ADVANCE',
-        remark: remark, // 🚀 REMARK PASSED TO API
-        billNo: billNo  // 🚀 NEW FIELD: BILL NO PASSED TO API
+        type: paymentType, // 🚀 DYNAMIC PAYMENT TYPE PASSED HERE
+        remark: remark, 
+        billNo: billNo  
       };
 
       const res = await recordSalaryPayment(payload);
       if (res.data.success) {
         setAdvanceAmount('');
-        setRemark('');  // Reset form field
-        setBillNo('');  // Reset form field
-        alert("✅ Advance Payment Voucher Recorded Safely!");
+        setRemark('');  
+        setBillNo('');  
+        setPaymentType('ADVANCE'); // Reset back to default
+        alert(`✅ ${paymentType} Payment Voucher Recorded Safely!`);
         viewLedger(selectedEmp, selectedMonth);
       }
     } catch (err) { 
-        alert(err.response?.data?.message || "Error processing advance transaction registration."); 
+        alert(err.response?.data?.message || "Error processing payment transaction registration."); 
         setLedgerLoading(false);
     }
   };
@@ -356,10 +358,10 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Voucher Payment Registration Input Form (WITH REMARK & BILL NO FIELD) */}
+                  {/* Voucher Payment Registration Input Form (WITH DYNAMIC PAYMENT TYPE SELECTION) */}
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-6 rounded-[2.5rem] space-y-4 shadow-xl shadow-emerald-600/20">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {/* Field 1: Amount */}
                         <div className="relative w-full">
                           <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
@@ -371,7 +373,23 @@ const EmployeeLedger = ({ user }) => {
                             className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
                           />
                         </div>
-                        {/* Field 2: Bill No (🚀 NEWLY ADDED) */}
+
+                        {/* Field 2: Payment Type Dropdown (🚀 NEWLY ADDED WITH DEFAULT VALUE) */}
+                        <div className="relative w-full">
+                          <Wallet className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
+                          <select 
+                            value={paymentType} 
+                            onChange={(e)=>setPaymentType(e.target.value)} 
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer appearance-none text-zinc-700"
+                          >
+                            <option value="ADVANCE">Advance</option>
+                            <option value="SALARY">Full Salary</option>
+                            <option value="INCENTIVE">Incentive Pay</option>
+                            <option value="BONUS">Bonus Payment</option>
+                          </select>
+                        </div>
+
+                        {/* Field 3: Bill No */}
                         <div className="relative w-full">
                           <Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
                           <input 
@@ -382,7 +400,8 @@ const EmployeeLedger = ({ user }) => {
                             className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
                           />
                         </div>
-                        {/* Field 3: Remark/Description */}
+
+                        {/* Field 4: Remark/Description */}
                         <div className="relative w-full">
                           <input 
                             type="text" 
