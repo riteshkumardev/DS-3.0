@@ -71,8 +71,8 @@ export const createStaff = async (req, res, next) => {
                 ifscCode: safeUpper(req.body["bankDetails[ifscCode]"] || bankDetails?.ifscCode || req.body.ifscCode || "")
             },
 
-            // Multer Image path handling
-            photo: req.file ? `/uploads/staff/${req.file.filename}` : null,
+            // ☁️ Updated to support Cloudinary Storage URL path payload directly
+            photo: req.file ? (req.file.path || req.file.secure_url) : null,
             createdBy: req.user?._id
         };
 
@@ -150,7 +150,7 @@ export const getStaffById = async (req, res, next) => {
     try {
         const { id } = req.params;
         
-        // 🚀 Fix: ObjectId aur Custom EmployeeId string dono formats ko match karega
+        // ObjectId aur Custom EmployeeId string dono formats ko match karega
         const criteria = isObjectId(id) ? { _id: id } : { employeeId: id.toUpperCase() };
         
         const staff = await Staff.findOne(criteria).select("-password");
@@ -174,12 +174,10 @@ export const updateStaff = async (req, res, next) => {
         const { id } = req.params;
         const { salary, baseSalary, role, isBlocked, password, name, fatherName, bankDetails, kycDetails } = req.body;
         
-        // Dynamic payload target determination
         const criteria = isObjectId(id) ? { _id: id } : { employeeId: id.toUpperCase() };
         
         let updateFields = {};
 
-        // Flat mapping to prevent Mongoose nested object clearing crashes
         if (name) updateFields.name = safeUpper(name);
         if (fatherName) updateFields.fatherName = safeUpper(fatherName);
         if (salary || baseSalary) updateFields.baseSalary = Number(salary || baseSalary);
@@ -197,7 +195,6 @@ export const updateStaff = async (req, res, next) => {
             updateFields.isBlocked = isBlocked; 
         }
 
-        // Direct FormData mappings handling
         if (req.body.phone && isValidPhone(req.body.phone)) updateFields.phone = req.body.phone.trim();
         if (req.body.emergencyPhone) updateFields.emergencyPhone = req.body.emergencyPhone.trim();
         if (req.body.address) updateFields.address = req.body.address.trim();
@@ -216,8 +213,8 @@ export const updateStaff = async (req, res, next) => {
         if (req.body.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(req.body.ifscCode);
         if (bankDetails?.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(bankDetails.ifscCode);
 
-        // Upload picture update execution if file stream exists
-        if (req.file) updateFields.photo = `/uploads/staff/${req.file.filename}`;
+        // ☁️ Cloudinary stream handler mapping logic update
+        if (req.file) updateFields.photo = req.file.path || req.file.secure_url;
 
         const staff = await Staff.findOneAndUpdate(
             criteria,
@@ -263,6 +260,130 @@ export const deleteStaff = async (req, res, next) => {
             message: `Staff ${staff.name} access revoked from ERP panel system.`
         });
     } catch (error) {
+        next(error);
+    }
+};
+
+// ========================================================
+// 🚀 6. NEWLY ADDED: SELF PROFILE LOGGED-IN SERVICES
+// ========================================================
+
+// 👤 A. Update Logged-in Staff Details
+export const updateProfile = async (req, res, next) => {
+    try {
+        const { employeeId, name, phone } = req.body;
+
+        if (!employeeId) return res.status(400).json({ success: false, message: "Employee ID is mandatory." });
+        if (phone && !isValidPhone(phone)) return res.status(400).json({ success: false, message: "Invalid phone layout syntax." });
+
+        let updateFields = {};
+        if (name) updateFields.name = safeUpper(name);
+        if (phone) updateFields.phone = phone.trim();
+
+        const staff = await Staff.findOneAndUpdate(
+            { employeeId: employeeId.toUpperCase() },
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        ).select("-password");
+
+        if (!staff) return res.status(404).json({ success: false, message: "Profile update scope target missing." });
+
+        res.status(200).json({
+            success: true,
+            message: "Profile synchronized safely",
+            data: staff
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 🔐 B. Secure Password/PIN Mutation Control
+export const changePassword = async (req, res, next) => {
+    try {
+        const { employeeId, password } = req.body;
+
+        if (!password || password.trim().length < 4) {
+            return res.status(400).json({ success: false, message: "PIN code parameters constraint unmatched (min 4 digits)." });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const staff = await Staff.findOneAndUpdate(
+            { employeeId: employeeId.toUpperCase() },
+            { $set: { password: hashedPassword } },
+            { new: true }
+        );
+
+        if (!staff) return res.status(404).json({ success: false, message: "Target account configuration unmatched." });
+
+        res.status(200).json({ success: true, message: "Access PIN updated securely inside cluster matrix." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (The Ultimate Unstoppable Fix)
+export const uploadProfilePhoto = async (req, res, next) => {
+    try {
+        const { employeeId } = req.body;
+
+        if (!req.file) return res.status(400).json({ success: false, message: "No buffer chunk asset detected." });
+        if (!employeeId) return res.status(400).json({ success: false, message: "Missing metadata linkage parameter." });
+
+        const secureCloudUrl = req.file.path || req.file.secure_url;
+        const rawId = String(employeeId).trim();
+
+        // 🎯 Multi-Route Search Criteria Array Build
+        let searchConditions = [];
+
+        // 1. Check if it's a valid 24-character Mongoose ObjectId hex string
+        if (mongoose.Types.ObjectId.isValid(rawId)) {
+            searchConditions.push({ _id: new mongoose.Types.ObjectId(rawId) });
+        }
+
+        // 2. Check Custom String Format (Standard uppercase like 'DS-1002')
+        searchConditions.push({ employeeId: rawId.toUpperCase() });
+
+        // 3. Check Custom String Format (As-is layout matching)
+        searchConditions.push({ employeeId: rawId });
+
+        // 4. Numeric string tracking fallback (e.g., '1002')
+        const numericOnly = rawId.toUpperCase().replace("DS-", "").replace("EMP-", "");
+        if (numericOnly) {
+            searchConditions.push({ employeeId: numericOnly });
+        }
+
+        console.log("🎯 [FINAL AUDIT] Executing Multi-Match Query inside cluster with:", searchConditions);
+
+        // 🚀 CRITICAL RECOVERY EXECUTION: Uses $or matrix layout with strict validation bypass
+        const staff = await Staff.findOneAndUpdate(
+            { $or: searchConditions },
+            { $set: { photo: secureCloudUrl } },
+            { 
+                new: true, 
+                runValidators: false // 🔓 Redundant fields validation check completely bypass
+            }
+        ).select("-password");
+
+        if (!staff) {
+            console.log(`❌ DB Lookup completely failed inside cluster for payload: ${employeeId}`);
+            return res.status(404).json({ 
+                success: false, 
+                message: `Link target mapping allocation failed. No employee found matching metadata reference: ${employeeId}` 
+            });
+        }
+
+        console.log(`✅ [SUCCESS] Cloud Binary updated for member: ${staff.name} (${staff.employeeId || staff._id})`);
+
+        res.status(200).json({
+            success: true,
+            message: "Cloud storage node delivery complete",
+            photo: secureCloudUrl
+        });
+    } catch (error) {
+        console.error("🚨 CRITICAL ERROR DURING PROFILE PHOTO TRANSACTION:", error);
         next(error);
     }
 };

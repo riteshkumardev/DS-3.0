@@ -1,4 +1,3 @@
-// staffRoutes.js
 import express from "express";
 const router = express.Router();
 
@@ -8,11 +7,16 @@ import {
     getAllStaff, 
     getStaffById, 
     updateStaff, 
-    deleteStaff 
+    deleteStaff,
+    // 🚀 PROFILE CONTROLLERS (Inhe controllers/staffController.js me handle karein)
+    updateProfile,      
+    changePassword, 
+    uploadProfilePhoto 
 } from "../controllers/staffController.js";
 
 // Middlewares Import
 import { protect, authorize } from "../middlewares/authMiddleware.js";
+import { upload } from "../cloudinaryConfig.js"; // ☁️ Cloudinary multer config instance
 
 /**
  * Staff Management Routes - Dharashakti Agro Products
@@ -24,7 +28,18 @@ router.route("/")
     .get(protect, getAllStaff)
     .post(protect, authorize('ADMIN', 'MANAGER'), createStaff);
 
-// 2. Individual Staff Details & Updates
+/**
+ * ========================================================
+ * 🚀 2. LOGGED-IN USER PROFILE OPERATIONS (Self-Management)
+ * ========================================================
+ * CRITICAL SEQUENCE: Inhe "/:id" ke upar hi rakhna hai taaki Express routing 
+ * engine "/profile-upload" string ko dynamic ":id" parameter na samajh le.
+ */
+router.post("/profile-update", protect, updateProfile);
+router.post("/change-password", protect, changePassword);
+router.post("/profile-upload", protect, upload.single("photo"), uploadProfilePhoto);
+
+// 3. Individual Staff Details & Updates
 router.route("/:id")
     .get(protect, getStaffById)
     .put(protect, authorize('ADMIN', 'MANAGER'), updateStaff)

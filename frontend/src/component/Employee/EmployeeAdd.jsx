@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   User, Phone, CreditCard, Landmark, Banknote,
-  CalendarDays, Briefcase, MapPin, Lock, Camera, Rocket, X
+  CalendarDays, Briefcase, MapPin, Lock, Camera, Rocket, X, FileImage
 } from "lucide-react";
 
 import Loader from "../Core_Component/Loader/Loader";
@@ -52,11 +52,29 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     setFormData({ ...formData, [name]: value });
   };
 
+  // ☁️ CLOUDINARY FILE ACCEPTANCE & PREVIEW LOGIC
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Allowed Formats matching backend cloudinaryConfig: ['jpg', 'png', 'jpeg']
+    const allowedExtensions = /(\.jpg|\.jpeg|\.png)$/i;
+    if (!allowedExtensions.exec(file.name)) {
+      showMsg("Invalid file format. Only JPG, JPEG, and PNG are allowed.", "error");
+      e.target.value = ""; // Form tracking clear
+      return;
+    }
+
     setFormData({ ...formData, photo: file });
     setPreview(URL.createObjectURL(file));
+  };
+
+  const removeSelectedPhoto = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setFormData({ ...formData, photo: null });
   };
 
   const handleSubmit = async (e) => {
@@ -71,7 +89,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     setLoading(true);
 
     try {
-      // 📦 BUILDING NESTED MULTIPART DATA
+      // 📦 BUILDING MULTIPART FORMDATA FOR CLOUDINARY STORAGE INTERFACE
       const data = new FormData();
       
       // 1. Root Level Fields
@@ -84,19 +102,18 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       data.append("address", formData.address);
       data.append("joiningDate", formData.joiningDate);
       
-      // 2. Base Salary (Backend key is baseSalary)
+      // 2. Base Salary
       data.append("baseSalary", Number(formData.salary));
 
-      // 3. Nested KYC Details (Mapping to Schema)
-      // Note: Aadhaar redacted as per privacy guidelines in output, but handled by logic.
+      // 3. Nested KYC Details
       data.append("kycDetails[aadharNumber]", formData.aadhar);
 
-      // 4. Nested Bank Details (Mapping to Schema)
+      // 4. Nested Bank Details
       data.append("bankDetails[accountNumber]", formData.accountNo);
       data.append("bankDetails[ifscCode]", formData.ifscCode.toUpperCase());
       data.append("bankDetails[bankName]", formData.bankName.toUpperCase());
 
-      // 5. Image/Photo
+      // 5. Cloudinary Image File Append (Key passes as 'image' to sync multer memory storage)
       if (formData.photo) {
         data.append("image", formData.photo); 
       }
@@ -111,7 +128,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       }
     } catch (error) {
       console.error("Staff Save Error:", error.response?.data);
-      const errorMsg = error.response?.data?.message || "ValidationError: Check password or required fields.";
+      const errorMsg = error.response?.data?.message || "ValidationError: Check input fields.";
       showMsg(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -124,10 +141,16 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       
       <div className="max-w-6xl mx-auto bg-white dark:bg-zinc-900 rounded-[3.5rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         
+        {/* Banner Section */}
         <div className="bg-emerald-600 p-10 flex flex-col md:flex-row justify-between items-center text-white gap-6">
           <div className="flex items-center gap-6">
             {preview ? (
-               <img src={preview} className="w-20 h-20 rounded-3xl object-cover border-4 border-white/20 shadow-2xl" alt="Preview" />
+               <div className="relative">
+                 <img src={preview} className="w-20 h-20 rounded-3xl object-cover border-4 border-white/20 shadow-2xl" alt="Preview" />
+                 <button type="button" onClick={removeSelectedPhoto} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-lg transition-transform active:scale-95 z-20">
+                   <X size={12} />
+                 </button>
+               </div>
             ) : (
                <div className="bg-white/20 p-5 rounded-[2rem] backdrop-blur-md"><Rocket size={40} /></div>
             )}
@@ -143,6 +166,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
 
         <form onSubmit={handleSubmit} className="p-10 md:p-14 space-y-12">
           
+          {/* Identity Block */}
           <div className="space-y-8">
             <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-4">
               <User size={18} className="text-emerald-500" /> Identity Details
@@ -163,6 +187,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             </div>
           </div>
 
+          {/* Employment Config */}
           <div className="space-y-8">
             <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-3 border-b dark:border-zinc-800 pb-4">
               <Briefcase size={18} className="text-emerald-500" /> Employment Config
@@ -191,6 +216,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             </div>
           </div>
 
+          {/* Contacts & Bank Info Panels */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
              <div className="lg:col-span-1 space-y-6 bg-zinc-50 dark:bg-zinc-800/40 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><Phone size={14}/> Contacts</h4>
@@ -211,17 +237,40 @@ const EmployeeAdd = ({ onEntrySaved }) => {
              </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center pt-8">
-            <div className="space-y-4">
-              <label className="form-label flex items-center justify-center gap-2"><Camera size={14} className="text-emerald-500"/> Profile Photo</label>
-              <div className="relative group">
-                <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                <div className="px-10 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-500 border-2 border-dashed border-zinc-200 dark:border-zinc-700 group-hover:border-emerald-500 transition-all">
-                  {formData.photo ? formData.photo.name : "Select Image File"}
-                </div>
+          {/* ☁️ DYNAMIC IMAGE UPLOAD PANEL ZONE */}
+          <div className="flex flex-col items-center justify-center pt-4 border-t dark:border-zinc-800">
+            <div className="w-full max-w-md space-y-4 text-center">
+              <label className="form-label flex items-center justify-center gap-2 text-zinc-500">
+                <Camera size={14} className="text-emerald-500"/> Profile Photo Configuration
+              </label>
+              
+              <div className="relative group border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-[2rem] p-6 bg-zinc-50 dark:bg-zinc-800/20 transition-all cursor-pointer flex flex-col items-center justify-center gap-2">
+                <input 
+                  type="file" 
+                  accept="image/jpeg, image/png, image/jpg" 
+                  onChange={handlePhotoChange} 
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                />
+                
+                {formData.photo ? (
+                  <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                    <FileImage size={24} />
+                    <span className="truncate max-w-[200px] font-mono">{formData.photo.name}</span>
+                    <button type="button" onClick={removeSelectedPhoto} className="p-1 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-full hover:bg-red-500 hover:text-white transition-colors">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Camera size={28} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">Drag & drop or Click to browse</p>
+                    <p className="text-[9px] font-bold text-zinc-400/70 uppercase">Supported: JPG, JPEG, PNG</p>
+                  </>
+                )}
               </div>
             </div>
             
+            {/* Submit Engine */}
             <button 
               type="submit" 
               disabled={loading}

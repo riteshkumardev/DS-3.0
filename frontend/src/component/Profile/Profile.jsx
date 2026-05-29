@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { 
   Camera, User, Phone, Lock, LogOut, 
   ShieldCheck, RefreshCw, Save, ChevronRight
 } from "lucide-react";
+
+// 🚀 Centralized API Service Imports
+import { 
+  updateProfileDetails, 
+  changeProfilePassword, 
+  uploadProfileImage 
+} from "../../api/staffApi"; // Apne folder structure ke hisab se path check kar lein
 
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
@@ -17,22 +23,24 @@ export default function Profile({ user, setUser }) {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const navigate = useNavigate();
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const API_URL = "https://dharashakti30backend.vercel.app";
   
-  // 🖼️ URL Formatter Helper
+  // 🖼️ URL Formatter Helper (Cloudinary & Local Storage Path Compatibility Matrix)
   const getImageUrl = (path) => {
-    if (!path) return "https://i.imgur.com/6VBx3io.png";
-    if (path.startsWith('http')) return path;
+    if (!path || path === "null") return "https://i.imgur.com/6VBx3io.png";
+    if (path.startsWith('http')) return path; // Cloudinary secure content delivery route bypass
     const cleanPath = path.replace(/\\/g, '/'); 
     return `${API_URL}/${cleanPath}`;
   };
 
   const [photoURL, setPhotoURL] = useState(getImageUrl(user?.photo));
 
-  // 🛠️ Helper to get Token for Requests
-  const getAuthHeader = () => ({
-    headers: { Authorization: `Bearer ${user?.token}` }
-  });
+  // Sync state cleanly if user session prop mutations occur
+  useEffect(() => {
+    setName(user?.name || "");
+    setPhone(user?.phone || "");
+    setPhotoURL(getImageUrl(user?.photo));
+  }, [user]);
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
@@ -44,15 +52,16 @@ export default function Profile({ user, setUser }) {
     
     try {
       setLoading(true);
-      const res = await axios.post(`${API_URL}/api/profile/update`, {
+      // 🚀 Centralized API Service Call (Headers and Base URL are pre-configured in instance)
+      const res = await updateProfileDetails({
         employeeId: user.employeeId, 
         name, 
         phone,
-      }, getAuthHeader());
+      });
       
       if (res.data.success) {
         const updatedData = { ...user, ...res.data.data };
-        localStorage.setItem("userInfo", JSON.stringify(updatedData)); // Sync with Login key
+        localStorage.setItem("userInfo", JSON.stringify(updatedData)); // LocalSync
         setUser(updatedData);
         showMsg("✅ प्रोफाइल सफलतापूर्वक अपडेट हो गई");
       }
@@ -63,15 +72,16 @@ export default function Profile({ user, setUser }) {
     }
   };
 
-  // 🔐 Change Password
+  // 🔐 Change Password Matrix
   const changePassword = async () => {
     if (newPassword.length < 4) return showMsg("Password minimum 4 digits hona chahiye", "warning");
     try {
       setLoading(true);
-      const res = await axios.post(`${API_URL}/api/profile/change-password`, {
+      // 🚀 Centralized API Service Call
+      const res = await changeProfilePassword({
         employeeId: user.employeeId, 
         password: newPassword,
-      }, getAuthHeader());
+      });
       
       if (res.data.success) {
         setNewPassword("");
@@ -84,28 +94,31 @@ export default function Profile({ user, setUser }) {
     }
   };
 
-  // 🖼️ Handle Image Upload
+// 🖼️ Handle Image Upload (Cloudinary Storage Sync - Fixed Matrix)
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const allowedExtensions = /(\.jpg|\.jpeg|\.png)$/i;
+    if (!allowedExtensions.exec(file.name)) {
+      return showMsg("Invalid format. Only JPG, JPEG, and PNG are allowed.", "warning");
+    }
 
     if (file.size > 2 * 1024 * 1024) return showMsg("File size too large (Max 2MB)", "warning");
 
     const formData = new FormData();
     formData.append("photo", file); 
-    formData.append("employeeId", user.employeeId);
+    
+    // 🚀 FIXED: Custom dynamic code 'DS-1002' ki jagah strict Mongoose MongoDB '_id' pass ki hai
+    formData.append("employeeId", user._id); 
 
     try {
       setLoading(true);
-      const res = await axios.post(`${API_URL}/api/profile/upload`, formData, {
-        headers: {
-          ...getAuthHeader().headers,
-          "Content-Type": "multipart/form-data"
-        }
-      });
+      // Centralized API Service Call with Automatic Multipart Configuration
+      const res = await uploadProfileImage(formData);
 
       if (res.data.success) {
-        const newPhotoPath = res.data.photo;
+        const newPhotoPath = res.data.photo; // Secure storage destination string returned
         const updatedUser = { ...user, photo: newPhotoPath };
 
         localStorage.setItem("userInfo", JSON.stringify(updatedUser));
@@ -117,16 +130,15 @@ export default function Profile({ user, setUser }) {
       showMsg(err.response?.data?.message || "Upload failed", "error");
     } finally {
       setLoading(false);
-      e.target.value = null;
+      e.target.value = null; // Flush input node stream channel
     }
   };
 
-  // 🚪 Professional Logout
+  // 🚪 Session Termination Layout
   const logout = () => {
     setLoading(true);
-    // Token aur session clear karna
     localStorage.removeItem("userInfo");
-    localStorage.clear(); // Safety clear
+    localStorage.clear(); 
     setUser(null);
     
     setTimeout(() => {
@@ -148,16 +160,16 @@ export default function Profile({ user, setUser }) {
               <div className="w-32 h-32 rounded-3xl overflow-hidden ring-4 ring-emerald-500/20 group-hover:ring-emerald-500/40 transition-all duration-500 shadow-2xl bg-zinc-100 dark:bg-zinc-800">
                 <img src={photoURL} alt="profile" className="w-full h-full object-cover" />
               </div>
-              <label className="absolute -bottom-2 -right-2 p-2.5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-xl cursor-pointer hover:scale-110 transition-transform shadow-lg">
+              <label className="absolute -bottom-2 -right-2 p-2.5 bg-zinc-900 dark:bg-emerald-600 text-white rounded-xl cursor-pointer hover:scale-110 transition-transform shadow-lg z-20">
                 <Camera size={18} />
-                <input type="file" hidden accept="image/*" onChange={handleImageChange} />
+                <input type="file" hidden accept="image/jpeg, image/png, image/jpg" onChange={handleImageChange} />
               </label>
             </div>
             
             <h2 className="mt-6 text-xl font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{user?.name}</h2>
             <div className="flex flex-col gap-1 mt-1">
                 <span className="text-zinc-400 text-[10px] font-black tracking-widest uppercase">ID: {user?.employeeId}</span>
-                <span className="text-emerald-500 text-[9px] font-black tracking-widest uppercase">{user?.email}</span>
+                <span className="text-emerald-500 text-[9px] font-black tracking-widest uppercase">{user?.email || "STAFF MEMBER"}</span>
             </div>
             
             <div className="mt-6 w-full pt-6 border-t border-zinc-100 dark:border-zinc-800">
