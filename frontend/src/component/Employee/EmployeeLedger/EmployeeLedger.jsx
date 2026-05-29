@@ -4,7 +4,7 @@ import {
   User, CreditCard, Landmark, Banknote, CalendarDays, 
   History, BookOpen, ChevronRight,
   TrendingUp, TrendingDown, ShieldCheck, DollarSign,
-  FileText, Users, Hash, Wallet
+  FileText, Users, Hash, Wallet, Calendar
 } from "lucide-react";
 
 // 🚀 Centralized API Imports (Strict Token Instance Synchronized)
@@ -37,7 +37,8 @@ const EmployeeLedger = ({ user }) => {
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [remark, setRemark] = useState(''); // 🚀 Remark/Description State
   const [billNo, setBillNo] = useState(''); // 🚀 Bill No State
-  const [paymentType, setPaymentType] = useState('ADVANCE'); // 🚀 NEW STATE: Default 'ADVANCE'
+  const [paymentType, setPaymentType] = useState('ADVANCE'); // 🚀 Default 'ADVANCE'
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // 🚀 NEW STATE: Handles dynamic transaction date
 
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
@@ -199,10 +200,8 @@ const EmployeeLedger = ({ user }) => {
       const payload = {
         employeeId: selectedEmp.employeeId,
         amount: Number(advanceAmount),
-        date: selectedMonth === new Date().toISOString().slice(0,7) 
-              ? new Date().toISOString().split('T')[0] 
-              : `${selectedMonth}-01`,
-        type: paymentType, // 🚀 DYNAMIC PAYMENT TYPE PASSED HERE
+        date: paymentDate, // 🚀 DYNAMIC SELECTED DATE PASSED DIRECTLY TO BACKEND
+        type: paymentType, 
         remark: remark, 
         billNo: billNo  
       };
@@ -212,9 +211,14 @@ const EmployeeLedger = ({ user }) => {
         setAdvanceAmount('');
         setRemark('');  
         setBillNo('');  
-        setPaymentType('ADVANCE'); // Reset back to default
+        setPaymentType('ADVANCE'); 
+        setPaymentDate(new Date().toISOString().split('T')[0]); // Reset date to current date
         alert(`✅ ${paymentType} Payment Voucher Recorded Safely!`);
-        viewLedger(selectedEmp, selectedMonth);
+        
+        // Ledger tab reload sync logic (Agar different month ki entries push hui hon to track hone ke liye)
+        const targetMonthSlice = paymentDate.substring(0, 7);
+        setSelectedMonth(targetMonthSlice);
+        viewLedger(selectedEmp, targetMonthSlice);
       }
     } catch (err) { 
         alert(err.response?.data?.message || "Error processing payment transaction registration."); 
@@ -358,11 +362,22 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Voucher Payment Registration Input Form (WITH DYNAMIC PAYMENT TYPE SELECTION) */}
+                  {/* Voucher Payment Registration Input Form (WITH DATE FIELD INTEGRATION) */}
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-6 rounded-[2.5rem] space-y-4 shadow-xl shadow-emerald-600/20">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Field 1: Amount */}
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        {/* Field 1: Dynamic Payment Date (🚀 NEWLY ADDED) */}
+                        <div className="relative w-full">
+                          <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600 z-10" size={20} />
+                          <input 
+                            type="date" 
+                            value={paymentDate} 
+                            onChange={(e)=>setPaymentDate(e.target.value)} 
+                            className="w-full pl-14 pr-4 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer text-zinc-400" 
+                          />
+                        </div>
+
+                        {/* Field 2: Amount */}
                         <div className="relative w-full">
                           <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
                           <input 
@@ -374,13 +389,13 @@ const EmployeeLedger = ({ user }) => {
                           />
                         </div>
 
-                        {/* Field 2: Payment Type Dropdown (🚀 NEWLY ADDED WITH DEFAULT VALUE) */}
+                        {/* Field 3: Payment Type Dropdown */}
                         <div className="relative w-full">
                           <Wallet className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
                           <select 
                             value={paymentType} 
                             onChange={(e)=>setPaymentType(e.target.value)} 
-                              className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400"
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer appearance-none text-zinc-400"
                           >
                             <option value="ADVANCE">Advance</option>
                             <option value="SALARY">Full Salary</option>
@@ -389,7 +404,7 @@ const EmployeeLedger = ({ user }) => {
                           </select>
                         </div>
 
-                        {/* Field 3: Bill No */}
+                        {/* Field 4: Bill No */}
                         <div className="relative w-full">
                           <Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
                           <input 
@@ -401,13 +416,13 @@ const EmployeeLedger = ({ user }) => {
                           />
                         </div>
 
-                        {/* Field 4: Remark/Description */}
+                        {/* Field 5: Remark/Description */}
                         <div className="relative w-full">
                           <input 
                             type="text" 
                             value={remark} 
                             onChange={(e)=>setRemark(e.target.value)} 
-                            placeholder="Remark (Trip, Medical etc)..." 
+                            placeholder="Remark..." 
                             className="w-full px-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
                           />
                         </div>
