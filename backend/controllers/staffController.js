@@ -324,51 +324,74 @@ export const changePassword = async (req, res, next) => {
     }
 };
 
-// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (The Unstoppable Final Patch)
+// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (The Ultimate Database Resolver)
 export const uploadProfilePhoto = async (req, res, next) => {
     try {
         const { employeeId } = req.body;
 
         if (!req.file) return res.status(400).json({ success: false, message: "No buffer chunk asset detected." });
-        if (!employeeId) return res.status(400).json({ success: false, message: "Missing metadata linkage context identification parameter." });
 
         const secureCloudUrl = req.file.path || req.file.secure_url;
-        const rawId = String(employeeId).trim();
+        
+        // 🩺 DIAGNOSTIC LAYER LOGS
+        console.log("\n🚨 ====== EMERGENCY COLLECTION AUDIT ======");
+        console.log("-> Raw Payload ID:", employeeId);
+        if (req.user) console.log("-> Authenticated JWT User Session ID:", req.user._id);
 
-        console.log("🛠️ [CRITICAL MATCH] Running brute-force query parsing for ID:", rawId);
-
-        // 🎯 1. Dynamic document pointer allocation check across multiple matching columns
-        let staff = await Staff.findOne({
-            $or: [
-                { _id: mongoose.Types.ObjectId.isValid(rawId) ? new mongoose.Types.ObjectId(rawId) : null },
-                { employeeId: rawId },
-                { employeeId: rawId.toUpperCase() },
-                { name: rawId.toUpperCase() } // Safe fallback fallback linkage map
-            ].filter(condition => Object.values(condition)[0] !== null) // Exclude invalid types
-        });
-
-        // 🎯 2. EMERGENCY OVERRIDE UNSTARK CHECK: If token user context exists and lookup still failed
-        if (!staff && req.user && req.user._id) {
-            console.log("⚠️ Fallback activated: Finding document via active session req.user._id");
-            staff = await Staff.findById(req.user._id);
+        // 🎯 1. Collect all possible unique matching keys
+        let dynamicIdentifiers = [];
+        
+        if (employeeId) {
+            const rawId = String(employeeId).trim();
+            if (mongoose.Types.ObjectId.isValid(rawId)) {
+                dynamicIdentifiers.push(new mongoose.Types.ObjectId(rawId));
+            }
+            dynamicIdentifiers.push(rawId);
+            dynamicIdentifiers.push(rawId.toUpperCase());
+        }
+        
+        if (req.user && req.user._id) {
+            dynamicIdentifiers.push(new mongoose.Types.ObjectId(req.user._id));
         }
 
-        // 🔴 3. Final verification failure trigger block
+        console.log("-> Querying Collection using matching indices:", dynamicIdentifiers);
+
+        // 🚀 2. Native Mongo Collection Write (Bypasses Schema validation and strict ID model matching)
+        // Mongoose wrapper model se alag hatkar direct native driver hook use karenge taaki collection configuration mismatch update pass ho jaye
+        const rawCollectionUpdate = await mongoose.connection.collection('staffs').findOneAndUpdate(
+            {
+                $or: [
+                    { _id: { $in: dynamicIdentifiers.filter(id => id instanceof mongoose.Types.ObjectId) } },
+                    { employeeId: { $in: dynamicIdentifiers.filter(id => typeof id === 'string') } }
+                ]
+            },
+            { $set: { photo: secureCloudUrl } },
+            { returnDocument: 'after' }
+        );
+
+        // 🛑 3. Fallback Check: If native collection returned null, try via mongoose model using raw name text mapping
+        let staff = rawCollectionUpdate?.value || rawCollectionUpdate;
+        
+        if (!staff && employeeId) {
+            console.log("⚠️ Native hook missed. Trying secondary named backup selector...");
+            staff = await Staff.findOneAndUpdate(
+                { name: String(employeeId).toUpperCase().trim() },
+                { $set: { photo: secureCloudUrl } },
+                { new: true, runValidators: false }
+            );
+        }
+
         if (!staff) {
-            console.log(`🚨 ALL BACKEND DATABASE MATCHES EXHAUSTED FOR REFERENCE: ${rawId}`);
+            console.log("❌ CRITICAL: Target document completely untraceable in connected cluster database.");
+            console.log("===========================================\n");
             return res.status(404).json({ 
                 success: false, 
-                message: `Link target mapping allocation failed. Target document mapping reference context '${rawId}' is missing inside MongoDB cluster collection.` 
+                message: `Link target mapping allocation failed. Database reference record mismatch or missing in the connected Atlas Cluster connection.` 
             });
         }
 
-        // 🎯 4. Directly apply dynamic photo value on instantiated document layer (Bypasses findOneAndUpdate string manipulation conflicts)
-        staff.photo = secureCloudUrl;
-        
-        // Disable full schema re-validation dynamically during execution loop save layer to prevent nested property missing crashes
-        await staff.save({ validateBeforeSave: false });
-
-        console.log(`🎉 [SUCCESS] Profile photo successfully mapped for database record member: ${staff.name}`);
+        console.log("✅ [SUCCESS] Document updated inside active collection structure cluster!");
+        console.log("===========================================\n");
 
         res.status(200).json({
             success: true,
@@ -376,7 +399,7 @@ export const uploadProfilePhoto = async (req, res, next) => {
             photo: secureCloudUrl
         });
     } catch (error) {
-        console.error("🚨 DATABASE EXCEPTION IN PROFILE PHOTO TRANSACTION LAYER:", error);
+        console.error("🚨 CRITICAL CORE CLUSTER UPDATE FAILURE:", error);
         next(error);
     }
 };
