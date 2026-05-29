@@ -4,7 +4,7 @@ import {
   User, CreditCard, Landmark, Banknote, CalendarDays, 
   History, BookOpen, ChevronRight,
   TrendingUp, TrendingDown, ShieldCheck, DollarSign,
-  FileText, Users
+  FileText, Users, Hash
 } from "lucide-react";
 
 // 🚀 Centralized API Imports (Strict Token Instance Synchronized)
@@ -35,7 +35,8 @@ const EmployeeLedger = ({ user }) => {
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, halfDay: 0 });
 
   const [advanceAmount, setAdvanceAmount] = useState('');
-  const [remark, setRemark] = useState(''); // 🚀 NEW STATE: Remark/Description ke liye
+  const [remark, setRemark] = useState(''); // 🚀 Remark/Description State
+  const [billNo, setBillNo] = useState(''); // 🚀 NEW STATE: Bill No ke liye
 
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
@@ -47,7 +48,7 @@ const EmployeeLedger = ({ user }) => {
 
   const [fullAttendanceData, setFullAttendanceData] = useState({}); 
   const [loading, setLoading] = useState(true);
-  const [ledgerLoading, setLedgerLoading] = useState(false); // 🚀 NEW STATE: Month change loader ke liye
+  const [ledgerLoading, setLedgerLoading] = useState(false); // 🚀 Month change loader ke liye
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0,7));
 
   const API_BASE_URL = "https://dharashakti30backend.vercel.app";
@@ -201,13 +202,15 @@ const EmployeeLedger = ({ user }) => {
               ? new Date().toISOString().split('T')[0] 
               : `${selectedMonth}-01`,
         type: 'ADVANCE',
-        remark: remark // 🚀 REMARK PASSED HERE TO API
+        remark: remark, // 🚀 REMARK PASSED TO API
+        billNo: billNo  // 🚀 NEW FIELD: BILL NO PASSED TO API
       };
 
       const res = await recordSalaryPayment(payload);
       if (res.data.success) {
         setAdvanceAmount('');
-        setRemark(''); // Form clear hone par remark reset
+        setRemark('');  // Reset form field
+        setBillNo('');  // Reset form field
         alert("✅ Advance Payment Voucher Recorded Safely!");
         viewLedger(selectedEmp, selectedMonth);
       }
@@ -353,10 +356,10 @@ const EmployeeLedger = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Voucher Payment Registration Input Form (WITH REMARK FIELD) */}
+                  {/* Voucher Payment Registration Input Form (WITH REMARK & BILL NO FIELD) */}
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-6 rounded-[2.5rem] space-y-4 shadow-xl shadow-emerald-600/20">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Field 1: Amount */}
                         <div className="relative w-full">
                           <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
@@ -364,17 +367,28 @@ const EmployeeLedger = ({ user }) => {
                             type="number" 
                             value={advanceAmount} 
                             onChange={(e)=>setAdvanceAmount(e.target.value)} 
-                            placeholder="Enter amount..." 
+                            placeholder="Amount..." 
                             className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
                           />
                         </div>
-                        {/* Field 2: Remark/Description */}
+                        {/* Field 2: Bill No (🚀 NEWLY ADDED) */}
+                        <div className="relative w-full">
+                          <Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
+                          <input 
+                            type="text" 
+                            value={billNo} 
+                            onChange={(e)=>setBillNo(e.target.value)} 
+                            placeholder="Bill / Voucher No..." 
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                          />
+                        </div>
+                        {/* Field 3: Remark/Description */}
                         <div className="relative w-full">
                           <input 
                             type="text" 
                             value={remark} 
                             onChange={(e)=>setRemark(e.target.value)} 
-                            placeholder="Enter Remark/Description (e.g., Trip Advance, Medical)..." 
+                            placeholder="Remark (Trip, Medical etc)..." 
                             className="w-full px-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
                           />
                         </div>
