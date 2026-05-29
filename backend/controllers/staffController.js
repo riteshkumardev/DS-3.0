@@ -324,7 +324,7 @@ export const changePassword = async (req, res, next) => {
     }
 };
 
-// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (Production Unstoppable Version)
+// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (The Unstoppable Final Patch)
 export const uploadProfilePhoto = async (req, res, next) => {
     try {
         const { employeeId } = req.body;
@@ -335,43 +335,40 @@ export const uploadProfilePhoto = async (req, res, next) => {
         const secureCloudUrl = req.file.path || req.file.secure_url;
         const rawId = String(employeeId).trim();
 
-        let searchConditions = [];
+        console.log("🛠️ [CRITICAL MATCH] Running brute-force query parsing for ID:", rawId);
 
-        // 1. Agar valid MongoDB ObjectId hex string hai (Jaise '69df71c4efbfd87cdf4a43cb')
-        if (mongoose.Types.ObjectId.isValid(rawId)) {
-            searchConditions.push({ _id: new mongoose.Types.ObjectId(rawId) });
+        // 🎯 1. Dynamic document pointer allocation check across multiple matching columns
+        let staff = await Staff.findOne({
+            $or: [
+                { _id: mongoose.Types.ObjectId.isValid(rawId) ? new mongoose.Types.ObjectId(rawId) : null },
+                { employeeId: rawId },
+                { employeeId: rawId.toUpperCase() },
+                { name: rawId.toUpperCase() } // Safe fallback fallback linkage map
+            ].filter(condition => Object.values(condition)[0] !== null) // Exclude invalid types
+        });
+
+        // 🎯 2. EMERGENCY OVERRIDE UNSTARK CHECK: If token user context exists and lookup still failed
+        if (!staff && req.user && req.user._id) {
+            console.log("⚠️ Fallback activated: Finding document via active session req.user._id");
+            staff = await Staff.findById(req.user._id);
         }
 
-        // 2. Custom String Formats Fallbacks (Jaise 'DS-1001' ya '1001')
-        searchConditions.push({ employeeId: rawId.toUpperCase() });
-        searchConditions.push({ employeeId: rawId });
-
-        const numericOnly = rawId.toUpperCase().replace("DS-", "").replace("EMP-", "");
-        if (numericOnly) {
-            searchConditions.push({ employeeId: numericOnly });
-        }
-
-        // 3. Ultimate Session Token Safeguard (Agar body metadata fail ho jaye)
-        if (req.user && req.user._id) {
-            searchConditions.push({ _id: req.user._id });
-        }
-
-        console.log("🎯 [FINAL AUDIT ENGINE] Running fallback match execution with:", searchConditions);
-
-        const staff = await Staff.findOneAndUpdate(
-            { $or: searchConditions },
-            { $set: { photo: secureCloudUrl } },
-            { new: true, runValidators: false }
-        ).select("-password");
-
+        // 🔴 3. Final verification failure trigger block
         if (!staff) {
+            console.log(`🚨 ALL BACKEND DATABASE MATCHES EXHAUSTED FOR REFERENCE: ${rawId}`);
             return res.status(404).json({ 
                 success: false, 
-                message: `Link target mapping allocation failed. No employee found inside cluster mapping for payload: ${employeeId}` 
+                message: `Link target mapping allocation failed. Target document mapping reference context '${rawId}' is missing inside MongoDB cluster collection.` 
             });
         }
 
-        console.log(`✅ [SUCCESS] Cloud target asset synced for member: ${staff.name}`);
+        // 🎯 4. Directly apply dynamic photo value on instantiated document layer (Bypasses findOneAndUpdate string manipulation conflicts)
+        staff.photo = secureCloudUrl;
+        
+        // Disable full schema re-validation dynamically during execution loop save layer to prevent nested property missing crashes
+        await staff.save({ validateBeforeSave: false });
+
+        console.log(`🎉 [SUCCESS] Profile photo successfully mapped for database record member: ${staff.name}`);
 
         res.status(200).json({
             success: true,
@@ -379,6 +376,7 @@ export const uploadProfilePhoto = async (req, res, next) => {
             photo: secureCloudUrl
         });
     } catch (error) {
+        console.error("🚨 DATABASE EXCEPTION IN PROFILE PHOTO TRANSACTION LAYER:", error);
         next(error);
     }
 };
