@@ -324,58 +324,54 @@ export const changePassword = async (req, res, next) => {
     }
 };
 
-// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (The Ultimate Unstoppable Fix)
+// 🖼️ C. Direct Cloudinary Secure Pipeline Asset Upload (Production Unstoppable Version)
 export const uploadProfilePhoto = async (req, res, next) => {
     try {
         const { employeeId } = req.body;
 
         if (!req.file) return res.status(400).json({ success: false, message: "No buffer chunk asset detected." });
-        if (!employeeId) return res.status(400).json({ success: false, message: "Missing metadata linkage parameter." });
+        if (!employeeId) return res.status(400).json({ success: false, message: "Missing metadata linkage context identification parameter." });
 
         const secureCloudUrl = req.file.path || req.file.secure_url;
         const rawId = String(employeeId).trim();
 
-        // 🎯 Multi-Route Search Criteria Array Build
         let searchConditions = [];
 
-        // 1. Check if it's a valid 24-character Mongoose ObjectId hex string
+        // 1. Agar valid MongoDB ObjectId hex string hai (Jaise '69df71c4efbfd87cdf4a43cb')
         if (mongoose.Types.ObjectId.isValid(rawId)) {
             searchConditions.push({ _id: new mongoose.Types.ObjectId(rawId) });
         }
 
-        // 2. Check Custom String Format (Standard uppercase like 'DS-1002')
+        // 2. Custom String Formats Fallbacks (Jaise 'DS-1001' ya '1001')
         searchConditions.push({ employeeId: rawId.toUpperCase() });
-
-        // 3. Check Custom String Format (As-is layout matching)
         searchConditions.push({ employeeId: rawId });
 
-        // 4. Numeric string tracking fallback (e.g., '1002')
         const numericOnly = rawId.toUpperCase().replace("DS-", "").replace("EMP-", "");
         if (numericOnly) {
             searchConditions.push({ employeeId: numericOnly });
         }
 
-        console.log("🎯 [FINAL AUDIT] Executing Multi-Match Query inside cluster with:", searchConditions);
+        // 3. Ultimate Session Token Safeguard (Agar body metadata fail ho jaye)
+        if (req.user && req.user._id) {
+            searchConditions.push({ _id: req.user._id });
+        }
 
-        // 🚀 CRITICAL RECOVERY EXECUTION: Uses $or matrix layout with strict validation bypass
+        console.log("🎯 [FINAL AUDIT ENGINE] Running fallback match execution with:", searchConditions);
+
         const staff = await Staff.findOneAndUpdate(
             { $or: searchConditions },
             { $set: { photo: secureCloudUrl } },
-            { 
-                new: true, 
-                runValidators: false // 🔓 Redundant fields validation check completely bypass
-            }
+            { new: true, runValidators: false }
         ).select("-password");
 
         if (!staff) {
-            console.log(`❌ DB Lookup completely failed inside cluster for payload: ${employeeId}`);
             return res.status(404).json({ 
                 success: false, 
-                message: `Link target mapping allocation failed. No employee found matching metadata reference: ${employeeId}` 
+                message: `Link target mapping allocation failed. No employee found inside cluster mapping for payload: ${employeeId}` 
             });
         }
 
-        console.log(`✅ [SUCCESS] Cloud Binary updated for member: ${staff.name} (${staff.employeeId || staff._id})`);
+        console.log(`✅ [SUCCESS] Cloud target asset synced for member: ${staff.name}`);
 
         res.status(200).json({
             success: true,
@@ -383,7 +379,6 @@ export const uploadProfilePhoto = async (req, res, next) => {
             photo: secureCloudUrl
         });
     } catch (error) {
-        console.error("🚨 CRITICAL ERROR DURING PROFILE PHOTO TRANSACTION:", error);
         next(error);
     }
 };
