@@ -29,8 +29,6 @@ export default function StaffManagementDashboard(user) {
   const handleReturnToTable = () => {
     setViewMode("TABLE");
   };
-console.log(user.user,"user");
-console.log(user.role,"user");
 
 
   return (
