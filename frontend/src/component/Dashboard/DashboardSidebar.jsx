@@ -74,8 +74,8 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
           icon: <Users size={16} />,
           visible: true,
           subItems: [
-            { label: "Directory", path: "/employee-table", restricted: !isBoss },
-            { label: "Recruit", path: "/employee-add", restricted: !isAdmin },
+            // { label: "Directory", path: "/employee-table", restricted: !isBoss },
+            { label: "Employee Management", path: "/employee-management", restricted: !isAdmin },
             { label: "Attendance", path: "/attendance", restricted: !isBoss },
             { label: "Ledger", path: "/staff-ledger", restricted: false },
           ].filter(item => !item.restricted),

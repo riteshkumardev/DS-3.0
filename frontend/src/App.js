@@ -27,6 +27,7 @@ import TransactionHistory from "./component/AddTransaction/TransactionHistory";
 import AuditPage from "./component/MasterPanel/AuditPage";
 import AnalysisPage from "./component/ProfitLoss/AnalysisPage";
 import Service from "./component/Service";
+import StaffManagementDashboard from "./component/Employee/StaffManagementDashboard";
 
 function App() {
   // ✅ 1. Dark Mode State Management
@@ -154,7 +155,7 @@ function App() {
             <Route path="/purchase-table" element={<ProtectedRoute managerAllowed><PurchaseManager user={user} /></ProtectedRoute>} />
             <Route path="/stock-management" element={<ProtectedRoute managerAllowed><StockManagement user={user} /></ProtectedRoute>} />
             <Route path="/stock-add" element={<ProtectedRoute managerAllowed><StockAddForm user={user} /></ProtectedRoute>} />
-            <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable user={user} /></ProtectedRoute>} />
+            {/* <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable user={user} /></ProtectedRoute>} /> */}
             <Route path="/Reports_Printing" element={<ProtectedRoute managerAllowed><ReportsPrinting user={user}/></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute managerAllowed><SupplierManager user={user}/></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute managerAllowed><Attendance user={user} /></ProtectedRoute>} />
@@ -162,7 +163,7 @@ function App() {
             {/* 🛡️ SYSTEM ADMIN LEVEL (Strict Security) */}
             <Route path="/master-panel" element={<ProtectedRoute adminOnly><MasterPanel user={user} /></ProtectedRoute>} />
             <Route path="/audit-trail" element={<ProtectedRoute adminOnly><AuditPage /></ProtectedRoute>} />
-            <Route path="/employee-add" element={<ProtectedRoute adminOnly><EmployeeAdd user={user} /></ProtectedRoute>} />
+            <Route path="/employee-management" element={<ProtectedRoute adminOnly><StaffManagementDashboard user={user} /></ProtectedRoute>} />
             <Route path="/add-transaction" element={<ProtectedRoute adminOnly><AddTransaction user={user}/></ProtectedRoute>} />
             <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory user={user}/></ProtectedRoute>} />
             <Route path="/analysis-page" element={<ProtectedRoute adminOnly><AnalysisPage  user={user} /></ProtectedRoute>} />
