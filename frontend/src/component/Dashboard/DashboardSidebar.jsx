@@ -70,7 +70,7 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
       items: [
         {
           id: "staff",
-          label: "Staff Control",
+          label: "Employee Control",
           icon: <Users size={16} />,
           visible: true,
           subItems: [
