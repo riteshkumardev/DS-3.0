@@ -28,6 +28,7 @@ import AuditPage from "./component/MasterPanel/AuditPage";
 import AnalysisPage from "./component/ProfitLoss/AnalysisPage";
 import Service from "./component/Service";
 import StaffManagementDashboard from "./component/Employee/StaffManagementDashboard";
+import { useParams } from "react-router-dom";
 
 function App() {
   // ✅ 1. Dark Mode State Management
@@ -107,6 +108,7 @@ function App() {
     
     return children;
   };
+  const { id } = useParams();
 
   return (
     <Router>
@@ -143,7 +145,8 @@ function App() {
             {/* 📊 STAFF LEVEL (Basic Access) */}
             <Route path="/dashboard" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
-            <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger user={user} /></ProtectedRoute>} />
+         // 🎯 Enforce parameters mapping to support specific target employee directory paths
+<Route path="/staff-ledger/:id" element={<ProtectedRoute><EmployeeLedger user={user} /></ProtectedRoute>} />
             <Route path="/invoice" element={<ProtectedRoute><InvoicePage user={user} /></ProtectedRoute>} />
 
             {/* 💼 MANAGEMENT LEVEL (Manager & Admin Only) */}

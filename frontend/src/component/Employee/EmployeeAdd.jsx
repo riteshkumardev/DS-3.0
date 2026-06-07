@@ -89,13 +89,12 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
     setFormData({ ...formData, [name]: value });
   };
 
-  // 🖼️ UPDATED: DYNAMIC IMAGE UPLOAD & INTERACTIVE CLOUD SYNC
+  // 🖼️ FIXED & UPDATED: DYNAMIC IMAGE UPLOAD & INTERACTIVE CLOUD SYNC
   const handlePhotoChange = async (e) => {
     if (isViewMode) return;
     const file = e.target.files[0];
     if (!file) return;
 
-    // Allowed Formats matching backend
     const allowedExtensions = /(\.jpg|\.jpeg|\.png)$/i;
     if (!allowedExtensions.exec(file.name)) {
       return showMsg("Invalid file format. Only JPG, JPEG, and PNG are allowed.", "warning");
@@ -122,9 +121,9 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
         }
       } catch (err) {
         showMsg(err.response?.data?.message || "Upload failed inside cloud node pipelines.", "error");
-      } {
+      } finally {
         setLoading(false);
-        e.target.value = null; // Flush input stream channel node
+        e.target.value = null; // Flush input stream channel node safely out of try block parameters
       }
     } else {
       // Standard registration mode handling: Hold local blob preview sequence until submit
@@ -190,8 +189,10 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
 
       let response;
       if (isEditMode) {
+        // 🔥 Trigger dynamic database atomic write for edit mutation channel
         response = await updateStaff(activeStaff._id, data);
       } else {
+        // Trigger addition operations channel
         response = await addStaff(data);
       }
 
@@ -270,7 +271,7 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
               </div>
               <div className="space-y-2">
                 <label className="form-label">Aadhaar (12 Digits) *</label>
-                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required disabled={isViewMode} className="form-input-zinc font-black tracking-widest disabled:opacity-60" placeholder="0000 0000 0000" />
+                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required disabled={isViewMode} className="form-input-zinc font-black tracking-widest disabled:opacity-60" placeholder="[Aadhaar Redacted]" />
               </div>
               <div className="space-y-2">
                 <label className="form-label">Father's Name</label>
