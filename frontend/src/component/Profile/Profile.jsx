@@ -10,7 +10,7 @@ import {
   updateProfileDetails, 
   changeProfilePassword, 
   uploadProfileImage 
-} from "../../api/staffApi"; // Apne folder structure ke hisab se path check kar lein
+} from "../../api/staffApi"; 
 
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
@@ -25,10 +25,10 @@ export default function Profile({ user, setUser }) {
   const navigate = useNavigate();
   const API_URL = "https://dharashakti30backend.vercel.app";
   
-  // 🖼️ URL Formatter Helper (Cloudinary & Local Storage Path Compatibility Matrix)
+  // 🖼️ URL Formatter Helper
   const getImageUrl = (path) => {
-    if (!path || path === "null") return "https://i.imgur.com/6VBx3io.png";
-    if (path.startsWith('http')) return path; // Cloudinary secure content delivery route bypass
+    if (!path || path === "null" || path === "undefined") return "https://i.imgur.com/6VBx3io.png";
+    if (path.startsWith('http')) return path; 
     const cleanPath = path.replace(/\\/g, '/'); 
     return `${API_URL}/${cleanPath}`;
   };
@@ -52,16 +52,23 @@ export default function Profile({ user, setUser }) {
     
     try {
       setLoading(true);
-      // 🚀 Centralized API Service Call (Headers and Base URL are pre-configured in instance)
+      
+      // 🚀 BULLETPROOF SYNC: MongoDB unique hexadecimal _id payload format parsing prioritized
+      const targetIdentifier = user?._id || user?.employeeId;
+
       const res = await updateProfileDetails({
-        employeeId: user.employeeId, 
-        name, 
-        phone,
+        employeeId: targetIdentifier, 
+        name: name.trim(), 
+        phone: phone.trim(),
       });
       
       if (res.data.success) {
         const updatedData = { ...user, ...res.data.data };
-        localStorage.setItem("userInfo", JSON.stringify(updatedData)); // LocalSync
+        
+        // Dono standard localStorage keys sync rakhein taaki frame crash na ho
+        localStorage.setItem("user", JSON.stringify(updatedData));
+        localStorage.setItem("userInfo", JSON.stringify(updatedData)); 
+        
         setUser(updatedData);
         showMsg("✅ प्रोफाइल सफलतापूर्वक अपडेट हो गई");
       }
@@ -77,9 +84,11 @@ export default function Profile({ user, setUser }) {
     if (newPassword.length < 4) return showMsg("Password minimum 4 digits hona chahiye", "warning");
     try {
       setLoading(true);
-      // 🚀 Centralized API Service Call
+      
+      const targetIdentifier = user?._id || user?.employeeId;
+
       const res = await changeProfilePassword({
-        employeeId: user.employeeId, 
+        employeeId: targetIdentifier, 
         password: newPassword,
       });
       
@@ -94,7 +103,7 @@ export default function Profile({ user, setUser }) {
     }
   };
 
-// 🖼️ Handle Image Upload (Cloudinary Storage Sync - Fixed Matrix)
+  // 🖼️ Handle Image Upload
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -108,20 +117,19 @@ export default function Profile({ user, setUser }) {
 
     const formData = new FormData();
     formData.append("photo", file); 
-    
-    // 🚀 FIXED: Custom dynamic code 'DS-1002' ki jagah strict Mongoose MongoDB '_id' pass ki hai
-    formData.append("employeeId", user._id); 
+    formData.append("employeeId", user?._id || user?.employeeId); 
 
     try {
       setLoading(true);
-      // Centralized API Service Call with Automatic Multipart Configuration
       const res = await uploadProfileImage(formData);
 
       if (res.data.success) {
-        const newPhotoPath = res.data.photo; // Secure storage destination string returned
+        const newPhotoPath = res.data.photo; 
         const updatedUser = { ...user, photo: newPhotoPath };
 
+        localStorage.setItem("user", JSON.stringify(updatedUser));
         localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+        
         setUser(updatedUser);
         setPhotoURL(getImageUrl(newPhotoPath));
         showMsg("✅ Profile photo updated successfully");
@@ -130,13 +138,14 @@ export default function Profile({ user, setUser }) {
       showMsg(err.response?.data?.message || "Upload failed", "error");
     } finally {
       setLoading(false);
-      e.target.value = null; // Flush input node stream channel
+      e.target.value = null; // Flush input stream channel node
     }
   };
 
   // 🚪 Session Termination Layout
   const logout = () => {
     setLoading(true);
+    localStorage.removeItem("user");
     localStorage.removeItem("userInfo");
     localStorage.clear(); 
     setUser(null);
@@ -166,9 +175,9 @@ export default function Profile({ user, setUser }) {
               </label>
             </div>
             
-            <h2 className="mt-6 text-xl font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{user?.name}</h2>
+            <h2 className="mt-6 text-xl font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{user?.name || "N/A"}</h2>
             <div className="flex flex-col gap-1 mt-1">
-                <span className="text-zinc-400 text-[10px] font-black tracking-widest uppercase">ID: {user?.employeeId}</span>
+                <span className="text-zinc-400 text-[10px] font-black tracking-widest uppercase">ID: {user?.employeeId || "UNKNOWN"}</span>
                 <span className="text-emerald-500 text-[9px] font-black tracking-widest uppercase">{user?.email || "STAFF MEMBER"}</span>
             </div>
             

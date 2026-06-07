@@ -15,6 +15,7 @@ import logger from "./utils/logger.js";
 
 // --- Routes ---
 import authRoutes from "./routes/authRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js"; // 🎯 Added Profile Router Import
 import expenseRoutes from "./routes/expenseRoutes.js";
 import ledgerRoutes from "./routes/ledgerRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
@@ -27,7 +28,7 @@ import partyRoutes from "./routes/partyRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
-import salaryPaymentRoutes from "./routes/salaryPaymentRoutes.js"; // File path sahi check kar lein
+import salaryPaymentRoutes from "./routes/salaryPaymentRoutes.js"; 
 
 // ===============================
 // 🔹 CONFIG
@@ -100,9 +101,9 @@ app.use(activityLogger);
 // ===============================
 // 🔹 ROUTES
 // ===============================
-// 👇 YEH LINE ADD KAREIN
 app.use("/api/salary-payments", salaryPaymentRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes); // 🎯 404 FIX: Dedicated Profile route mounted right under activityLogger
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/ledger", ledgerRoutes);
 app.use("/api/logs", logRoutes);
@@ -115,9 +116,6 @@ app.use("/api/stocks", stockRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/attendance", attendanceRoutes);
-
-
-// ... baki middlewares
 app.use("/api/backup", backupRoutes);
 
 // ===============================

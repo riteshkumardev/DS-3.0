@@ -3,14 +3,13 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import mongoose from "mongoose"; // added for direct connection check
-import connectDB from "./config/db.js";
+import mongoose from "mongoose";
 
 // --- Routes Imports ---
 import salesRoutes from "./routes/sales.routes.js";
 import employeesRoutes from "./routes/employees.routes.js";
 import authRoutes from "./routes/auth.routes.js";
-import profileRoutes from "./routes/profile.routes.js";
+import profileRoutes from "./routes/profileRoutes.js";
 import logRoutes from "./routes/log.routes.js";
 import salaryRoutes from "./routes/salary.routes.js";
 import stockRoutes from "./routes/stock.routes.js";
@@ -23,7 +22,6 @@ import aiRoutes from "./routes/ai.routes.js";
 import backupRoutes from "./routes/backup.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 
-
 // Initialize Config
 dotenv.config();
 
@@ -33,7 +31,6 @@ if (!MONGO_URI) {
   console.error("❌ MONGO_URI not found in .env");
   process.exit(1);
 }
-
 
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
@@ -76,16 +73,15 @@ app.use(
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// ✅ 3. Static Files Middleware
+// ✅ 3. Static Files Middleware (Resolved Path)
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ✅ 4. API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeesRoutes);
-app.use("/api/profile", profileRoutes);
- 
-app.use("/api/analytics", analyticsRoutes); // '/analysis' ko badal kar '/analytics' kar dein
+app.use("/api/profile", profileRoutes); 
+app.use("/api/analytics", analyticsRoutes); 
 app.use("/api/activity-logs", logRoutes); 
 app.use("/api/sales", salesRoutes);
 app.use("/api/purchases", purchaseRoutes); 
@@ -97,8 +93,6 @@ app.use("/api/suppliers", supplierRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/backup", backupRoutes); 
-app.use("/uploads", express.static("uploads"));
-
 
 // ✅ 5. Root Route
 app.get("/", (req, res) => {
@@ -122,7 +116,6 @@ app.use((err, req, res, next) => {
     message: err.message || "Internal Server Error" 
   });
 });
-;
 
 // ✅ Port configuration
 const PORT = process.env.PORT || 5000;
@@ -131,6 +124,5 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 Server running locally on port ${PORT}`);
   });
 }
-
 
 export default app;

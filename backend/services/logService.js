@@ -1,4 +1,4 @@
-import AuditLog from "../models/AuditLog.js";
+import AuditLog from "../models/AuditLog.js"; // 🔥 Ensure target model path syntax is valid
 
 /**
  * 🚀 PROFESSIONAL AUDIT LOG SERVICE (FINAL)
@@ -7,7 +7,6 @@ import AuditLog from "../models/AuditLog.js";
  * ✔ IP + Device parsing fixed
  * ✔ Payload size control
  */
-
 class LogService {
 
     /**
@@ -29,7 +28,6 @@ class LogService {
             req.socket?.remoteAddress ||
             req.ip;
 
-        // handle multiple IPs
         if (ip && ip.includes(",")) {
             ip = ip.split(",")[0].trim();
         }
@@ -84,7 +82,7 @@ class LogService {
                     `Activity recorded in ${this.safeUpper(module)} module`,
             };
 
-            // 🔥 NON-BLOCKING (no await)
+            // 🔥 NON-BLOCKING (no await execution loop block)
             AuditLog.create(logData).catch((err) => {
                 console.error("❌ Log Save Failed:", err.message);
             });

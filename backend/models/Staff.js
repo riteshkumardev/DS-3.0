@@ -7,7 +7,7 @@ const staffSchema = new mongoose.Schema({
         unique: true,
         uppercase: true,
         trim: true
-        // Frontend Controller automation ke liye required hata diya gaya hai
+        // Frontend & Middleware tracking automation ke liye automated hook setup hai
     },
     name: { 
         type: String, 
@@ -19,7 +19,7 @@ const staffSchema = new mongoose.Schema({
     role: { 
         type: String, 
         enum: ['MANAGER', 'ACCOUNTANT', 'DRIVER', 'LOADER', 'SALES_MAN', 'OPERATOR', 'WORKER', 'OTHER'],
-        default: 'WORKER' // Fallback to WORKER to match dropdown
+        default: 'WORKER' 
     },
     
     // --- Contact & Personal Details ---
@@ -31,13 +31,19 @@ const staffSchema = new mongoose.Schema({
     },
     emergencyPhone: { type: String, trim: true }, 
     address: { type: String, trim: true }, 
-    
-    // --- Employment & Salary Config ---
+    photo: { type: String, default: null }, // Fixed: Photo storage node parameter link added
+
+    // --- Employment & Security Config ---
     joiningDate: { type: Date, default: Date.now },
+    leftDate: { type: Date, default: null },
     status: { 
         type: String, 
         enum: ['ACTIVE', 'ON_LEAVE', 'LEFT', 'TERMINATED'], 
         default: 'ACTIVE' 
+    },
+    isBlocked: { 
+        type: Boolean, 
+        default: false // Fixed: Controller authorization locks support enabled
     },
     baseSalary: { 
         type: Number, 
@@ -65,26 +71,51 @@ const staffSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         comment: "Tracks real-time transactional offset (Negative: Advance, Positive: Payable)"
+    },
+    
+    // --- Session Handshake Control ---
+    currentSessionId: {
+        type: String,
+        default: null
     }
 }, { 
     timestamps: true 
 });
 
-// Fast indexing for lookups and credentials verification
+// Fast indexing for optimize dashboard performance lookups
 staffSchema.index({ employeeId: 1, phone: 1 });
 staffSchema.index({ status: 1 });
 
 /**
- * 🚀 CRITICAL FIX: Safe auto-generation mechanism to avoid compilation error.
- * Use 'this.constructor' instead of calling mongoose.model('Staff') directly.
+ * 🚀 BULLETPROOF FIX: Auto-Sequence ID Generator
+ * Count engine ke bajay ye database me se highest incremental sequence ID fetch karega
+ * taaki document delete hone ke baad bhi code collision/duplicate runtime error na de.
  */
 staffSchema.pre('save', async function (next) {
+    // Only generate if employeeId doesn't exist yet
     if (!this.employeeId) {
         try {
             const year = new Date().getFullYear();
-            // this.constructor dynamic target model ko reference karta hai bina execution circular loops ke
-            const count = await this.constructor.countDocuments();
-            this.employeeId = `DS-${year}-${(count + 1).toString().padStart(3, '0')}`;
+            const prefix = `DS-${year}-`;
+
+            // Find the latest staff created for the current year
+            const latestStaff = await this.constructor.findOne(
+                { employeeId: new RegExp(`^${prefix}`) },
+                { employeeId: 1 },
+                { sort: { employeeId: -1 } }
+            );
+
+            let nextSequence = 1;
+            if (latestStaff && latestStaff.employeeId) {
+                // Last 3 digits extract karke increment karein
+                const lastSequenceText = latestStaff.employeeId.replace(prefix, "");
+                const parsedSequence = parseInt(lastSequenceText, 10);
+                if (!isNaN(parsedSequence)) {
+                    nextSequence = parsedSequence + 1;
+                }
+            }
+
+            this.employeeId = `${prefix}${nextSequence.toString().padStart(3, '0')}`;
         } catch (err) {
             return next(err);
         }
