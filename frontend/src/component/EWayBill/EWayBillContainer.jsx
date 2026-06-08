@@ -4,12 +4,17 @@ import SinghImage from '../rkSig.png';
 const EWayBillContainer = ({ data }) => {
   if (!data) return null;
 
-  // 1. Function: Number to Words (Aapka logic intact hai)
+  // 1. Function: Number to Words (Fixed potential index out of bound fallback)
   const amountInWords = (num) => {
     const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
     const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    if ((num = num.toString()).length > 9) return 'Overflow';
-    let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+    
+    // Convert to absolute integer to avoid decimal conflicts in string conversion
+    let cleanNum = Math.round(Number(num || 0));
+    if (cleanNum === 0) return 'Zero Only';
+    if (cleanNum.toString().length > 9) return 'Overflow';
+    
+    let n = ('000000000' + cleanNum).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
     if (!n) return ''; 
     let str = '';
     str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
@@ -20,35 +25,42 @@ const EWayBillContainer = ({ data }) => {
     return str;
   };
 
-  const totalWeight = data?.goods?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
-  const totalBags = data?.deliveryNote || Math.ceil(totalWeight / 50); 
-  const subTotal = Number(data.taxableValue || 0);
-  const freightAmt = Number(data.freight || 0);
-  const finalTotal = Number(data.totalAmount || 0);
+  // 🚀 CALCULATION BUG FIXES: Strict database key mappings with fallbacks
+  const goodsList = data?.goods || [];
+  const totalWeight = goodsList.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
+  
+  // Delivery Note check
+  const totalBags = data?.deliveryNote || `${Math.ceil(totalWeight / 50)} BAGS`; 
+  
+  // Correct key integration matching backend object structure
+  const subTotal = Number(data.subTotal || data.taxableValue || 0);
+  const freightAmt = data.logistics?.freight ? Math.abs(Number(data.logistics.freight)) : 0;
+  const roundOff = Number(data.roundOff || 0);
+  const finalTotal = Number(data.grandTotal || data.totalAmount || 0);
 
+  // 🚀 PROPERTY MAPPING BUG FIXES: Extracting keys from nested partyId & logistics schemas
   const invoiceData = {
     billNo: data?.billNo || "N/A",
-    date: data?.date || "N/A",
-    vehicleNo: data?.vehicleNo || "N/A",
-    customerName: data?.customerName || "N/A",
+    date: data?.date ? String(data.date).split('T')[0] : "N/A",
+    vehicleNo: data?.logistics?.vehicleNo || "N/A",
+    customerName: data?.customerName || data?.partyId?.name || "RITESH",
     customerAddress: data?.address || "N/A",
     customerGSTIN: data?.gstin || "N/A",
-    customerMobile: data?.mobile || "N/A",
+    customerMobile: data?.partyId?.phone || data?.mobile || "N/A",
     paymentMode: data?.paymentMode || "BY BANK",
     buyerOrderNo: data?.buyerOrderNo || "-",
     buyerOrderDate: data?.buyerOrderDate || "-",
-    dispatchDocNo: data?.dispatchDocNo || "-",
-    dispatchDate: data?.dispatchDate || "-",
-    dispatchedThrough: data?.dispatchedThrough || "-",
-    destination: data?.destination || "-",
-    lrRrNo: data?.lrRrNo || "-",
+    dispatchDocNo: data?.logistics?.lrRrNo || data?.dispatchDocNo || "-",
+    dispatchDate: data?.date ? String(data.date).split('T')[0] : "-",
+    dispatchedThrough: data?.logistics?.dispatchedThrough || "-",
+    destination: data?.logistics?.destination || "-",
+    lrRrNo: data?.logistics?.lrRrNo || "-",
     termsOfDelivery: data?.termsOfDelivery || "-",
-    goods: data?.goods || []
+    goods: goodsList
   };
 
   const uniqueHSNs = invoiceData.goods ? [...new Set(invoiceData.goods.map(item => item.hsn))].filter(h => h) : [];
 
-  // UPDATED HANDLE PRINT FOR MOBILE STABILITY
   const handlePrint = () => {
     const printContent = document.getElementById('printableInvoice').innerHTML;
     const styleContent = document.getElementById('unifiedInvoiceStyles').innerHTML;
@@ -72,7 +84,6 @@ const EWayBillContainer = ({ data }) => {
 
   return (
     <div className="invoice-container-main">
-      {/* 🟢 CSS UPDATED FOR MOBILE AND DARK MODE */}
       <style id="unifiedInvoiceStyles">
         {`
           * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -83,7 +94,6 @@ const EWayBillContainer = ({ data }) => {
             --bg-color: #fff;
           }
 
-          /* Dark Mode UI Support (On screen only) */
           @media screen and (prefers-color-scheme: dark) {
             .invoice-wrapper { background: #1a1a1a; color: #f0f0f0; border: 1px solid #444; }
             .main-border, .border-b, .info-row, .info-col, .items-table th, .items-table td, .hsn-tax-table td { border-color: #555 !important; }
@@ -122,7 +132,6 @@ const EWayBillContainer = ({ data }) => {
           .spacer-row { height: 180px; }
           .spacer-row td { border-bottom: none !important; }
           
-          .footer-section { border-top: none; }
           .hsn-tax-table { width: 100%; border-collapse: collapse; }
           .hsn-tax-table td { border: 1px solid var(--primary-border); padding: 4px 8px; }
           
@@ -133,13 +142,12 @@ const EWayBillContainer = ({ data }) => {
           .auth-sig-box { padding: 5px; text-align: right; height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
           
           .no-print { 
-            display: block; width: 200px; margin: 20px auto; padding: 12px; 
-            background: #2563eb; color: white; border: none; border-radius: 8px; 
+            display: block; width: 220px; margin: 20px auto; padding: 12px; 
+            background: #059669; color: white; border: none; border-radius: 8px; 
             cursor: pointer; text-align: center; font-weight: bold; font-size: 14px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
           }
 
-          /* 📱 MOBILE & PRINT FIXES */
           @media print {
             @page { size: A4; margin: 0; }
             body { background: white !important; -webkit-print-color-adjust: exact; }
@@ -161,7 +169,7 @@ const EWayBillContainer = ({ data }) => {
           }
         `}
       </style>
- {/* Wrapping content in printableInvoice ID */}
+
       <div id="printableInvoice" className="invoice-wrapper">
         <div className="main-border">
           <div className="title-center">BILL OF SUPPLY (ORIGINAL FOR RECIPIENT)</div>
@@ -200,7 +208,7 @@ const EWayBillContainer = ({ data }) => {
                 <div className="info-col">Dated<br/><strong>{invoiceData.date}</strong></div>
               </div>
               <div className="info-row">
-                <div className="info-col">Delivery Note<br/><strong>{totalBags} BAGS</strong></div>
+                <div className="info-col">Delivery Note<br/><strong>{totalBags}</strong></div>
                 <div className="info-col">Mode/Terms of Payment<br/><strong>{invoiceData.paymentMode}</strong></div>
               </div>
               <div className="info-row">
@@ -242,29 +250,34 @@ const EWayBillContainer = ({ data }) => {
               {invoiceData.goods.map((g, i) => (
                 <tr key={i}>
                   <td>{i + 1}</td>
-                  <td className="text-left"><strong>{g.product}</strong></td>
+                  {/* 🚀 BUG FIX: g.product ko badal kar g.productName kiya */}
+                  <td className="text-left"><strong>{g.productName || g.product || "BROKEN RICE"}</strong></td>
                   <td>{g.hsn}</td>
                   <td><strong>{g.quantity} KGS</strong></td>  
                   <td>{g.rate}</td>
-                  <td>KGS</td>
-                  <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount).toFixed(2)}</td>
+                  <td>{g.unit || "KGS"}</td>
+                  {/* 🚀 BUG FIX: Schema match parameters calculation safety */}
+                  <td className="text-right" style={{borderRight: 'none'}}>
+                    {Number(g.taxableAmount || (g.quantity * g.rate)).toFixed(2)}
+                  </td>
                 </tr>
               ))}
               <tr className="spacer-row"><td></td><td></td><td></td><td></td><td></td><td></td><td style={{borderRight: 'none'}}></td></tr>
               
               <tr style={{borderTop: '1px solid #000'}}>
-                <td colSpan="6" className="text-right"><strong>{subTotal.toFixed(2)}</strong></td>
+                <td colSpan="6" className="text-right"><strong>Sub-Total</strong></td>
                 <td className="text-right" style={{borderRight: 'none'}}><strong>{subTotal.toFixed(2)}</strong></td>
               </tr>
               <tr>
                 <td colSpan="3" className="text-left">Less:</td>
                 <td colSpan="3" className="text-right"><strong>FREIGHT CHARGES</strong></td>
-                <td className="text-right" style={{borderRight: 'none'}}><strong>-({Math.abs(freightAmt).toFixed(2)})</strong></td>
+                {/* 🚀 BUG FIX: Displaying clear layout mapping for transport additions/deductions */}
+                <td className="text-right" style={{borderRight: 'none'}}><strong>-({freightAmt.toFixed(2)})</strong></td>
               </tr>
               <tr>
                 <td colSpan="3"></td>
                 <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
-                <td className="text-right" style={{borderRight: 'none'}}><strong>(0.00)</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>({roundOff.toFixed(2)})</strong></td>
               </tr>
 
               <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
@@ -295,7 +308,7 @@ const EWayBillContainer = ({ data }) => {
                     <td style={{textAlign: 'center'}}>{hsnCode}</td>
                     <td style={{textAlign: 'right', borderRight: 'none'}}>
                       {invoiceData.goods.filter(item => item.hsn === hsnCode)
-                        .reduce((sum, item) => sum + Number(item.taxableAmount || 0), 0).toFixed(2)}
+                        .reduce((sum, item) => sum + Number(item.taxableAmount || (item.quantity * item.rate)), 0).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -317,8 +330,8 @@ const EWayBillContainer = ({ data }) => {
                 </div>
                 <div className="auth-sig-box">
                   <span>for DHARA SHAKTI AGRO PRODUCTS</span>
-                  <div style={{ textAlign: 'right', width: '100%' }}>
-                    <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px', objectFit: 'contain' }} />
+                  <div style={{ textAlign: 'right', width: '100%', margin: '4px 0' }}>
+                    <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '35px', objectFit: 'contain' }} />
                   </div>
                   <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
                 </div>

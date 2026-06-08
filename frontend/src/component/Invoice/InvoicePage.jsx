@@ -20,7 +20,7 @@ const InvoicePage = () => {
   useEffect(() => {
     const loadSales = async () => {
       try {
-        setLoading(true); // 🚀 Loader status synchronized
+        setLoading(true); 
         const res = await getAllSales(); 
         if (res.data?.success) {
           setAllSales(res.data.data || []);
@@ -48,26 +48,36 @@ const InvoicePage = () => {
       });
     }
 
-    // 🚀 Sort by absolute date sequence (Latest on top)
+    // Sort by absolute date sequence (Latest on top)
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [searchTerm, allSales]);
 
   const handleSelectSale = (sale) => {
-    setEwayData(sale); 
+    // 🚀 CODE CORRECTION: PDF Print data me missing/negative fields ko yahan safe-guard kiya gaya hai
+    const optimizedSale = {
+      ...sale,
+      // Agar backend se freight negative (-3000) aa raha hai toh uska sign fix karein display ke liye
+      logistics: {
+        ...sale.logistics,
+        freight: sale.logistics?.freight ? Math.abs(Number(sale.logistics.freight)) : 0,
+      }
+    };
+    setEwayData(optimizedSale); 
     setShowPreview(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 🚀 VARIABLE CORRECTION REFIX: Matched strictly to backend data layout keys 'grandTotal' & 'amountPaid'
+  // 🚀 CALCULATION REFIX: Pure database mapping ke sath fallback calculations
   const totalInvoiced = useMemo(() => {
-    return customerHistory.reduce((sum, s) => sum + (Number(s.grandTotal || s.totalAmount || 0)), 0);
+    return customerHistory.reduce((sum, s) => sum + (Number(s.grandTotal || s.subTotal || 0)), 0);
   }, [customerHistory]);
 
   const totalReceived = useMemo(() => {
-    return customerHistory.reduce((sum, s) => sum + (Number(s.amountPaid || s.amountReceived || 0)), 0);
+    return customerHistory.reduce((sum, s) => sum + (Number(s.amountPaid || 0)), 0);
   }, [customerHistory]);
 
   const totalPending = useMemo(() => {
+    // Agar absolute value outstanding tracking karni hai
     return totalInvoiced - totalReceived;
   }, [totalInvoiced, totalReceived]);
 
@@ -143,16 +153,15 @@ const InvoicePage = () => {
                 <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
                   {customerHistory.length > 0 ? (
                     customerHistory.map((s) => {
-                      // 🚀 BUG FIX: Dynamic safe conversion format matching ISO dates splits
                       const cleanDate = s.date ? String(s.date).split('T')[0] : '—';
                       
-                      // Extracting strings from nested products array format
+                      // 🚀 REFIX: Safe extraction dropdown fallback product name mapping
                       const aggregatedProdNames = s.goods && s.goods.length > 0 
-                        ? s.goods.map(g => g.productName || g.product).join(", ") 
-                        : "Agro Goods";
+                        ? s.goods.map(g => g.productName || g.product || "Broken Rice").join(", ") 
+                        : "BROKEN RICE";
 
-                      const billValue = Number(s.grandTotal || s.totalAmount || 0);
-                      const receivedValue = Number(s.amountPaid || s.amountReceived || 0);
+                      const billValue = Number(s.grandTotal || s.subTotal || 0);
+                      const receivedValue = Number(s.amountPaid || 0);
                       const isCleared = (billValue - receivedValue) <= 0;
 
                       return (
@@ -168,7 +177,7 @@ const InvoicePage = () => {
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
                               <span className="text-sm font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-tighter italic">{s.customerName || 'UNKNOWN PARTY'}</span>
-                              <span className="text-[10px] text-zinc-400 font-bold mt-0.5">{s.partyId?.phone || 'NO PHONE'}</span>
+                              <span className="text-[10px] text-zinc-400 font-bold mt-0.5">{s.partyId?.phone || s.phone || 'NO PHONE'}</span>
                             </div>
                           </td>
                           <td className="px-6 py-5">
@@ -229,6 +238,7 @@ const InvoicePage = () => {
           </div>
           
           <div className="bg-white rounded-2xl shadow-2xl overflow-hidden ring-1 ring-zinc-200">
+             {/* Yahan optimized data pass ho raha hai component ko */}
              <EWayBillContainer data={ewayData} />
           </div>
 
@@ -241,7 +251,7 @@ const InvoicePage = () => {
   );
 };
 
-// Reusable Components to keep code clean
+// Reusable Components
 const StatCard = ({ label, value, color, icon }) => {
   const colors = {
     zinc: "border-zinc-400 dark:border-zinc-700 text-zinc-600 dark:bg-zinc-900",
