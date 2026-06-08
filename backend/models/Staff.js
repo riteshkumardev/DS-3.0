@@ -50,6 +50,17 @@ const staffSchema = new mongoose.Schema({
         required: [true, "Base salary is required"],
         min: 0
     },
+    
+    // 🚀 NEW HISTORICAL ARRAY TRACKER LAYER: 
+    // Isse aapka reports engine direct profile level se salary history query control kar payega
+    salaryHistory: [
+        {
+            salary: { type: Number, required: true },
+            effectiveFrom: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }
+    ],
+
     password: { 
         type: String, 
         required: [true, "Access PIN/Password is required"] 
@@ -120,6 +131,16 @@ staffSchema.pre('save', async function (next) {
             return next(err);
         }
     }
+
+    // 🚀 INITIAL SALARY POPULATION:
+    // Pehli baar save hone par baseSalary ko array log me automatic push kar dega
+    if (this.isNew && this.baseSalary) {
+        this.salaryHistory.push({
+            salary: this.baseSalary,
+            effectiveFrom: this.joiningDate || new Date()
+        });
+    }
+    
     next();
 });
 

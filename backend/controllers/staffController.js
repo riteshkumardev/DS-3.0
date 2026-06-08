@@ -173,14 +173,24 @@ export const getStaffById = async (req, res, next) => {
 export const updateStaff = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { salary, baseSalary, role, isBlocked, password, name, fatherName, bankDetails, kycDetails } = req.body;
+        const { salary, baseSalary, role, isBlocked, password, name, fatherName, bankDetails, kycDetails, isSalaryModified, oldSalarySnapshot } = req.body;
         
         const criteria = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { employeeId: id.toUpperCase() };
+        
+        // Target profile tracking audit validations
+        const currentStaff = await Staff.findOne(criteria);
+        if (!currentStaff) return res.status(404).json({ success: false, message: "Staff record missing." });
+
         let updateFields = {};
 
         if (name) updateFields.name = safeUpper(name);
         if (fatherName) updateFields.fatherName = safeUpper(fatherName);
-        if (salary || baseSalary) updateFields.baseSalary = Number(salary || baseSalary);
+        
+        // Salary Allocation Core Strategy Logic
+        if (salary || baseSalary) {
+            updateFields.baseSalary = Number(salary || baseSalary);
+        }
+        
         if (role) updateFields.role = role.toUpperCase();
 
         if (password && password.trim().length >= 4) {
@@ -189,36 +199,51 @@ export const updateStaff = async (req, res, next) => {
         }
 
         if (isBlocked !== undefined) {
-            updateFields.status = isBlocked ? "LEFT" : "ACTIVE";
-            updateFields.isBlocked = isBlocked; 
+            const blockStatus = String(isBlocked) === "true";
+            updateFields.status = blockStatus ? "LEFT" : "ACTIVE";
+            updateFields.isBlocked = blockStatus; 
         }
 
         if (req.body.phone && isValidPhone(req.body.phone)) updateFields.phone = req.body.phone.trim();
         if (req.body.emergencyPhone) updateFields.emergencyPhone = req.body.emergencyPhone.trim();
         if (req.body.address) updateFields.address = req.body.address.trim();
 
-        if (req.body.aadhar) updateFields["kycDetails.aadharNumber"] = req.body.aadhar;
-        if (kycDetails?.aadharNumber) updateFields["kycDetails.aadharNumber"] = kycDetails.aadharNumber;
-        if (kycDetails?.panNumber) updateFields["kycDetails.panNumber"] = safeUpper(kycDetails.panNumber);
+        // 🚀 MULTIPART LAYERS SAFETY SYNC
+        updateFields["kycDetails.aadharNumber"] = req.body["kycDetails[aadharNumber]"] || kycDetails?.aadharNumber || req.body.aadhar || currentStaff.kycDetails?.aadharNumber;
+        
+        if (req.body["kycDetails[panNumber]"] || kycDetails?.panNumber) {
+            updateFields["kycDetails.panNumber"] = safeUpper(req.body["kycDetails[panNumber]"] || kycDetails.panNumber);
+        }
 
-        if (req.body.bankName) updateFields["bankDetails.bankName"] = safeUpper(req.body.bankName);
-        if (bankDetails?.bankName) updateFields["bankDetails.bankName"] = safeUpper(bankDetails.bankName);
+        if (req.body["bankDetails[bankName]"] || bankDetails?.bankName || req.body.bankName) {
+            updateFields["bankDetails.bankName"] = safeUpper(req.body["bankDetails[bankName]"] || bankDetails?.bankName || req.body.bankName);
+        }
 
-        if (req.body.accountNo) updateFields["bankDetails.accountNumber"] = req.body.accountNo;
-        if (bankDetails?.accountNumber) updateFields["bankDetails.accountNumber"] = bankDetails.accountNumber;
+        if (req.body["bankDetails[accountNumber]"] || bankDetails?.accountNumber || req.body.accountNo) {
+            updateFields["bankDetails.accountNumber"] = req.body["bankDetails[accountNumber]"] || bankDetails?.accountNumber || req.body.accountNo;
+        }
 
-        if (req.body.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(req.body.ifscCode);
-        if (bankDetails?.ifscCode) updateFields["bankDetails.ifscCode"] = safeUpper(bankDetails.ifscCode);
+        if (req.body["bankDetails[ifscCode]"] || bankDetails?.ifscCode || req.body.ifscCode) {
+            updateFields["bankDetails.ifscCode"] = safeUpper(req.body["bankDetails[ifscCode]"] || bankDetails?.ifscCode || req.body.ifscCode);
+        }
 
         if (req.file) updateFields.photo = req.file.path || req.file.secure_url;
+
+        // 🚀 AUDIT TRACKER INTEGRATION: If salary change is true log metadata events
+        if (isSalaryModified === "true" || (updateFields.baseSalary && currentStaff.baseSalary !== updateFields.baseSalary)) {
+            const prevSal = oldSalarySnapshot || currentStaff.baseSalary || 0;
+            await logAudit(
+                req.user?.name || "Admin", 
+                `Salary Modified for ${currentStaff.employeeId}: Changed from ₹${prevSal} to ₹${updateFields.baseSalary}`,
+                "PAYROLL_MUTATION"
+            );
+        }
 
         const staff = await Staff.findOneAndUpdate(
             criteria,
             { $set: updateFields },
             { new: true, runValidators: true }
         ).select("-password");
-
-        if (!staff) return res.status(404).json({ success: false, message: "Staff record missing." });
 
         logger.info(`✏️ Staff Sync: ${staff.employeeId} updated successfully.`);
         await logAudit(req.user?.name || "Admin", `Updated staff dashboard values for: ${staff.employeeId}`);
