@@ -10,6 +10,7 @@ import {
 // 🚀 Centralized API Imports (Strict Token Instance Synchronized)
 import { getAllStaff } from '../../../api/staffApi'; 
 import { getStaffMonthlyReport } from '../../../api/attendanceApi';
+// 🚀 BUG FIX: Structural routing api alignment updated
 import { getSalaryPaymentsByEmployee, recordSalaryPayment } from '../../../api/staffApi'; 
 
 import Loader from "../../Core_Component/Loader/Loader";
@@ -35,10 +36,10 @@ const EmployeeLedger = ({ user }) => {
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, halfDay: 0 });
 
   const [advanceAmount, setAdvanceAmount] = useState('');
-  const [remark, setRemark] = useState(''); // 🚀 Remark/Description State
-  const [billNo, setBillNo] = useState(''); // 🚀 Bill No State
-  const [paymentType, setPaymentType] = useState('ADVANCE'); // 🚀 Default 'ADVANCE'
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // 🚀 NEW STATE: Handles dynamic transaction date
+  const [remark, setRemark] = useState(''); 
+  const [billNo, setBillNo] = useState(''); 
+  const [paymentType, setPaymentType] = useState('ADVANCE'); 
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); 
 
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
@@ -50,7 +51,7 @@ const EmployeeLedger = ({ user }) => {
 
   const [fullAttendanceData, setFullAttendanceData] = useState({}); 
   const [loading, setLoading] = useState(true);
-  const [ledgerLoading, setLedgerLoading] = useState(false); // 🚀 Month change loader ke liye
+  const [ledgerLoading, setLedgerLoading] = useState(false); 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0,7));
 
   const API_BASE_URL = "https://dharashakti30backend.vercel.app";
@@ -104,14 +105,14 @@ const EmployeeLedger = ({ user }) => {
     if (isBoss) fetchEmployees();
   }, [isBoss]);
 
-  // 🚀 CORE LEDGER FETCH ENGINE WITH INDEPENDENT LOADER
+  // CORE LEDGER FETCH ENGINE WITH INDEPENDENT LOADER
   const viewLedger = async (emp, targetMonth) => {
     if (!emp || !targetMonth) return;
     
     const [year, monthNum] = targetMonth.split('-');
 
     try {
-      setLedgerLoading(true); // 🚀 Month badalne par ledger loader ON
+      setLedgerLoading(true); 
       const [payRes, attRes] = await Promise.all([
         getSalaryPaymentsByEmployee(emp.employeeId),
         getStaffMonthlyReport(emp._id, monthNum, year)
@@ -123,8 +124,9 @@ const EmployeeLedger = ({ user }) => {
         
         const filteredHistory = rawPayments.filter(p => {
           if (!p.date) return false;
-          const cleanDateString = String(p.date).substring(0, 7); 
-          return cleanDateString === targetMonth;
+          // Support checking either strict salaryMonth flag or fallbacks back to raw dates string parsing
+          const targetSlice = p.salaryMonth || String(p.date).substring(0, 7); 
+          return targetSlice === targetMonth;
         }).reverse();
 
         setPaymentHistory(filteredHistory);
@@ -160,7 +162,7 @@ const EmployeeLedger = ({ user }) => {
     } catch(err) {
       console.error("Ledger structural extraction failure", err);
     } finally {
-      setLedgerLoading(false); // 🚀 Data aane ke baad loader OFF
+      setLedgerLoading(false); 
     }
   };
 
@@ -182,7 +184,17 @@ const EmployeeLedger = ({ user }) => {
   };
 
   // Financial Standard Computations
-  const baseSal = selectedEmp ? Number(selectedEmp.baseSalary || 0) : 0;
+  // 🚀 CRITICAL REFIX: Use locked history salary if viewing an older month entry context
+  const baseSal = useMemo(() => {
+    if (!selectedEmp) return 0;
+    // Find if the current filtered payment history contains the locked base snapshot
+    const activeSalarySnapshot = paymentHistory.find(p => p.baseSalaryAtThatTime > 0);
+    if (activeSalarySnapshot) {
+      return Number(activeSalarySnapshot.baseSalaryAtThatTime);
+    }
+    return Number(selectedEmp.baseSalary || selectedEmp.salary || 0);
+  }, [selectedEmp, paymentHistory]);
+
   const daysInCurrentMonth = getDaysInMonth(selectedMonth);
   const dayRate = baseSal / daysInCurrentMonth;
   const effectiveDaysWorked = attendanceStats.present + (attendanceStats.halfDay * 0.5);
@@ -197,13 +209,18 @@ const EmployeeLedger = ({ user }) => {
     if (!isAuthorized || !advanceAmount) return;
     try {
       setLedgerLoading(true);
+      
+      // 🚀 CRITICAL FIXED: Dynamic determination of targeted payroll month cycle matching transaction data selection
+      const calculatedSalaryMonth = paymentDate.substring(0, 7);
+
       const payload = {
         employeeId: selectedEmp.employeeId,
         amount: Number(advanceAmount),
-        date: paymentDate, // 🚀 DYNAMIC SELECTED DATE PASSED DIRECTLY TO BACKEND
+        date: paymentDate, 
         type: paymentType, 
         remark: remark, 
-        billNo: billNo  
+        billNo: billNo,
+        salaryMonth: calculatedSalaryMonth // 🚀 NEW LOGIC INTEGRATION: Triggers backend isolation freeze safely
       };
 
       const res = await recordSalaryPayment(payload);
@@ -212,13 +229,12 @@ const EmployeeLedger = ({ user }) => {
         setRemark('');  
         setBillNo('');  
         setPaymentType('ADVANCE'); 
-        setPaymentDate(new Date().toISOString().split('T')[0]); // Reset date to current date
+        setPaymentDate(new Date().toISOString().split('T')[0]); 
         alert(`✅ ${paymentType} Payment Voucher Recorded Safely!`);
         
-        // Ledger tab reload sync logic (Agar different month ki entries push hui hon to track hone ke liye)
-        const targetMonthSlice = paymentDate.substring(0, 7);
-        setSelectedMonth(targetMonthSlice);
-        viewLedger(selectedEmp, targetMonthSlice);
+        // Ledger sync routing logic
+        setSelectedMonth(calculatedSalaryMonth);
+        viewLedger(selectedEmp, calculatedSalaryMonth);
       }
     } catch (err) { 
         alert(err.response?.data?.message || "Error processing payment transaction registration."); 
@@ -268,7 +284,7 @@ const EmployeeLedger = ({ user }) => {
           {selectedEmp ? (
             <div className="lg:col-span-9 space-y-6 relative">
               
-              {/* 🚀 SUB-LOADER OVERLAY FOR MONTH SWITCHING */}
+              {/* SUB-LOADER OVERLAY FOR MONTH SWITCHING */}
               {ledgerLoading && (
                 <div className="absolute inset-0 bg-white/60 dark:bg-zinc-950/60 z-50 rounded-[3rem] flex items-center justify-center backdrop-blur-sm">
                   <Loader />
@@ -322,7 +338,7 @@ const EmployeeLedger = ({ user }) => {
               </div>
 
               {showPassbook ? (
-                <EmployeePassbook selectedEmp={selectedEmp} availableMonths={availableMonths} fullAttendanceData={fullAttendanceData} allPayments={allPayments} />
+                <EmployeePassbook selectedEmp={{...selectedEmp, baseSalary: baseSal}} availableMonths={availableMonths} fullAttendanceData={fullAttendanceData} allPayments={allPayments} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Earnings Calculation Breakdown */}
@@ -366,14 +382,14 @@ const EmployeeLedger = ({ user }) => {
                   {isAuthorized && (
                     <div className="md:col-span-2 bg-emerald-600 p-6 rounded-[2.5rem] space-y-4 shadow-xl shadow-emerald-600/20">
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {/* Field 1: Dynamic Payment Date (🚀 NEWLY ADDED) */}
+                        {/* Field 1: Dynamic Payment Date */}
                         <div className="relative w-full">
                           <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-600 z-10" size={20} />
                           <input 
                             type="date" 
                             value={paymentDate} 
                             onChange={(e)=>setPaymentDate(e.target.value)} 
-                            className="w-full pl-14 pr-4 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer text-zinc-400" 
+                            className="w-full pl-14 pr-4 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer text-zinc-800" 
                           />
                         </div>
 
@@ -385,7 +401,7 @@ const EmployeeLedger = ({ user }) => {
                             value={advanceAmount} 
                             onChange={(e)=>setAdvanceAmount(e.target.value)} 
                             placeholder="Amount..." 
-                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400 text-zinc-950" 
                           />
                         </div>
 
@@ -395,7 +411,7 @@ const EmployeeLedger = ({ user }) => {
                           <select 
                             value={paymentType} 
                             onChange={(e)=>setPaymentType(e.target.value)} 
-                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer appearance-none text-zinc-400"
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none cursor-pointer appearance-none text-zinc-800"
                           >
                             <option value="ADVANCE">Advance</option>
                             <option value="SALARY">Full Salary</option>
@@ -412,7 +428,7 @@ const EmployeeLedger = ({ user }) => {
                             value={billNo} 
                             onChange={(e)=>setBillNo(e.target.value)} 
                             placeholder="Bill / Voucher No..." 
-                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                            className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400 text-zinc-950" 
                           />
                         </div>
 
@@ -423,7 +439,7 @@ const EmployeeLedger = ({ user }) => {
                             value={remark} 
                             onChange={(e)=>setRemark(e.target.value)} 
                             placeholder="Remark..." 
-                            className="w-full px-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400" 
+                            className="w-full px-6 py-4 bg-white rounded-[1.5rem] text-sm font-black outline-none placeholder:text-zinc-400 text-zinc-950" 
                           />
                         </div>
                       </div>
@@ -455,7 +471,7 @@ const EmployeeLedger = ({ user }) => {
 
       {selectedEmp && showPayslip && (
         <ProfessionalPayslip 
-          selectedEmp={selectedEmp} 
+          selectedEmp={{...selectedEmp, baseSalary: baseSal}} 
           stats={{...attendanceStats, effectiveDaysWorked, totalMonthDays: daysInCurrentMonth}} 
           payroll={{grossEarned, totalAdvance, otEarning, totalEarnings, netPayable, incentive}} 
           currentMonth={selectedMonth} 
