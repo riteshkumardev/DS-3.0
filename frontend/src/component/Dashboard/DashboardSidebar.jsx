@@ -77,7 +77,7 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
             // { label: "Directory", path: "/employee-table", restricted: !isBoss },
             { label: "Employee Management", path: "/employee-management", restricted: !isAdmin },
             { label: "Attendance", path: "/attendance", restricted: !isBoss },
-            { label: "Ledger", path: "/staff-ledger", restricted: false },
+            { label: "Ledger", path: "/staff-ledger/:id", restricted: false },
           ].filter(item => !item.restricted),
         },
       ]
