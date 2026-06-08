@@ -1,4 +1,4 @@
-import SalaryPayment from "../models/SalaryPayment.js"; // 🚀 CRITICAL FIX: Reference Error solved here
+import SalaryPayment from "../models/SalaryPayment.js"; 
 import Staff from "../models/Staff.js";
 
 /**
@@ -10,8 +10,13 @@ export const getSalaryPaymentByBill = async (req, res, next) => {
     try {
         const { billNo } = req.params;
 
+        if (!billNo) {
+            res.status(400);
+            throw new Error("Bill / Voucher number is required");
+        }
+
         // SalaryPayment database collection se unique bill structure fetch karein
-        const payment = await SalaryPayment.findOne({ billNo: billNo });
+        const payment = await SalaryPayment.findOne({ billNo: String(billNo).trim() });
 
         if (!payment) {
             res.status(404);
@@ -41,8 +46,11 @@ export const getSalaryPaymentByEmployee = async (req, res, next) => {
             throw new Error("Employee ID is required");
         }
 
+        // Case sensitivity safe-guarding: UpperCase mapping
+        const searchId = String(employeeId).trim().toUpperCase();
+
         // Employee ka saara running statement fetch karein (Newest First)
-        const payments = await SalaryPayment.find({ employeeId }).sort({ date: -1 });
+        const payments = await SalaryPayment.find({ employeeId: searchId }).sort({ date: -1 });
 
         res.status(200).json({
             success: true,
@@ -61,30 +69,56 @@ export const getSalaryPaymentByEmployee = async (req, res, next) => {
  */
 export const recordSalaryPayment = async (req, res, next) => {
     try {
-        const { employeeId, amount, type, date, remark, billNo } = req.body;
+        // 🚀 req.body se metadata fields aur safe params access
+        const { employeeId, amount, type, date, remark, billNo, salaryMonth } = req.body;
 
-        if (!employeeId || !amount) {
+        if (!employeeId || amount === undefined || amount === null) {
             res.status(400);
             throw new Error("Employee ID and Amount are required fields");
         }
 
-        // Verification check: Kya employee Staff Master mein mapped hai?
-        const staffExists = await Staff.findOne({ employeeId });
+        if (Number(amount) < 0) {
+            res.status(400);
+            throw new Error("Amount cannot be negative");
+        }
+
+        // 🚀 BUG FIX: String optimization & strict uppercase parsing matching structural validation rules
+        const cleanEmployeeId = String(employeeId).trim().toUpperCase();
+
+        // Verification check & Salary Fetching
+        const staffExists = await Staff.findOne({ employeeId: cleanEmployeeId });
         if (!staffExists) {
             res.status(404);
-            throw new Error(`Employee with ID ${employeeId} does not exist inside Staff Master`);
+            throw new Error(`Employee with ID ${cleanEmployeeId} does not exist inside Staff Master`);
         }
 
         // Auto-generate Bill/Voucher No agar frontend se nahi aaya
-        const finalBillNo = billNo || `VCH-${Date.now().toString().slice(-6)}`;
+        const finalBillNo = billNo ? String(billNo).trim() : `VCH-${Date.now().toString().slice(-6)}`;
+
+        // Unique bill restriction fallback constraint validation check
+        const billDuplicateCheck = await SalaryPayment.findOne({ billNo: finalBillNo });
+        if (billDuplicateCheck) {
+            res.status(400);
+            throw new Error(`Voucher sequence crash: A record with Bill No ${finalBillNo} already exists.`);
+        }
+
+        // 🚀 CRITICAL FIX: Fallback calculation mechanics
+        const paymentDate = date || new Date().toISOString().split('T')[0];
+        const finalSalaryMonth = salaryMonth || paymentDate.slice(0, 7);
+
+        // Staff schema key fallbacks checking safety structures dynamically
+        const currentSalaryRate = staffExists.baseSalary || staffExists.salary || 0;
 
         const payment = new SalaryPayment({
-            employeeId,
-            amount,
-            type: type || 'ADVANCE',
-            date: date || new Date().toISOString().split('T')[0],
-            remark: remark || "RECORDED FROM PAYROLL PORTAL",
-            billNo: finalBillNo
+            employeeId: cleanEmployeeId,
+            amount: Number(amount),
+            type: type ? String(type).toUpperCase() : 'ADVANCE',
+            date: paymentDate,
+            remark: remark ? String(remark).trim().toUpperCase() : "RECORDED FROM PAYROLL PORTAL",
+            billNo: finalBillNo,
+            // 🚀 HISTORICAL SNAPSHOT FIELDS: Freeze execution logs safely
+            baseSalaryAtThatTime: Number(currentSalaryRate), 
+            salaryMonth: finalSalaryMonth 
         });
 
         const savedPayment = await payment.save();

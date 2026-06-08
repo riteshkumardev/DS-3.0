@@ -58,7 +58,7 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
         address: activeStaff.address || "",
         designation: activeStaff.role || "WORKER",
         joiningDate: activeStaff.joiningDate ? activeStaff.joiningDate.split("T")[0] : new Date().toISOString().split("T")[0],
-        salary: activeStaff.baseSalary || "",
+        salary: activeStaff.baseSalary || activeStaff.salary || "",
         bankName: activeStaff.bankDetails?.bankName || "",
         accountNo: activeStaff.bankDetails?.accountNumber || "",
         ifscCode: activeStaff.bankDetails?.ifscCode || "",
@@ -174,6 +174,17 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
       data.append("joiningDate", formData.joiningDate);
       data.append("baseSalary", Number(formData.salary));
 
+      // 🚀 HISTORICAL BUG FIX TRIGGER: 
+      // Agar edit mode hai aur salary pichli bachi hui database salary se alag hai toh metadata flag bhejein
+      if (isEditMode) {
+        const originalSalary = Number(activeStaff.baseSalary || activeStaff.salary || 0);
+        const currentFormSalary = Number(formData.salary);
+        if (originalSalary !== currentFormSalary) {
+          data.append("isSalaryModified", "true");
+          data.append("oldSalarySnapshot", originalSalary);
+        }
+      }
+
       // Nested KYC details parameters
       data.append("kycDetails[aadharNumber]", formData.aadhar || "");
 
@@ -189,7 +200,7 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
 
       let response;
       if (isEditMode) {
-        // 🔥 Trigger dynamic database atomic write for edit mutation channel
+        // Trigger dynamic database atomic write for edit mutation channel
         response = await updateStaff(activeStaff._id, data);
       } else {
         // Trigger addition operations channel
@@ -271,7 +282,7 @@ const EmployeeAdd = ({ editData, viewData, onCancel, onEntrySaved }) => {
               </div>
               <div className="space-y-2">
                 <label className="form-label">Aadhaar (12 Digits) *</label>
-                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required disabled={isViewMode} className="form-input-zinc font-black tracking-widest disabled:opacity-60" placeholder="[Aadhaar Redacted]" />
+                <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required disabled={isViewMode} className="form-input-zinc font-black tracking-widest disabled:opacity-60" placeholder="Aadhaar Card Number" />
               </div>
               <div className="space-y-2">
                 <label className="form-label">Father's Name</label>
