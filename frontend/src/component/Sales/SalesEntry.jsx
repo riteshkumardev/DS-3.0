@@ -53,7 +53,7 @@ const SalesEntry = ({ user, editData, onCancel, onSuccess }) => {
     try {
       setLoading(true);
       const [supRes, prodRes] = await Promise.all([
-        fetchPartiesList('CUSTOMER'), // Customers fetch karein
+        fetchPartiesList('SUPPLIER'), // Customers fetch karein
         getAllProducts({ isActive: true })
       ]);
 
