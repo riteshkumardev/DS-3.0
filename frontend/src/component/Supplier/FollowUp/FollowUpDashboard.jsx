@@ -130,25 +130,104 @@ const FollowUpDashboard = () => {
     }
   };
 
-  // 🚀 FIXED PRINT ENGINE OVERRIDE LOGIC
+  // 🚀 FIXED PRINT ENGINE: Bypasses layout block completely via programmatic print injection
   const handleDownloadPDF = () => {
     if (leads.length === 0) {
       return showMsg("No actionable follow-up dataset logs present to generate report.", "warning");
     }
-    showMsg("Initializing print preview layout...", "success");
+
+    showMsg("Generating isolated print compilation document...", "success");
+
+    // Create a beautifully formatted HTML document string inside a separate browser environment scope
+    let printContents = `
+      <html>
+        <head>
+          <title>Dhara Shakti Agro Products - CRM Report</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #1c1917; background-color: #ffffff; text-align: left; }
+            .header { border-b: 4px solid #1c1917; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-start; }
+            .header h1 { font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -0.05em; }
+            .header p { font-size: 11px; font-weight: bold; color: #71717a; margin: 5px 0 0 0; text-transform: uppercase; }
+            .meta-info { text-align: right; font-size: 11px; font-weight: bold; color: #52525b; line-height: 1.4; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { background-color: #f4f4f5; color: #000000; font-weight: 900; border: 1px solid #000000; padding: 10px 8px; font-size: 11px; text-transform: uppercase; text-align: left; }
+            td { border: 1px solid #e4e4e7; padding: 10px 8px; font-size: 11px; color: #18181b; font-weight: 600; text-align: left; }
+            .sno { font-family: monospace; color: #71717a; }
+            .party-title { font-weight: 900; font-size: 12px; text-transform: uppercase; }
+            .badge { display: inline-block; font-size: 9px; font-weight: 900; background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; rounded-radius: 4px; text-transform: uppercase; margin-top: 4px; }
+            .remarks-box { text-transform: uppercase; font-size: 10.5px; background: #fafafa; padding: 6px; border-radius: 6px; border: 1px solid #f4f4f5; max-width: 300px; word-wrap: break-word; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
+              <p>CRM Follow-Up Ledger & Actionable Distribution Summary Report</p>
+            </div>
+            <div class="meta-info">
+              <div>Date: ${new Date().toLocaleDateString('en-IN', { dateStyle: 'long' })}</div>
+              <div>Active Reminders Count: ${leads.length}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%">S.No.</th>
+                <th style="width: 25%">Party Account Details</th>
+                <th style="width: 25%">Destination Mapping / Route</th>
+                <th style="width: 30%">Action Item Conversation Logs</th>
+                <th style="width: 15%">Timeline / Trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${leads.map((lead, idx) => `
+                <tr>
+                  <td class="sno">${idx + 1}</td>
+                  <td>
+                    <div class="party-title">${lead.partyName}</div>
+                    <div style="font-family: monospace; color: #71717a; margin-top: 2px;">${lead.mobileNumber}</div>
+                  </td>
+                  <td>
+                    <div style="text-transform: uppercase;">${lead.address}</div>
+                    ${lead.routeLocation ? `<div class="badge">Route: ${lead.routeLocation}</div>` : ''}
+                  </td>
+                  <td>
+                    <div class="remarks-box">${lead.remarks}</div>
+                  </td>
+                  <td>
+                    <div style="font-size: 10px; color: #71717a; text-transform: uppercase;">${lead.actionTrigger}</div>
+                    <div style="font-size: 10px; color: #b45309; font-weight: bold; margin-top: 2px;">Target: ${lead.followUpDate ? String(lead.followUpDate).split('T')[0] : '—'}</div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Inject isolated data window scope execution 
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(printContents);
+    printWindow.document.close();
+
+    // Trigger atomic native browser print engine on the new clean window context
+    printWindow.focus();
     setTimeout(() => {
-      window.print();
-    }, 300);
+      printWindow.print();
+      printWindow.close();
+    }, 350);
   };
 
   if (loading && leads.length === 0) return <Loader />;
 
   return (
-    <div className="crm-dashboard-root min-h-screen bg-zinc-50 dark:bg-zinc-950 p-3 md:p-8 font-sans text-left transition-colors duration-300">
-      <div className="max-w-7xl mx-auto space-y-8 crm-print-container">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-3 md:p-8 font-sans text-left transition-colors duration-300">
+      <div className="max-w-7xl mx-auto space-y-8">
         
         {/* --- MAIN HEADER CONTROLLER --- */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-xl border dark:border-zinc-800 crm-print-hide">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-xl border dark:border-zinc-800">
           <div>
             <h2 className="text-2xl font-black text-zinc-900 dark:text-white flex items-center gap-3 tracking-tight uppercase italic">
               <div className="p-2.5 bg-amber-500 rounded-xl text-white shadow-md">
@@ -176,36 +255,20 @@ const FollowUpDashboard = () => {
           </div>
         </div>
 
-        {/* 🚀 PRINTING EXCLUSIVE STATEMENT HEADER */}
-        <div className="crm-print-header hidden border-b-4 border-zinc-950 pb-4 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900">DHARA SHAKTI AGRO PRODUCTS</h1>
-              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mt-1">CRM Follow-Up Ledger & Actionable Distribution Summary Report</p>
-            </div>
-            <div className="text-right text-xs font-mono font-bold text-zinc-500">
-              <div>Generated Date: {new Date().toLocaleDateString('en-IN', { dateStyle: 'long' })}</div>
-              <div>Active Reminders Count: {leads.length}</div>
-            </div>
-          </div>
-        </div>
-
         {/* --- FORM SUB-COMPONENT --- */}
         {showAddForm && (
-          <div className="crm-print-hide">
-            <FollowUpForm 
-              formData={formData}
-              handleInputChange={handleInputChange}
-              handleCustomerSelect={handleCustomerSelect}
-              suppliers={suppliers}
-              handleSubmitLead={handleSubmitLead}
-              submitLoading={submitLoading}
-            />
-          </div>
+          <FollowUpForm 
+            formData={formData}
+            handleInputChange={handleInputChange}
+            handleCustomerSelect={handleCustomerSelect}
+            suppliers={suppliers}
+            handleSubmitLead={handleSubmitLead}
+            submitLoading={submitLoading}
+          />
         )}
 
         {/* --- CARDS GRID ALERTS SUB-COMPONENT --- */}
-        <div className="space-y-4 text-left crm-print-hide">
+        <div className="space-y-4 text-left">
           <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
             <AlertTriangle size={14} className="text-amber-500" /> Critical Pending Client Reminders Checklist ({leads.length})
           </h3>
@@ -223,85 +286,18 @@ const FollowUpDashboard = () => {
         </div>
 
         {/* --- SYSTEM REGISTRY DATATABLE SUB-COMPONENT --- */}
-        <div className="crm-table-print-wrapper">
-          <FollowUpTable leads={leads} handleResolveStatus={handleResolveStatus} />
-        </div>
+        <FollowUpTable leads={leads} handleResolveStatus={handleResolveStatus} />
 
       </div>
 
       <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
 
-      {/* 🚀 ADVANCED ANTI-BLANK ENGINE STYLES */}
       <style>{`
         .form-label-crm { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #71717a; margin-left: 0.4rem; display: block; margin-bottom: 4px; }
         .form-input-crm { width: 100%; background: #f8fafc; border: 2px solid transparent; border-radius: 1.25rem; padding: 1rem 1.25rem; font-size: 0.85rem; outline: none; transition: all 0.3s; color: #1e293b; }
         .dark .form-input-crm { background: #18181b; color: white; border-color: #27272a; }
         .form-input-crm:focus { border-color: #f59e0b; background: white; }
         .dark .form-input-crm:focus { background: #09090b; }
-
-        @media print {
-          /* Force block visibility on all layout roots */
-          html, body, #root, .crm-dashboard-root {
-            background: white !important;
-            color: black !important;
-            height: auto !important;
-            overflow: visible !important;
-            position: static !important;
-            visibility: visible !important;
-          }
-          
-          /* Hide unnecessary dashboard UI blocks */
-          .crm-print-hide, button, nav, header, sidebar, .bg-zinc-900\\/50 {
-            display: none !important;
-          }
-          
-          /* Force display print items */
-          .crm-print-header {
-            display: block !important;
-          }
-
-          .crm-print-container {
-            padding: 0 !important;
-            margin: 0 !important;
-            max-w-full !important;
-            width: 100% !important;
-          }
-
-          /* Reset table layout constraints */
-          .crm-table-print-wrapper, table {
-            overflow: visible !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            display: table !important;
-          }
-
-          table {
-            border: 1px solid #000000 !important;
-            border-collapse: collapse !important;
-          }
-
-          th {
-            background: #f4f4f5 !important;
-            color: #000000 !important;
-            font-weight: bold !important;
-            border: 1px solid #000000 !important;
-            padding: 8px !important;
-            font-size: 11px !important;
-            text-transform: uppercase !important;
-          }
-
-          td {
-            border: 1px solid #e4e4e7 !important;
-            padding: 8px !important;
-            color: #000000 !important;
-            font-size: 10px !important;
-          }
-          
-          /* Hide resolve buttons inside tabular body */
-          td button, td :text-center {
-            display: none !important;
-          }
-        }
       `}</style>
     </div>
   );
