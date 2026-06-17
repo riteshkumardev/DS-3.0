@@ -95,6 +95,7 @@ const DashboardSidebar = ({ closeSidebar, user }) => {
             { label: "Expenses", path: "/expenses" },
             { label: "P & L", path: "/profit-loss" },
             { label: "Reports", path: "/Reports_Printing" },
+            { label: "FollowUp", path: "/createFollowUp" },
             { label: "Invoice", path: "/invoice" },
             { label: "Transaction", path: "/add-transaction", restricted: !isAdmin },
             { label: "Txn History", path: "/transaction-history", restricted: !isAdmin },

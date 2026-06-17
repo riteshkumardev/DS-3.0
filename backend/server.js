@@ -29,6 +29,7 @@ import productRoutes from "./routes/productRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
 import salaryPaymentRoutes from "./routes/salaryPaymentRoutes.js"; 
+import leadRoutes from "./routes/leadFollowUpRoutes.js";
 
 // ===============================
 // 🔹 CONFIG
@@ -117,6 +118,7 @@ app.use("/api/parties", partyRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/backup", backupRoutes);
+app.use("/api/leads", leadRoutes);
 
 // ===============================
 // 🔹 HEALTH CHECK

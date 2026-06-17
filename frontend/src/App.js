@@ -29,6 +29,7 @@ import AnalysisPage from "./component/ProfitLoss/AnalysisPage";
 import Service from "./component/Service";
 import StaffManagementDashboard from "./component/Employee/StaffManagementDashboard";
 import { useParams } from "react-router-dom";
+import FollowUpDashboard from "./component/Supplier/FollowUpDashboard";
 
 function App() {
   // ✅ 1. Dark Mode State Management
@@ -171,6 +172,7 @@ function App() {
             <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory user={user}/></ProtectedRoute>} />
             <Route path="/analysis-page" element={<ProtectedRoute adminOnly><AnalysisPage  user={user} /></ProtectedRoute>} />
             <Route path="/service" element={<ProtectedRoute adminOnly><Service/></ProtectedRoute>} />
+            <Route path="/createFollowUp" element={<ProtectedRoute adminOnly><FollowUpDashboard/></ProtectedRoute>} />
 
             {/* Fallback Redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
