@@ -29,7 +29,7 @@ import AnalysisPage from "./component/ProfitLoss/AnalysisPage";
 import Service from "./component/Service";
 import StaffManagementDashboard from "./component/Employee/StaffManagementDashboard";
 import { useParams } from "react-router-dom";
-import FollowUpDashboard from "./component/Supplier/FollowUpDashboard";
+import FollowUpDashboard from "./component/Supplier/FollowUp/FollowUpDashboard";
 
 function App() {
   // ✅ 1. Dark Mode State Management
